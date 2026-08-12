@@ -1,0 +1,182 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    @apply bg-gray-100 text-gray-800 m-0;
+    font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  }
+  #root {
+    @apply min-h-screen;
+  }
+}
+
+/* ─── Temas (Claro/Oscuro/Sepia) ──────────────────────────────────────────
+   Re-tiñen los contenedores/textos neutros más usados en todo el proyecto
+   (fondos blancos/grises, textos grises, bordes) sin tocar cada componente.
+   Los colores de acento (botones de acción, chips de estado, headers
+   degradados) se mantienen iguales en los 3 temas a propósito. */
+:root[data-theme="oscuro"] {
+  --bg-page: #0f172a;
+  --bg-surface: #1e293b;
+  --bg-surface-soft: #172033;
+  --text-strong: #e2e8f0;
+  --text-soft: #cbd5e1;
+  --border-soft: #334155;
+}
+:root[data-theme="sepia"] {
+  --bg-page: #f4ecd8;
+  --bg-surface: #fbf5e6;
+  --bg-surface-soft: #efe4c8;
+  --text-strong: #4a3826;
+  --text-soft: #6b5843;
+  --border-soft: #ddc9a3;
+}
+
+[data-theme="oscuro"], [data-theme="sepia"] {
+  background-color: var(--bg-page);
+}
+[data-theme="oscuro"] body, [data-theme="sepia"] body {
+  background-color: var(--bg-page) !important;
+  color: var(--text-strong) !important;
+}
+
+/* Los inputs/selects/textareas no llevan clases de color explícitas en la
+   mayoría de formularios (heredan del navegador, no del body) — sin esto
+   quedan con fondo blanco y texto oscuro por defecto, o directamente
+   invisibles si el contenedor detrás ya se re-tiñó oscuro. */
+[data-theme="oscuro"] input,
+[data-theme="oscuro"] select,
+[data-theme="oscuro"] textarea,
+[data-theme="sepia"] input,
+[data-theme="sepia"] select,
+[data-theme="sepia"] textarea {
+  background-color: var(--bg-surface) !important;
+  color: var(--text-strong) !important;
+  border-color: var(--border-soft) !important;
+}
+[data-theme="oscuro"] input::placeholder,
+[data-theme="oscuro"] select::placeholder,
+[data-theme="oscuro"] textarea::placeholder,
+[data-theme="sepia"] input::placeholder,
+[data-theme="sepia"] select::placeholder,
+[data-theme="sepia"] textarea::placeholder {
+  color: var(--text-soft) !important;
+  opacity: 1;
+}
+[data-theme="oscuro"] input:disabled,
+[data-theme="oscuro"] select:disabled,
+[data-theme="oscuro"] textarea:disabled,
+[data-theme="sepia"] input:disabled,
+[data-theme="sepia"] select:disabled,
+[data-theme="sepia"] textarea:disabled {
+  background-color: var(--bg-surface-soft) !important;
+  color: var(--text-soft) !important;
+}
+
+[data-theme="oscuro"] .bg-white,
+[data-theme="sepia"] .bg-white,
+[data-theme="oscuro"] .card,
+[data-theme="sepia"] .card {
+  background-color: var(--bg-surface) !important;
+}
+[data-theme="oscuro"] .bg-gray-50,
+[data-theme="sepia"] .bg-gray-50 {
+  background-color: var(--bg-surface-soft) !important;
+}
+[data-theme="oscuro"] .bg-gray-100,
+[data-theme="sepia"] .bg-gray-100 {
+  background-color: var(--bg-surface-soft) !important;
+}
+[data-theme="oscuro"] .bg-gray-900,
+[data-theme="sepia"] .bg-gray-900 {
+  background-color: var(--text-strong) !important;
+  color: var(--bg-page) !important;
+}
+
+/* Cajas de cálculo (subtotal/IGV/total) con degradado gris claro→color
+   suave (ej. "bg-gradient-to-br from-gray-50 to-blue-50/40") — el override
+   de .bg-gray-50 no alcanza acá porque el degradado se pinta vía
+   background-image, no background-color. Sin esto, en oscuro/sepia queda
+   un fondo claro fijo con texto ya re-teñido claro encima (ilegible). */
+[data-theme="oscuro"] .bg-gradient-to-br.from-gray-50,
+[data-theme="sepia"] .bg-gradient-to-br.from-gray-50 {
+  background-image: none !important;
+  background-color: var(--bg-surface-soft) !important;
+}
+
+/* Tarjetas de "Relaciones" (TarjetaRelacion en detalleShared.jsx, variante
+   con datos): fondo pastel por tipo de documento (bg-sky-50, bg-blue-50,
+   etc.) que se deja igual en los 3 temas a propósito, como el resto de
+   acentos del proyecto. El texto interno (título, precios, código) usa
+   clases grises que SÍ se re-tiñen claras en oscuro/sepia — sin esto queda
+   texto claro sobre el fondo pastel claro que no se re-tiñe. Se re-fuerza
+   el color original acá, scopeado a .tarjeta-relacion-color para no tocar
+   los mismos bg-*-50/text-gray-* en el resto del proyecto (se usan también
+   en hovers, chips, cajas informativas que si funcionan bien tal cual). */
+[data-theme="oscuro"] .tarjeta-relacion-color .text-gray-800,
+[data-theme="oscuro"] .tarjeta-relacion-color .text-gray-700,
+[data-theme="sepia"] .tarjeta-relacion-color .text-gray-800,
+[data-theme="sepia"] .tarjeta-relacion-color .text-gray-700 {
+  color: #1f2937 !important;
+}
+[data-theme="oscuro"] .tarjeta-relacion-color .text-gray-500,
+[data-theme="sepia"] .tarjeta-relacion-color .text-gray-500 {
+  color: #6b7280 !important;
+}
+
+[data-theme="oscuro"] .text-gray-900,
+[data-theme="oscuro"] .text-gray-800,
+[data-theme="oscuro"] .text-gray-700,
+[data-theme="oscuro"] .text-gray-600,
+[data-theme="sepia"] .text-gray-900,
+[data-theme="sepia"] .text-gray-800,
+[data-theme="sepia"] .text-gray-700,
+[data-theme="sepia"] .text-gray-600 {
+  color: var(--text-strong) !important;
+}
+[data-theme="oscuro"] .text-gray-500,
+[data-theme="oscuro"] .text-gray-400,
+[data-theme="sepia"] .text-gray-500,
+[data-theme="sepia"] .text-gray-400 {
+  color: var(--text-soft) !important;
+}
+
+[data-theme="oscuro"] .border-gray-100,
+[data-theme="oscuro"] .border-gray-200,
+[data-theme="oscuro"] .border-gray-300,
+[data-theme="oscuro"] .card,
+[data-theme="sepia"] .border-gray-100,
+[data-theme="sepia"] .border-gray-200,
+[data-theme="sepia"] .border-gray-300,
+[data-theme="sepia"] .card {
+  border-color: var(--border-soft) !important;
+}
+
+[data-theme="oscuro"] .hover\:bg-gray-50:hover,
+[data-theme="sepia"] .hover\:bg-gray-50:hover {
+  background-color: var(--bg-surface-soft) !important;
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-secondary {
+    @apply bg-white text-gray-700 border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm;
+  }
+  .btn-danger {
+    @apply bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors font-medium text-sm;
+  }
+  .btn-warning {
+    @apply bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors font-medium text-sm;
+  }
+  .input-field {
+    @apply w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-400;
+  }
+  .label {
+    @apply block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1;
+  }
+  .card {
+    @apply bg-white rounded-xl shadow-sm border border-gray-100 p-5;
+  }
+}

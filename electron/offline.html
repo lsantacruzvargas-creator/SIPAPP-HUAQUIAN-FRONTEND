@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<title>Sin conexión</title>
+<style>
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    height: 100vh;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f8fafc;
+  }
+  .box { text-align: center; padding: 2rem; max-width: 360px; }
+  .icon {
+    width: 56px; height: 56px; margin: 0 auto 1rem;
+    border-radius: 9999px; background: #fee2e2;
+    display: flex; align-items: center; justify-content: center;
+  }
+  h1 { color: #1e293b; font-size: 1.25rem; margin: 0 0 .5rem; }
+  p { color: #64748b; font-size: .9rem; margin: 0 0 1.5rem; line-height: 1.5; }
+  button {
+    background: #1d4ed8; color: #fff; border: none;
+    padding: .6rem 1.75rem; border-radius: .5rem;
+    font-size: .9rem; font-weight: 600; cursor: pointer;
+  }
+  button:hover { background: #1e40af; }
+</style>
+</head>
+<body>
+  <div class="box">
+    <div class="icon">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.58 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01" />
+      </svg>
+    </div>
+    <h1>Sin conexión a internet</h1>
+    <p>No se pudo conectar con el servidor. Verifica tu conexión e intenta nuevamente.</p>
+    <button id="retryBtn">Reintentar</button>
+  </div>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const retryUrl = params.get("retry") || "/";
+    document.getElementById("retryBtn").addEventListener("click", () => {
+      location.href = retryUrl;
+    });
+  </script>
+</body>
+</html>
