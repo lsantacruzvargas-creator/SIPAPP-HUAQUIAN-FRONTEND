@@ -3,6 +3,9 @@ const { autoUpdater } = require("electron-updater");
 
 autoUpdater.autoDownload = false;
 
+// TODO: dominio real de Huaquian pendiente — reemplazar cuando exista.
+const LOGIN_URL = "https://huaquian.com/#/login";
+
 let mainWindow;
 
 function createWindow() {
@@ -19,7 +22,7 @@ function createWindow() {
   if (isDev) {
     mainWindow.loadURL("http://localhost:5173");
   } else {
-    mainWindow.loadURL("https://alcoin-sac.com/#/login");
+    mainWindow.loadURL(LOGIN_URL);
   }
 
   // Cerrar sesión al cerrar la ventana. El JWT/usuario ya viven en

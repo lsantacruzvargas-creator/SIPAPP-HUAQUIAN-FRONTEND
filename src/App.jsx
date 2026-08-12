@@ -13,6 +13,10 @@ import IngresoEquipos from "./pages/IngresoEquipos";
 import Usuarios from "./pages/Usuarios";
 import CatalogoServicios from "./pages/CatalogoServicios";
 import Almacen from "./pages/Almacen";
+import ListaComprobantes from "./pages/ListaComprobantes";
+import EmitirComprobante from "./pages/EmitirComprobante";
+import ListaGuias from "./pages/ListaGuias";
+import EmitirGuia from "./pages/EmitirGuia";
 import NotFound from "./pages/NotFound";
 
 function Layout({ children }) {
@@ -133,6 +137,39 @@ export default function App() {
         element={
           <ProtectedRoute roles={["admin", "almacenero", "asistente"]}>
             <Layout><Almacen /></Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/facturacion-electronica"
+        element={
+          <ProtectedRoute roles={["admin", "asistente"]}>
+            <Layout><ListaComprobantes /></Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/facturacion-electronica/emitir"
+        element={
+          <ProtectedRoute roles={["admin", "asistente"]}>
+            <Layout><EmitirComprobante /></Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/facturacion-electronica/guias"
+        element={
+          <ProtectedRoute roles={["admin", "asistente"]}>
+            <Layout><ListaGuias /></Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/facturacion-electronica/guias/emitir"
+        element={
+          <ProtectedRoute roles={["admin", "asistente"]}>
+            <Layout><EmitirGuia /></Layout>
           </ProtectedRoute>
         }
       />

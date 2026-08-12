@@ -94,9 +94,9 @@ export default function Navbar() {
             className="flex items-center gap-2.5 cursor-pointer shrink-0"
             onClick={() => ir(esTecnico ? "/ordenes-trabajo" : esAlmacenero ? "/almacen" : "/dashboard")}
           >
-            <img src={`${import.meta.env.BASE_URL}assets/logos/logo_recortado.jpg`} alt="Alcoinsac"
+            <img src={`${import.meta.env.BASE_URL}assets/logos/logo_recortado.jpg`} alt="Huaquian"
               className="w-9 h-9 rounded-xl object-contain shrink-0" />
-            <span className="font-bold text-gray-800 text-base tracking-tight hidden sm:block">Alcoinsac</span>
+            <span className="font-bold text-gray-800 text-base tracking-tight hidden sm:block">Huaquian</span>
           </div>
 
           {/* Links escritorio */}
@@ -111,6 +111,7 @@ export default function Navbar() {
               <button onClick={() => ir("/cotizaciones")} className={linkCls("/cotizaciones")}>Ordenes de Trabajo</button>
               <button onClick={() => ir("/ordenes-compra")} className={linkCls("/ordenes-compra")}>Ordenes de Compra</button>
               <button onClick={() => ir("/facturas")} className={linkCls("/facturas")}>Facturas</button>
+              <button onClick={() => ir("/facturacion-electronica")} className={linkCls("/facturacion-electronica")}>Fact. Electrónica</button>
               <button onClick={() => ir("/empresas")} className={linkCls("/empresas")}>Empresas</button>
               <button onClick={() => ir("/catalogo-servicios")} className={linkCls("/catalogo-servicios")}>Catálogo</button>
             </>)}
@@ -224,6 +225,7 @@ export default function Navbar() {
             <button onClick={() => ir("/cotizaciones")} className={linkMovil("/cotizaciones")}>Presupuesto</button>
             <button onClick={() => ir("/ordenes-compra")} className={linkMovil("/ordenes-compra")}>Órdenes de Compra</button>
             <button onClick={() => ir("/facturas")} className={linkMovil("/facturas")}>Facturas</button>
+            <button onClick={() => ir("/facturacion-electronica")} className={linkMovil("/facturacion-electronica")}>Fact. Electrónica</button>
             <button onClick={() => ir("/empresas")} className={linkMovil("/empresas")}>Empresas</button>
             <button onClick={() => ir("/catalogo-servicios")} className={linkMovil("/catalogo-servicios")}>Catálogo</button>
           </>)}

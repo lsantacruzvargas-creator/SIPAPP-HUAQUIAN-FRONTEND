@@ -1,6 +1,6 @@
-# SIP App Alcoinsac — Frontend
+# SIP App Huaquian — Frontend
 
-ERP de Alcoinsac, empresa dedicada a la reparación de motores y mantenimiento. React 19 + Vite + Tailwind CSS v4 + React Router (HashRouter). Empaquetable como app de escritorio con Electron.
+ERP de Huaquian, empresa dedicada a la reparación de motores y mantenimiento. React 19 + Vite + Tailwind CSS v4 + React Router (HashRouter). Empaquetable como app de escritorio con Electron.
 
 ## Requisitos
 
@@ -29,8 +29,8 @@ npm run electron:build    # empaqueta instalador de escritorio (NSIS, dist-elect
 La URL del backend se resuelve vía la variable de entorno `VITE_API_URL`
 (build-time, Vite) en `src/utils/fetchAuth.js`, con fallback a
 `http://localhost:5000/api` si no está definida. Para apuntar a producción,
-crear un `.env` en `Frontend/` con `VITE_API_URL=https://api.alcoin-sac.com/api`
-antes de compilar.
+crear un `.env` en `Frontend/` con `VITE_API_URL=https://api.huaquian.com/api`
+(placeholder hasta que exista el dominio real) antes de compilar.
 
 ## Estructura
 
@@ -111,7 +111,7 @@ Genera el instalador en `dist-electron/` (configuración en `package.json` → `
 ## Releases en GitHub + auto-actualización
 
 La app se distribuye publicando instaladores en los **Releases** del repo público
-`lsantacruzvargas-creator/SIPAPP-ALCOINSAC-FRONTEND`. Al ser público, `electron-updater`
+`lsantacruzvargas-creator/SIPAPP-HUAQUIAN-FRONTEND`. Al ser público, `electron-updater`
 lee esos Releases sin necesitar ningún token embebido, y actualiza la app sola cada
 vez que se abre.
 

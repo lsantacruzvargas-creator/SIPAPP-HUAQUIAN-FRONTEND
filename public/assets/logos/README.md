@@ -1,5 +1,8 @@
 # Logos del membrete de Cotización
 
+**Pendiente:** estos archivos todavía traen el arte de Alcoinsac — el usuario
+aún no tiene el logo nuevo de Huaquian. Reemplazar cuando esté disponible.
+
 Archivos que usa `Frontend/src/utils/cotizacionPdf.js` para armar el
 encabezado del PDF exportado:
 

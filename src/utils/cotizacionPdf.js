@@ -33,8 +33,10 @@ export const exportarCotizacionPdf = async (cotizacion) => {
 
   const [icono, textoLogo, ...marcasImgs] = await Promise.all([
     // Cuadrado (1:1): ícono globo+paloma con "ALCOINSAC" apilado debajo.
+    // TODO: logo pendiente de actualizar a Huaquian — el usuario aún no tiene el arte nuevo.
     cargarImagen("/assets/logos/Logo_grande-DESKTOP-3FJUSSF.png"),
     // Wordmark ancho (~4.46:1): "ALCOINSAC / ALPHA CONTROL E INGENIERIA S.A.C.".
+    // TODO: logo pendiente de actualizar a Huaquian — el usuario aún no tiene el arte nuevo.
     cargarImagen("/assets/logos/Logo_pequeño.png"),
     ...LOGOS_MARCAS.map((m) => cargarImagen(m.src)),
   ]);
@@ -61,7 +63,8 @@ export const exportarCotizacionPdf = async (cotizacion) => {
   let ry = 14;
   doc.text("Mza. F1 Lote 16 Urbanizacion El Dorado", PAGE_R-25, ry, { align: "center" }); ry += 4;
   doc.text("Puente Piedra - Lima - Lima", PAGE_R-25, ry, { align: "center" }); ry += 4;
-  doc.text("www.alcoinsac.com   ventas@alcoinsac.com", PAGE_R-25, ry, { align: "center" }); ry += 4;
+  // TODO: dominio/correo placeholder — reemplazar cuando exista el dominio real de Huaquian.
+  doc.text("www.huaquian.com   ventas@huaquian.com", PAGE_R-25, ry, { align: "center" }); ry += 4;
   doc.text("CEL: 969585300", PAGE_R-25, ry, { align: "center" });
 
   let y = 32;
@@ -264,7 +267,7 @@ export const exportarCotizacionPdf = async (cotizacion) => {
   doc.setFont("helvetica", "bold");
   doc.text("JESUS HERRERA", 14, y2);
   y2 += 5;
-  doc.text("ALCOINSAC", 14, y2);
+  doc.text("HUAQUIAN", 14, y2);
     y2 += 5;
   doc.text("CEL: 969585300", 14, y2);
 

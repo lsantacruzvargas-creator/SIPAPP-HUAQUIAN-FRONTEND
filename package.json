@@ -1,10 +1,10 @@
 {
   "main": "electron/main.cjs",
-  "description": "ERP SIP App Alcoinsac",
-  "author": "Alcoinsac",
+  "description": "ERP SIP App Huaquian",
+  "author": "Huaquian",
   "build": {
-    "appId": "com.Alcoinsac.sipapp",
-    "productName": "SIPAPP Alcoinsac",
+    "appId": "com.huaquian.sipapp",
+    "productName": "SIPAPP Huaquian",
     "directories": {
       "output": "dist-electron"
     },
@@ -19,11 +19,11 @@
     "publish": {
       "provider": "github",
       "owner": "lsantacruzvargas-creator",
-      "repo": "SIPAPP-ALCOINSAC-FRONTEND",
+      "repo": "SIPAPP-HUAQUIAN-FRONTEND",
       "releaseType": "release"
     }
   },
-  "name": "sipapp-Alcoinsac",
+  "name": "sipapp-huaquian",
   "private": true,
   "version": "3.3.4",
   "type": "module",

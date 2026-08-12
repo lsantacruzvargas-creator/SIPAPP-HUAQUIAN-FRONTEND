@@ -38,13 +38,13 @@ export default function Login() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="card w-full max-w-sm">
         <div className="flex items-center justify-center gap-3 mb-6">
-          <img src={`${import.meta.env.BASE_URL}assets/logos/logo_recortado.jpg`} alt="Alcoinsac"
+          <img src={`${import.meta.env.BASE_URL}assets/logos/logo_huaquian.jpg`} alt="Huaquian"
             className="w-9 h-9 rounded-xl object-contain" />
           <div>
             <p className="font-bold text-gray-800">
               SIP App <span className="text-xs font-normal text-gray-400">v{APP_VERSION}</span>
             </p>
-            <p className="text-xs text-gray-400">Alcoinsac</p>
+            <p className="text-xs text-gray-400">Huaquian</p>
           </div>
         </div>
 

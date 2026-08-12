@@ -4,6 +4,16 @@ import { fetchAuth } from "../utils/fetchAuth";
 const INP     = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 w-full";
 const INP_DIS = "border border-gray-100 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500 w-full";
 
+// Empresa emisora fija para la emisión electrónica SUNAT. Las credenciales
+// SUNAT las resuelve el hub central por RUC (Backend/src/services/hub.service.js)
+// — este ERP no guarda ningún registro de credenciales.
+// TODO: RUC/razón social/serie reales pendientes de configurar (deben coincidir
+// con RUC_EMISOR/RAZON_SOCIAL_EMISOR del backend) antes de usar el toggle
+// "Emitir factura electrónica SUNAT" contra SUNAT de verdad.
+const RUC_EMISOR = "00000000000";
+const NOMBRE_EMISOR = "HUAQUIAN (RUC pendiente de configurar)";
+const SERIE_FACTURA = "F001";
+
 function calcular(sub) {
   const s = Math.round(Number(sub) * 100) / 100 || 0;
   const igv = Math.round(s * 0.18 * 100) / 100;
@@ -12,6 +22,15 @@ function calcular(sub) {
   // depósito se hace en números enteros (sin decimales).
   const detraccion = total >= 701 ? Math.round(total * 0.12) : 0;
   return { igv, total, detraccion, totalAPagar: Math.round((total - detraccion) * 100) / 100 };
+}
+
+// Base facturable: con el toggle SUNAT activo se factura el subtotal ya neto
+// del descuento (igual que el ítem del CPE); en modo manual no hay descuento.
+function baseFacturable(subtotal, descuentoPorcentaje, emitirSunat) {
+  const sub = Number(subtotal) || 0;
+  if (!emitirSunat) return sub;
+  const desc = Number(descuentoPorcentaje) || 0;
+  return Math.round(sub * (1 - desc / 100) * 100) / 100;
 }
 
 function BuscadorOrdenCompra({ onSelect, onClose }) {
@@ -63,7 +82,7 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
     const base = {
       numeroFactura: "", numeroOrdenCompra: "",
       fechaEmision: hoy, fechaCancelacion: "",
-      empresa: "", subtotal: "", descripcion: "",
+      empresa: "", subtotal: "", descuentoPorcentaje: "0", descripcion: "",
       encargado: "", planta: "", numeroGuiaEmision: "", numeroGuiaRemision: "",
     };
     if (!ocInicial) return base;
@@ -79,7 +98,11 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
       numeroGuiaRemision: ocInicial.numeroGuiaRemision || "",
     };
   });
-  const [calc, setCalc]           = useState(() => calcular(ocInicial?.subtotal > 0 ? ocInicial.subtotal : 0));
+  // Emitir vía SUNAT es el modo por defecto; el toggle permite volver al
+  // registro manual de siempre (sin llamar a /cpe/factura) para casos que no
+  // requieren comprobante electrónico.
+  const [emitirSunat, setEmitirSunat] = useState(true);
+  const [calc, setCalc]           = useState(() => calcular(baseFacturable(ocInicial?.subtotal > 0 ? ocInicial.subtotal : 0, 0, true)));
   const [ocVinculada, setOcVinc]  = useState(ocInicial || null);
   const [empresas, setEmpresas]   = useState([]);
   const [buscadorOC, setBOC]      = useState(false);
@@ -92,10 +115,21 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
   }, []);
 
   const plantasEmpresa = empresas.find(e => e._id === form.empresa)?.plantas ?? [];
+  const empresaSeleccionada = empresas.find(e => e._id === form.empresa) ?? null;
+
+  const recalcular = (subtotal, descuento, sunat) => {
+    setCalc(calcular(baseFacturable(subtotal, descuento, sunat)));
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    if (name === "subtotal") setCalc(calcular(value));
+    if (name === "subtotal" || name === "descuentoPorcentaje") {
+      recalcular(
+        name === "subtotal" ? value : form.subtotal,
+        name === "descuentoPorcentaje" ? value : form.descuentoPorcentaje,
+        emitirSunat
+      );
+    }
     setForm(prev => ({
       ...prev,
       [name]: value,
@@ -103,12 +137,20 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
     }));
   };
 
+  const toggleSunat = () => {
+    setEmitirSunat(prev => {
+      const next = !prev;
+      recalcular(form.subtotal, form.descuentoPorcentaje, next);
+      return next;
+    });
+  };
+
   const seleccionarOC = (oc) => {
     setOcVinc(oc);
     setBOC(false);
     setForm(prev => {
       const nuevoSub = prev.subtotal || (oc.subtotal > 0 ? String(oc.subtotal) : prev.subtotal);
-      if (!prev.subtotal && oc.subtotal > 0) setCalc(calcular(oc.subtotal));
+      if (!prev.subtotal && oc.subtotal > 0) recalcular(oc.subtotal, prev.descuentoPorcentaje, emitirSunat);
       return {
         ...prev,
         numeroOrdenCompra:  oc.numeroOrden   || prev.numeroOrdenCompra,
@@ -123,45 +165,43 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
     });
   };
 
-  const guardar = async () => {
+  // Resuelve la OC vinculada (o crea una nueva) — paso compartido por el
+  // registro manual y por la emisión SUNAT, para que la Factura nazca con
+  // `ordenCompra` ya seteado (así hereda su numeroDocumento).
+  const resolverOrdenCompra = async () => {
+    if (ocVinculada) return { ocId: ocVinculada._id };
+
+    const ocPayload = {
+      titulo:        form.descripcion || "por definir",
+      numeroOrden:   form.numeroOrdenCompra || "",
+      numeroFactura: form.numeroFactura,
+      subtotal:      Number(form.subtotal),
+      igv:           calc.igv,
+      total:         calc.total,
+      monto:         Number(form.subtotal),
+      descripcion:   form.descripcion,
+      planta:        form.planta,
+      encargado:     form.encargado,
+    };
+    if (form.empresa) ocPayload.empresa = form.empresa;
+    const resOC = await fetchAuth("/ordenes-compra", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(ocPayload),
+    });
+    if (!resOC.ok) return { error: "No se pudo crear la orden de compra." };
+    const newOC = await resOC.json();
+    return { ocId: newOC._id };
+  };
+
+  const guardarManual = async () => {
     if (!form.numeroFactura.trim()) return setError("El N° de factura es obligatorio.");
     if (!form.subtotal || Number(form.subtotal) <= 0) return setError("El subtotal debe ser mayor a 0.");
     setError(""); setGuardando(true);
 
-    // Paso 1: OC existente vs nueva — se resuelve ANTES de crear la factura para
-    // que esta nazca con `ordenCompra` ya seteado (así hereda su numeroDocumento).
-    let ocId;
+    const { ocId, error: errorOC } = await resolverOrdenCompra();
+    if (errorOC) { setError(errorOC); setGuardando(false); return; }
 
-    if (ocVinculada) {
-      ocId = ocVinculada._id;
-    } else {
-      const ocPayload = {
-        titulo:        form.descripcion || "por definir",
-        numeroOrden:   form.numeroOrdenCompra || "",
-        numeroFactura: form.numeroFactura,
-        subtotal:      Number(form.subtotal),
-        igv:           calc.igv,
-        total:         calc.total,
-        monto:         Number(form.subtotal),
-        descripcion:   form.descripcion,
-        planta:        form.planta,
-        encargado:     form.encargado,
-      };
-      if (form.empresa) ocPayload.empresa = form.empresa;
-      const resOC = await fetchAuth("/ordenes-compra", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(ocPayload),
-      });
-      if (resOC.ok) { const newOC = await resOC.json(); ocId = newOC._id; }
-      else {
-        setError("No se pudo crear la orden de compra.");
-        setGuardando(false);
-        return;
-      }
-    }
-
-    // Paso 2: crear la factura, ya vinculada a la OC desde el inicio
     const factPayload = {
       numeroFactura:      form.numeroFactura,
       fechaEmision:       form.fechaEmision,
@@ -198,6 +238,83 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
     // mensaje de éxito, evitando una segunda creación por doble click.
   };
 
+  const guardarConSunat = async () => {
+    if (!form.descripcion.trim()) return setError("La descripción es obligatoria.");
+    if (!form.subtotal || Number(form.subtotal) <= 0) return setError("El subtotal debe ser mayor a 0.");
+    if (!empresaSeleccionada?.ruc || !/^\d{11}$/.test(empresaSeleccionada.ruc))
+      return setError("La empresa seleccionada no tiene un RUC válido — la factura SUNAT requiere un receptor con RUC.");
+    setError(""); setGuardando(true);
+
+    const { ocId, error: errorOC } = await resolverOrdenCompra();
+    if (errorOC) { setError(errorOC); setGuardando(false); return; }
+
+    // Paso 1: emitir la Factura SUNAT real (correlativo atómico vía SerieCorrelativo).
+    const resCpe = await fetchAuth("/cpe/factura", {
+      method: "POST",
+      body: JSON.stringify({
+        tipoDoc: "01",
+        serie: SERIE_FACTURA,
+        rucEmisor: RUC_EMISOR,
+        receptor: { numDoc: empresaSeleccionada.ruc, nombre: empresaSeleccionada.razonSocial, schemeID: "6" },
+        items: [{
+          descripcion: form.descripcion.trim(),
+          cantidad: 1,
+          unidad: "ZZ",
+          valorUnitario: Number(form.subtotal),
+          precioUnitario: Math.round(Number(form.subtotal) * 1.18 * 100) / 100,
+          afectacion: "10",
+          descuentoPorcentaje: (Number(form.descuentoPorcentaje) || 0) / 100,
+        }],
+        formaPago: "Contado",
+        moneda: "PEN",
+        numeroOrdenCompra: form.numeroOrdenCompra || "",
+        ordenCompra: ocId,
+      }),
+    });
+    const dataCpe = await resCpe.json();
+    if (!dataCpe.ok) {
+      setError(dataCpe.mensaje || dataCpe.error || "SUNAT rechazó el comprobante.");
+      setGuardando(false);
+      return;
+    }
+
+    // Paso 2: crear el registro interno Factura con el número real ya emitido.
+    const factPayload = {
+      numeroFactura:      dataCpe.serie,
+      fechaEmision:       form.fechaEmision,
+      subtotal:           baseFacturable(form.subtotal, form.descuentoPorcentaje, true),
+      descripcion:        form.descripcion,
+      encargado:          form.encargado,
+      planta:             form.planta,
+      numeroGuiaEmision:  form.numeroGuiaEmision,
+      numeroGuiaRemision: form.numeroGuiaRemision,
+      ordenCompra:        ocId,
+      empresa:            form.empresa,
+    };
+    if (form.fechaCancelacion) factPayload.fechaCancelacion = form.fechaCancelacion;
+    if (ocVinculada) {
+      factPayload.codigoSap   = ocVinculada.codigoSap;
+      factPayload.fechaSalida = ocVinculada.fechaSalida;
+    }
+
+    const resF = await fetchAuth("/facturas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(factPayload),
+    });
+    if (!resF.ok) {
+      setError(`La factura SUNAT ${dataCpe.serie} se emitió correctamente, pero no se pudo crear el registro interno. Verifica manualmente.`);
+      setGuardando(false);
+      return;
+    }
+    const factura = await resF.json();
+
+    setExito(factura.codigo);
+    setTimeout(() => onCreada(factura), 1800);
+  };
+
+  const guardar = () => (emitirSunat ? guardarConSunat() : guardarManual());
+
   return (
     <>
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -210,13 +327,35 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
 
         <div className="flex-1 overflow-y-auto p-6 space-y-5">
 
+          {/* Toggle emisión SUNAT vs registro manual */}
+          <label className="flex items-center gap-3 bg-gray-50 rounded-xl p-4 cursor-pointer">
+            <input type="checkbox" checked={emitirSunat} onChange={toggleSunat} className="w-4 h-4" />
+            <div>
+              <p className="text-sm font-medium text-gray-800">Emitir factura electrónica SUNAT</p>
+              <p className="text-xs text-gray-500">
+                {emitirSunat
+                  ? "Se emite un comprobante real ante SUNAT y el N° de factura se asigna automáticamente."
+                  : "Se registra solo en el ERP, sin comprobante electrónico — el N° de factura se ingresa a mano."}
+              </p>
+            </div>
+          </label>
+
+          {emitirSunat && (
+            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-xs text-blue-700 space-y-1">
+              <p><strong>Empresa emisora:</strong> {NOMBRE_EMISOR} — RUC {RUC_EMISOR}</p>
+              <p><strong>Serie:</strong> {SERIE_FACTURA} · <strong>Tipo:</strong> Factura (01)</p>
+            </div>
+          )}
+
           {/* Datos principales */}
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">N° Factura *</label>
-              <input name="numeroFactura" value={form.numeroFactura} onChange={handleChange}
-                placeholder="Ej. F001-00123" className={INP} />
-            </div>
+            {!emitirSunat && (
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">N° Factura *</label>
+                <input name="numeroFactura" value={form.numeroFactura} onChange={handleChange}
+                  placeholder="Ej. F001-00123" className={INP} />
+              </div>
+            )}
             <div>
               <label className="text-xs text-gray-500 block mb-1">N° Orden de Compra</label>
               {ocVinculada ? (
@@ -249,7 +388,7 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
               <input type="date" name="fechaCancelacion" value={form.fechaCancelacion} onChange={handleChange} className={INP} />
             </div>
             <div className="col-span-2">
-              <label className="text-xs text-gray-500 block mb-1">Empresa</label>
+              <label className="text-xs text-gray-500 block mb-1">Empresa{emitirSunat ? " (receptor SUNAT) *" : ""}</label>
               <select name="empresa" value={form.empresa} onChange={handleChange} className={INP}>
                 <option value="">— Sin empresa —</option>
                 {empresas.map(e => (
@@ -261,11 +400,20 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
 
           {/* Cálculos */}
           <div className="bg-gray-50 rounded-xl p-4 grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <label className="text-xs text-gray-500 block mb-1">Subtotal sin IGV *</label>
+            <div className={emitirSunat ? "" : "col-span-2"}>
+              <label className="text-xs text-gray-500 block mb-1">
+                {emitirSunat ? "Valor unitario sin IGV *" : "Subtotal sin IGV *"}
+              </label>
               <input type="number" name="subtotal" value={form.subtotal} onChange={handleChange}
                 step="0.01" min="0" placeholder="0.00" className={INP} />
             </div>
+            {emitirSunat && (
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Descuento %</label>
+                <input type="number" name="descuentoPorcentaje" value={form.descuentoPorcentaje} onChange={handleChange}
+                  step="0.01" min="0" max="100" className={INP} />
+              </div>
+            )}
             <div>
               <label className="text-xs text-gray-500 block mb-1">IGV 18%</label>
               <input value={calc.igv.toFixed(2)} disabled className={INP_DIS} />
@@ -335,7 +483,7 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
           </button>
           <button onClick={guardar} disabled={guardando}
             className="text-sm bg-blue-700 text-white px-5 py-2 rounded-lg hover:bg-blue-800 disabled:opacity-50 transition font-medium">
-            {guardando ? "Guardando…" : "Crear factura"}
+            {guardando ? (emitirSunat ? "Emitiendo…" : "Guardando…") : (emitirSunat ? "Emitir y crear factura" : "Crear factura")}
           </button>
         </div>
       </div>
