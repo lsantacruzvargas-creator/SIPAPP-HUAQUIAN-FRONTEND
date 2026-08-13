@@ -86,7 +86,7 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
   const [guardando, setGuardando] = useState(false);
   const [error, setError]         = useState("");
   const [cargandoOC, setCargandoOC] = useState(false);
-  const puedeEditar = ["admin", "asistente"].includes(getUsuario()?.rol);
+  const puedeEditar = ["admin", "facturacion"].includes(getUsuario()?.rol);
 
   const abrirOC = async () => {
     if (!ocVinculada || cargandoOC) return;

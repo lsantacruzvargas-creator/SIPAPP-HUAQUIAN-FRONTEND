@@ -1,14 +1,17 @@
 import { useState, useEffect } from "react";
 import { fetchAuth } from "../utils/fetchAuth";
 
-const ROLES = ["admin", "tecnico", "almacenero", "asistente", "supervisor"];
+const ROLES = ["admin", "tecnico", "almacenero", "asistente", "supervisor", "jefatura", "facturacion", "planner"];
 
 const badgeRol = (rol) => {
-  if (rol === "admin")      return "bg-red-50 text-red-700";
-  if (rol === "tecnico")    return "bg-amber-50 text-amber-700";
-  if (rol === "almacenero") return "bg-purple-50 text-purple-700";
-  if (rol === "asistente")  return "bg-teal-50 text-teal-700";
-  if (rol === "supervisor") return "bg-indigo-50 text-indigo-700";
+  if (rol === "admin")       return "bg-red-50 text-red-700";
+  if (rol === "tecnico")     return "bg-amber-50 text-amber-700";
+  if (rol === "almacenero")  return "bg-purple-50 text-purple-700";
+  if (rol === "asistente")   return "bg-teal-50 text-teal-700";
+  if (rol === "supervisor")  return "bg-indigo-50 text-indigo-700";
+  if (rol === "jefatura")    return "bg-sky-50 text-sky-700";
+  if (rol === "facturacion") return "bg-emerald-50 text-emerald-700";
+  if (rol === "planner")     return "bg-fuchsia-50 text-fuchsia-700";
   return "bg-gray-100 text-gray-500";
 };
 

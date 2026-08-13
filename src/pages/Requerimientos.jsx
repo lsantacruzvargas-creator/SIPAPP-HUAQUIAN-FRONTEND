@@ -1,0 +1,245 @@
+import { useState, useEffect, useCallback } from "react";
+import { fetchAuth, getUsuario } from "../utils/fetchAuth";
+import SelectorMateriales from "../components/SelectorMateriales";
+
+const ESTADO_ITEM = {
+  pendiente: "bg-blue-100 text-blue-700",
+  atendido: "bg-green-100 text-green-700",
+  cerrado: "bg-green-100 text-green-700",
+  rechazado: "bg-red-100 text-red-700",
+};
+
+function resumenCompra(item) {
+  return Object.entries(item.camposCompra || {}).map(([k, v]) => `${k}: ${v}`).join(" · ");
+}
+
+// ─── Salida de un ítem de stock: pide lote (FIFO disponible) + cantidad ────
+
+function PanelSalida({ requerimientoId, item, onClose, onListo }) {
+  const [lotes, setLotes] = useState([]);
+  const [lote, setLote] = useState("");
+  const [precioAuto, setPrecioAuto] = useState(0);
+  const [cantidad, setCantidad] = useState(item.cantidad);
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    fetchAuth(`/movimientos-almacen/lotes/${item.material._id}`)
+      .then((r) => r.ok ? r.json() : [])
+      .then(setLotes);
+  }, [item.material._id]);
+
+  const seleccionarLote = (l) => { setLote(l.lote); setPrecioAuto(l.precioUnitario); };
+
+  const confirmar = async () => {
+    if (!lote || !cantidad || cantidad <= 0) { setError("Selecciona el lote e ingresa la cantidad."); return; }
+    setGuardando(true);
+    const r = await fetchAuth(`/requerimientos/${requerimientoId}/items/${item._id}/salida`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lote, cantidad: Number(cantidad), precioUnitario: precioAuto }),
+    });
+    if (r.ok) {
+      onListo(await r.json());
+    } else {
+      const d = await r.json();
+      setError(d.mensaje || "Error al registrar la salida");
+    }
+    setGuardando(false);
+  };
+
+  return (
+    <div className="bg-blue-50/60 rounded-xl p-3 mt-2 space-y-2">
+      {error && <p className="text-xs text-red-500 bg-red-50 px-2 py-1 rounded">{error}</p>}
+      {lotes.length === 0 ? (
+        <p className="text-xs text-gray-400">Sin lotes disponibles para este material.</p>
+      ) : (
+        <div className="space-y-1.5">
+          {lotes.map((l) => (
+            <button key={l.lote} type="button" onClick={() => seleccionarLote(l)}
+              className={`w-full text-left px-3 py-2 rounded-lg border text-xs transition ${
+                lote === l.lote ? "border-blue-400 bg-blue-50" : "border-gray-200 bg-white hover:border-gray-300"
+              }`}>
+              <div className="flex justify-between">
+                <span className="font-mono font-semibold text-gray-700">{l.lote}</span>
+                <span className="font-semibold text-gray-800">S/ {Number(l.precioUnitario).toFixed(2)}</span>
+              </div>
+              <div className="flex gap-3 text-gray-400 mt-0.5">
+                <span>Disponible: <strong>{l.cantidadDisponible}</strong></span>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="flex items-center gap-2">
+        <input type="number" min={0.01} step="any" value={cantidad} onChange={(e) => setCantidad(e.target.value)}
+          className="w-24 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-right bg-white" />
+        <button onClick={confirmar} disabled={guardando || !lote}
+          className="text-xs bg-emerald-600 text-white px-3 py-1.5 rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition font-medium">
+          {guardando ? "Guardando…" : "Confirmar salida"}
+        </button>
+        <button onClick={onClose} className="text-xs text-gray-400 hover:text-gray-700">Cancelar</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Fila de un ítem dentro de un requerimiento ─────────────────────────────
+
+function FilaItem({ requerimiento, item, puedeAtender, onActualizado }) {
+  const [panelSalida, setPanelSalida] = useState(false);
+  const [buscadorAbierto, setBuscadorAbierto] = useState(false);
+
+  const accion = async (endpoint, body) => {
+    const r = await fetchAuth(`/requerimientos/${requerimiento._id}/items/${item._id}/${endpoint}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {}),
+    });
+    if (r.ok) onActualizado(await r.json());
+  };
+
+  const rechazar = () => {
+    const motivo = window.prompt("Motivo del rechazo:");
+    if (motivo === null) return;
+    accion("rechazar", { motivo });
+  };
+
+  const vincular = (material) => {
+    setBuscadorAbierto(false);
+    accion("vincular-material", { material: material._id });
+  };
+
+  return (
+    <div className="border-t border-gray-50 first:border-t-0 py-2.5">
+      <div className="flex items-center gap-3">
+        <div className="flex-1 min-w-0">
+          {item.esSolicitudCompra ? (
+            <>
+              <p className="text-sm font-medium text-gray-800">
+                <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 mr-1.5">Compra</span>
+                {item.categoriaNombre} — {item.cantidad}
+              </p>
+              <p className="text-xs text-gray-400 truncate">{resumenCompra(item)}</p>
+              {item.materialAsociado && (
+                <p className="text-xs text-blue-600 mt-0.5">Vinculado a: {item.materialAsociado.codigo} — {item.materialAsociado.nombre}</p>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-medium text-gray-800">{item.material?.nombre}</p>
+              <p className="text-xs text-gray-400 font-mono">{item.material?.codigo} — cantidad: {item.cantidad} {item.material?.unidad}</p>
+            </>
+          )}
+        </div>
+        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold shrink-0 ${ESTADO_ITEM[item.estado]}`}>
+          {item.estado}
+        </span>
+        {puedeAtender && item.estado === "pendiente" && !item.esSolicitudCompra && (
+          <button onClick={() => setPanelSalida((v) => !v)}
+            className="text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-lg hover:bg-emerald-100 transition font-medium shrink-0">
+            Salida
+          </button>
+        )}
+        {puedeAtender && item.estado === "pendiente" && item.esSolicitudCompra && !item.materialAsociado && (
+          <button onClick={() => setBuscadorAbierto(true)}
+            className="text-xs bg-blue-50 text-blue-700 px-2.5 py-1 rounded-lg hover:bg-blue-100 transition font-medium shrink-0">
+            Vincular SKU
+          </button>
+        )}
+        {puedeAtender && item.estado === "pendiente" && item.esSolicitudCompra && item.materialAsociado && (
+          <button onClick={() => accion("cerrar")}
+            className="text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-lg hover:bg-emerald-100 transition font-medium shrink-0">
+            Cerrar
+          </button>
+        )}
+        {puedeAtender && item.estado === "pendiente" && (
+          <button onClick={rechazar} className="text-xs text-gray-400 hover:text-red-500 transition shrink-0">
+            Rechazar
+          </button>
+        )}
+      </div>
+
+      {panelSalida && (
+        <PanelSalida requerimientoId={requerimiento._id} item={item}
+          onClose={() => setPanelSalida(false)}
+          onListo={(r) => { setPanelSalida(false); onActualizado(r); }} />
+      )}
+      {buscadorAbierto && (
+        <SelectorMateriales onSelect={vincular} onClose={() => setBuscadorAbierto(false)} />
+      )}
+    </div>
+  );
+}
+
+// ─── Página principal ────────────────────────────────────────────────────────
+
+export default function Requerimientos() {
+  const [lista, setLista] = useState([]);
+  const [filtro, setFiltro] = useState("activos");
+  const usuario = getUsuario();
+  const puedeAtender = ["admin", "almacenero"].includes(usuario?.rol);
+
+  const cargar = useCallback(async () => {
+    const r = await fetchAuth("/requerimientos");
+    if (r.ok) setLista(await r.json());
+  }, []);
+
+  useEffect(() => { cargar(); }, [cargar]);
+
+  const actualizarEnLista = (actualizado) => {
+    setLista((prev) => prev.map((r) => r._id === actualizado._id ? actualizado : r));
+  };
+
+  const tieneItemsPendientes = (r) => r.items.some((it) => it.estado === "pendiente");
+  const filtrados = lista.filter((r) => filtro === "activos" ? tieneItemsPendientes(r) : !tieneItemsPendientes(r));
+
+  const fmtFecha = (d) => d ? new Date(d).toLocaleDateString("es-PE", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "—";
+
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
+      <div>
+        <h1 className="text-xl font-bold text-gray-800">Requerimientos de material</h1>
+        <p className="text-sm text-gray-400 mt-0.5">Solicitudes de material hechas desde las Órdenes de Trabajo</p>
+      </div>
+
+      <div className="flex border-b border-gray-200 gap-1">
+        {[{ id: "activos", label: "Activos" }, { id: "completados", label: "Completados" }].map((t) => (
+          <button key={t.id} onClick={() => setFiltro(t.id)}
+            className={`px-5 py-2.5 text-sm font-medium transition border-b-2 -mb-px ${
+              filtro === t.id ? "border-blue-600 text-blue-700" : "border-transparent text-gray-500 hover:text-gray-700"
+            }`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="space-y-4">
+        {filtrados.length === 0 && (
+          <p className="text-center py-10 text-gray-300 text-sm">Sin requerimientos {filtro === "activos" ? "activos" : "completados"}</p>
+        )}
+        {filtrados.map((r) => (
+          <div key={r._id} className="bg-white border border-gray-100 rounded-2xl shadow-sm p-5">
+            <div className="flex flex-wrap justify-between items-start gap-2 mb-2">
+              <div>
+                <p className="font-mono text-xs text-gray-400">{r.codigo}</p>
+                <p className="text-sm font-semibold text-gray-800">
+                  {r.ordenTrabajo?.numeroOT} — {r.ordenTrabajo?.titulo}
+                </p>
+                <p className="text-xs text-gray-500">{r.solicitadoPor}{r.dni ? ` — DNI ${r.dni}` : ""}</p>
+              </div>
+              <span className="text-xs text-gray-400">{fmtFecha(r.createdAt)}</span>
+            </div>
+            {r.observaciones && <p className="text-xs text-gray-400 italic mb-2">{r.observaciones}</p>}
+            <div>
+              {r.items.map((item) => (
+                <FilaItem key={item._id} requerimiento={r} item={item} puedeAtender={puedeAtender}
+                  onActualizado={actualizarEnLista} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

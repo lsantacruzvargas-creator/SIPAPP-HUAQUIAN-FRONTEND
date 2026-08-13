@@ -8,20 +8,38 @@ export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
   const [form, setForm] = useState(
     empresa
       ? {
-          razonSocial: empresa.razonSocial,
-          ruc: empresa.ruc,
-          direccion: empresa.direccion || "",
-          alias: empresa.alias || "",
-          plantas: empresa.plantas || [],
-        }
+        razonSocial: empresa.razonSocial,
+        ruc: empresa.ruc,
+        direccion: empresa.direccion || "",
+        alias: empresa.alias || "",
+        plantas: empresa.plantas || [],
+      }
       : FORM_VACIO
   );
   const [plantaInput, setPlantaInput] = useState(PLANTA_VACIA);
   const [errorPlanta, setErrorPlanta] = useState("");
   const [error, setError] = useState("");
   const [cargando, setCargando] = useState(false);
+  const [buscandoRuc, setBuscandoRuc] = useState(false);
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  const buscarDatosRuc = async (ruc) => {
+    if (ruc.length !== 11) return;
+    setBuscandoRuc(true);
+    try {
+      const res = await fetchAuth(`/sunat/ruc/${ruc}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setForm((f) => ({
+        ...f,
+        razonSocial: data.razonSocial || f.razonSocial,
+        direccion: data.direccion || f.direccion,
+      }));
+    } finally {
+      setBuscandoRuc(false);
+    }
+  };
 
   const handlePlantaInputChange = (e) =>
     setPlantaInput({ ...plantaInput, [e.target.name]: e.target.value });
@@ -47,6 +65,9 @@ export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
 
   const guardar = async (e) => {
     e.preventDefault();
+    if (buscandoRuc) return setError("Espera a que termine de consultar el RUC en SUNAT.");
+    if (!form.razonSocial.trim())
+      return setError("No se pudo obtener la razón social para este RUC. Verifica que el RUC sea correcto.");
     setCargando(true);
     setError("");
     try {
@@ -65,7 +86,7 @@ export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl p-6">
         <h3 className="font-semibold text-gray-800 mb-4">
           {empresa ? "Editar empresa" : "Nueva empresa"}
@@ -78,22 +99,27 @@ export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
         )}
 
         <form onSubmit={guardar} className="grid grid-cols-2 gap-4">
-          <div className="col-span-2">
+          <div className="col-span-2" >
             <label className="block text-xs font-medium text-gray-600 mb-1">Razón social</label>
             <input
+              disabled
               name="razonSocial"
               value={form.razonSocial}
               onChange={handleChange}
-              required
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
+    
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 disabled:bg-gray-100 disabled:text-gray-500"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">RUC</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              RUC{buscandoRuc && <span className="text-gray-400 font-normal"> — Consultando…</span>}
+            </label>
             <input
               name="ruc"
               value={form.ruc}
               onChange={handleChange}
+              onBlur={(e) => buscarDatosRuc(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); buscarDatosRuc(e.target.value); } }}
               required
               maxLength={11}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
@@ -111,10 +137,11 @@ export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
           <div className="col-span-2">
             <label className="block text-xs font-medium text-gray-600 mb-1">Dirección</label>
             <input
+              disabled
               name="direccion"
               value={form.direccion}
               onChange={handleChange}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 disabled:bg-gray-100 disabled:text-gray-500"
             />
           </div>
           <div className="col-span-2">
@@ -195,7 +222,7 @@ export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
             </button>
             <button
               type="submit"
-              disabled={cargando}
+              disabled={cargando || buscandoRuc}
               className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-700 transition disabled:opacity-50"
             >
               {cargando ? "Guardando..." : "Guardar"}

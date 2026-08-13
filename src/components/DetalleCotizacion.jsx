@@ -26,6 +26,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
     subtotal: subtotalInicial > 0 ? String(subtotalInicial) : "",
     empresa: inicial.empresa?._id || "",
     tipo: inicial.tipo || "venta",
+    moneda: inicial.moneda || "PEN",
     condicionPago: inicial.condicionPago || "",
     plazoEntrega: inicial.plazoEntrega || "",
     lugarEntrega: inicial.lugarEntrega || "",
@@ -58,6 +59,8 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   const [seleccionados, setSeleccionados] = useState(() => new Set());
   const [generandoOT, setGenerandoOT] = useState(false);
   const puedeEditar = ["admin", "asistente"].includes(getUsuario()?.rol);
+  const puedeAprobar = ["admin", "jefatura"].includes(getUsuario()?.rol);
+  const puedeEnviar = ["admin", "asistente"].includes(getUsuario()?.rol);
 
   const cargarRelaciones = () => {
     Promise.all([
@@ -135,6 +138,18 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
     cargarRelaciones();
   };
 
+  // Desvincula la OT ya generada de un ítem — la OT sigue existiendo, solo
+  // queda sin cotización asociada (ver Backend/src/routes/cotizaciones.js).
+  const quitarOT = async (idx) => {
+    const res = await fetchAuth(`/cotizaciones/${cot._id}/items/${idx}/quitar-ot`, { method: "PATCH" });
+    if (res.ok) {
+      const actualizada = await res.json();
+      setCot(actualizada);
+      setItems((actualizada.items || []).map(itemDesdeDb));
+      cargarRelaciones();
+    }
+  };
+
   const subtotalItems = parseFloat(items.reduce((acc, i) => acc + calcSubtotal(i), 0).toFixed(2));
   const usarTotalesDeItems = items.length > 0;
   const totalesMostrados = usarTotalesDeItems ? calcular(subtotalItems) : calc;
@@ -153,6 +168,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
     plazoEntrega: form.plazoEntrega,
     lugarEntrega: form.lugarEntrega,
     validezOferta: form.validezOferta,
+    moneda: form.moneda,
     subtotal: totalesMostrados.subtotal,
     igv: totalesMostrados.igv,
     total: totalesMostrados.total,
@@ -190,6 +206,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
       plazoEntrega: form.plazoEntrega,
       lugarEntrega: form.lugarEntrega,
       validezOferta: form.validezOferta,
+      moneda: form.moneda,
       subtotal: totalesMostrados.subtotal,
       igv: totalesMostrados.igv,
       total: totalesMostrados.total,
@@ -259,6 +276,32 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
     }
   };
 
+  const toggleAprobar = async () => {
+    const res = await fetchAuth(`/cotizaciones/${cot._id}/aprobar`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ aprobado: !cot.aprobado }),
+    });
+    if (res.ok) {
+      const actualizada = await res.json();
+      setCot(actualizada);
+      onGuardada?.(actualizada);
+    }
+  };
+
+  const toggleEnviar = async () => {
+    const res = await fetchAuth(`/cotizaciones/${cot._id}/enviar`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enviado: !cot.enviado }),
+    });
+    if (res.ok) {
+      const actualizada = await res.json();
+      setCot(actualizada);
+      onGuardada?.(actualizada);
+    }
+  };
+
   const ultimo = informes[informes.length - 1];
 
   const pasos = [
@@ -294,15 +337,55 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
           <div className="flex items-center gap-4">
             <div className="text-right">
               <p className="text-[10px] text-white/60 uppercase tracking-widest leading-none">Total</p>
-              <p className="text-lg font-bold leading-tight">{money(cot.total)}</p>
+              <p className="text-lg font-bold leading-tight">{money(cot.total, cot.moneda)}</p>
               <Chip className="mt-0.5 bg-white/20 text-white">{cot.tipo}</Chip>
             </div>
+            {!cot.anulado && (
+              <div className="text-right">
+                <p className="text-[10px] text-white/60 uppercase tracking-widest leading-none">Aprobación</p>
+                {puedeAprobar ? (
+                  <label className="flex items-center gap-1.5 justify-end mt-0.5 cursor-pointer select-none">
+                    <input type="checkbox" checked={cot.aprobado} onChange={toggleAprobar} className="w-4 h-4" />
+                    <span className="text-sm font-medium">{cot.aprobado ? "Aprobada" : "Pendiente"}</span>
+                  </label>
+                ) : (
+                  <Chip className={`mt-0.5 ${cot.aprobado ? "bg-green-500/40 text-white" : "bg-white/20 text-white"}`}>
+                    {cot.aprobado ? "Aprobada" : "Pendiente"}
+                  </Chip>
+                )}
+                {cot.aprobado && cot.aprobadoPor && (
+                  <p className="text-[10px] text-white/60 leading-tight mt-0.5">
+                    {cot.aprobadoPor}{cot.fechaAprobacion && ` · ${new Date(cot.fechaAprobacion).toLocaleDateString("es-PE")}`}
+                  </p>
+                )}
+              </div>
+            )}
+            {!cot.anulado && (
+              <div className="text-right">
+                <p className="text-[10px] text-white/60 uppercase tracking-widest leading-none">Envío</p>
+                {puedeEnviar ? (
+                  <label className="flex items-center gap-1.5 justify-end mt-0.5 cursor-pointer select-none">
+                    <input type="checkbox" checked={cot.enviado} onChange={toggleEnviar} className="w-4 h-4" />
+                    <span className="text-sm font-medium">{cot.enviado ? "Enviada" : "No enviada"}</span>
+                  </label>
+                ) : (
+                  <Chip className={`mt-0.5 ${cot.enviado ? "bg-green-500/40 text-white" : "bg-white/20 text-white"}`}>
+                    {cot.enviado ? "Enviada" : "No enviada"}
+                  </Chip>
+                )}
+                {cot.enviado && cot.enviadoPor && (
+                  <p className="text-[10px] text-white/60 leading-tight mt-0.5">
+                    {cot.enviadoPor}{cot.fechaEnvio && ` · ${new Date(cot.fechaEnvio).toLocaleDateString("es-PE")}`}
+                  </p>
+                )}
+              </div>
+            )}
             <button onClick={() => exportarCotizacionPdf(datosParaPdf())}
               className="bg-white/15 text-white text-sm px-4 py-2 rounded-lg hover:bg-white/25 transition font-medium shrink-0">
               Exportar PDF
             </button>
             {!cot.anulado && puedeEditar && <BotonAnular onAnular={anular} />}
-            {!cot.anulado && puedeEditar && (
+            {!cot.anulado && !cot.enviado && puedeEditar && (
               <button onClick={guardar} disabled={guardando}
                 className="bg-white text-sky-700 text-sm px-5 py-2 rounded-lg hover:bg-sky-50 disabled:opacity-60 transition font-semibold shadow-sm shrink-0">
                 {guardando ? "Guardando…" : "Guardar cambios"}
@@ -324,7 +407,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
         <div className="max-w-6xl mx-auto px-8 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
 
           {/* Datos editables */}
-          <fieldset disabled={cot.anulado || !puedeEditar} className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5 self-start">
+          <fieldset disabled={cot.anulado || cot.enviado || !puedeEditar} className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5 self-start">
             <div className="flex items-center gap-2">
               <span className="w-1.5 h-5 rounded-full bg-sky-500" />
               <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Datos de la cotización</h2>
@@ -332,6 +415,12 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
 
             {cot.anulado && (
               <BannerAnulado motivo={cot.motivoAnulacion} por={cot.anuladoPor} fecha={cot.fechaAnulacion} />
+            )}
+
+            {!cot.anulado && cot.enviado && (
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                Cotización enviada — de solo lectura. {puedeEnviar ? "Desmárcala como enviada (arriba) para poder editarla." : "Solo Admin o Asistente pueden retirarla del estado enviado."}
+              </p>
             )}
 
             <div className="grid grid-cols-2 gap-4">
@@ -399,7 +488,15 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
               </div>
             </div>
 
-
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Moneda de la cotización</label>
+                <select name="moneda" value={form.moneda} onChange={handleChange} className={INP}>
+                  <option value="PEN">Soles (S/)</option>
+                  <option value="USD">Dólares (US$)</option>
+                </select>
+              </div>
+            </div>
 
 
 
@@ -528,7 +625,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
 
             {ots.length === 0 ? (
               <TarjetaRelacion tipo="ot" vacio
-                onCrear={!cot.anulado ? () => setCrearOTOpen(true) : undefined} crearLabel="OT" />
+                onCrear={!cot.anulado && !cot.enviado ? () => setCrearOTOpen(true) : undefined} crearLabel="OT" />
             ) : (
               ots.map(o => (
                 <TarjetaRelacion key={o._id} tipo="ot" codigo={o.codigo} numero={o.numeroOT}
@@ -537,7 +634,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
                 </TarjetaRelacion>
               ))
             )}
-            {!cot.anulado && (
+            {!cot.anulado && !cot.enviado && (
               <div className="flex items-center gap-3 -mt-2 px-1">
                 {ots.length > 0 && (
                   <button type="button" onClick={() => setCrearOTOpen(true)}
@@ -561,7 +658,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
 
             <TarjetaRelacion tipo="oc" codigo={oc?.codigo} numero={oc?.numeroOrden} vacio={!oc}
               onClick={oc ? () => onNavegar?.({ tipo: "oc", data: oc, extra: factura }) : undefined}
-              onCrear={!oc && !cot.anulado ? () => setCrearOCOpen(true) : undefined} crearLabel="OC">
+              onCrear={!oc && !cot.anulado && cot.aprobado && cot.enviado ? () => setCrearOCOpen(true) : undefined} crearLabel="OC">
               {oc?.monto > 0 && <p className="text-xs text-gray-500">{money(oc.monto)}</p>}
             </TarjetaRelacion>
 
@@ -582,15 +679,16 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
             onItemsChange={setItems}
             tipo={form.tipo}
             puedeEditar={puedeEditar}
-            disabled={cot.anulado}
+            disabled={cot.anulado || cot.enviado}
             intentoGuardar={intentoGuardar}
             totalesMostrados={totalesMostrados}
-            seleccionables={form.tipo === "servicio" && puedeEditar && !cot.anulado}
+            seleccionables={form.tipo === "servicio" && puedeEditar && !cot.anulado && !cot.enviado}
             seleccionados={seleccionados}
             onToggleSeleccion={toggleSeleccion}
             onGenerarOT={generarOTSeleccionados}
             generando={generandoOT}
             onVerOT={(o) => onNavegar?.({ tipo: "ot", data: ots.find(x => x._id === o._id) || o })}
+            onQuitarOT={quitarOT}
           />
         </div>
       </div>

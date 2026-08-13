@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchAuth } from "../utils/fetchAuth";
-import ModalEmpresa from "./ModalEmpresa";
+import SelectorEmpresas from "./SelectorEmpresas";
 
 const INP    = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 w-full";
 
@@ -25,7 +25,7 @@ export default function ModalNuevaOT({ onClose, onCreada }) {
   const [form, setForm] = useState(FORM_VACIO);
   const [empresas, setEmpresas] = useState([]);
   const [personal, setPersonal] = useState([]);
-  const [nuevaEmpresaOpen, setNuevaEmpresaOpen] = useState(false);
+  const [empresasOpen, setEmpresasOpen] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
 
@@ -128,10 +128,10 @@ export default function ModalNuevaOT({ onClose, onCreada }) {
                 </select>
                 <button
                   type="button"
-                  onClick={() => setNuevaEmpresaOpen(true)}
+                  onClick={() => setEmpresasOpen(true)}
                   className="shrink-0 text-xs border border-gray-300 px-3 rounded-lg hover:bg-gray-50 transition"
                 >
-                  + Nueva
+                  Empresas
                 </button>
               </div>
             </div>
@@ -229,13 +229,17 @@ export default function ModalNuevaOT({ onClose, onCreada }) {
         </div>
       </div>
 
-      {nuevaEmpresaOpen && (
-        <ModalEmpresa
-          onClose={() => setNuevaEmpresaOpen(false)}
-          onGuardada={async (nueva) => {
+      {empresasOpen && (
+        <SelectorEmpresas
+          empresas={empresas}
+          onClose={() => setEmpresasOpen(false)}
+          onSeleccionar={(e) => {
+            setForm((f) => ({ ...f, empresa: e._id, planta: "" }));
+            setEmpresasOpen(false);
+          }}
+          onCambio={async (guardada, { esNueva }) => {
             await cargarEmpresas();
-            setForm((f) => ({ ...f, empresa: nueva._id }));
-            setNuevaEmpresaOpen(false);
+            if (esNueva) setForm((f) => ({ ...f, empresa: guardada._id, planta: "" }));
           }}
         />
       )}

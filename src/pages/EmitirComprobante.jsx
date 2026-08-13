@@ -22,10 +22,10 @@ const REFERENCIA_VACIA = { id: "", serie: "", tipoDoc: "" };
 
 // Empresa emisora fija — este ERP factura únicamente a nombre de Huaquian.
 // Las credenciales SUNAT las resuelve el hub central por RUC (no hay registro
-// de credenciales en el ERP). TODO: RUC/razón social reales pendientes de
-// confirmar — deben coincidir con RUC_EMISOR/RAZON_SOCIAL_EMISOR del backend.
-const RUC_EMISOR = "00000000000";
-const NOMBRE_EMISOR = "HUAQUIAN (RUC pendiente de configurar)";
+// de credenciales en el ERP). Deben coincidir con RUC_EMISOR/RAZON_SOCIAL_EMISOR
+// de Backend/.env.
+const RUC_EMISOR = "20601565235";
+const NOMBRE_EMISOR = "HUAQUIAN";
 
 // Serie fija por tipo de comprobante — todas terminan en "2" para evitar
 // futuros conflictos de correlativo con series de prueba/históricas.

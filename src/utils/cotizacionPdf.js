@@ -115,52 +115,66 @@ export const exportarCotizacionPdf = async (cotizacion) => {
   // Tipo "servicio": descripción con sub-ítems en viñetas + columna Moneda.
   // Tipo "venta": tabla simple Item/Descripción/Cantidad/Precio unitario/Precio total.
   const esVenta = cotizacion.tipo === "venta";
+  // Moneda de TODA la cotización (no la de cada ítem) — determina el símbolo
+  // de Subtotal/IGV/TOTAL al pie de la tabla.
+  const simboloDoc = cotizacion.moneda === "USD" ? "US$" : "S/";
 
+  // Para tipo "servicio": una fila de tabla por cada sub-ítem (en vez de
+  // apilar todos los sub-ítems dentro de la celda del ítem padre). `esSubfila`
+  // queda en paralelo a `body` para que didParseCell sepa a cuál de las dos
+  // filas (padre en negrita / sub-ítem normal) le toca cada estilo.
+  const esSubfila = [];
   autoTable(doc, {
     startY: y,
     head: esVenta
       ? [["#", "Descripción", "Cant.", "Precio Unitario", "Precio Total"]]
       : [["#", "Descripción", "Cant.", "Precio", "Mon.", "Subtotal"]],
-    body: cotizacion.items.map((item, i) => {
-      // Ítems informativos (sin costo propio, p.ej. sub-agrupaciones del
-      // catálogo) suelen quedar en 0.00 — se ocultan #, Cantidad, Moneda,
-      // Precio y Subtotal (en blanco) en vez de mostrar ceros que no aplican.
-      const precioNum = Number(item.precio) || 0;
-      const subtotalNum = Number(item.subtotal) || 0;
-      const esInformativo = precioNum === 0;
-      if (esVenta) {
-        const simbolo = item.moneda === "PEN" ? "S/" : "$";
-        return [
-          esInformativo ? "" : i + 1,
-          item.descripcion,
-          esInformativo ? "" : item.cantidad,
-          esInformativo ? "" : `${simbolo} ${precioNum.toFixed(2)}`,
-          subtotalNum === 0 ? "" : `${simbolo} ${subtotalNum.toFixed(2)}`,
-        ];
-      }
-      let desc = item.descripcion;
-      if (item.subItems?.length > 0) {
-        desc += "\n" + item.subItems.map((s) => `  • ${s}`).join("\n");
-      }
-      return [
-        esInformativo ? "" : i + 1,
-        desc,
-        esInformativo ? "" : item.cantidad,
-        esInformativo ? "" : precioNum.toFixed(2),
-        esInformativo ? "" : (item.moneda === "PEN" ? "S/" : "$"),
-        subtotalNum === 0 ? "" : subtotalNum.toFixed(2),
-      ];
-    }),
+    body: esVenta
+      ? cotizacion.items.map((item, i) => {
+          // Ítems informativos (sin costo propio, p.ej. sub-agrupaciones del
+          // catálogo) suelen quedar en 0.00 — se ocultan #, Cantidad, Moneda,
+          // Precio y Subtotal (en blanco) en vez de mostrar ceros que no aplican.
+          const precioNum = Number(item.precio) || 0;
+          const subtotalNum = Number(item.subtotal) || 0;
+          const esInformativo = precioNum === 0;
+          const simbolo = item.moneda === "PEN" ? "S/" : "$";
+          return [
+            esInformativo ? "" : i + 1,
+            item.descripcion,
+            esInformativo ? "" : item.cantidad,
+            esInformativo ? "" : `${simbolo} ${precioNum.toFixed(2)}`,
+            subtotalNum === 0 ? "" : `${simbolo} ${subtotalNum.toFixed(2)}`,
+          ];
+        })
+      : cotizacion.items.flatMap((item, i) => {
+          const precioNum = Number(item.precio) || 0;
+          const subtotalNum = Number(item.subtotal) || 0;
+          const esInformativo = precioNum === 0;
+          esSubfila.push(false);
+          const filaPadre = [
+            esInformativo ? "" : i + 1,
+            item.descripcion,
+            esInformativo ? "" : item.cantidad,
+            esInformativo ? "" : precioNum.toFixed(2),
+            esInformativo ? "" : (item.moneda === "PEN" ? "S/" : "$"),
+            subtotalNum === 0 ? "" : subtotalNum.toFixed(2),
+          ];
+          const filasSub = (item.subItems || []).map((s) => {
+            esSubfila.push(true);
+            return ["", `   • ${s}`, "", "", "", ""];
+          });
+          return [filaPadre, ...filasSub];
+        }),
     foot: esVenta
       ? [
-          [{ content: "Subtotal:", colSpan: 4, styles: { halign: "right", fontStyle: "bold" } }, Number(cotizacion.subtotal).toFixed(2)],
-          [{ content: "IGV 18%:", colSpan: 4, styles: { halign: "right", fontStyle: "bold" } }, Number(cotizacion.igv).toFixed(2)],
-          [{ content: "TOTAL:", colSpan: 4, styles: { halign: "right", fontStyle: "bold" } }, Number(cotizacion.total).toFixed(2)],
+          [{ content: "Subtotal:", colSpan: 4, styles: { halign: "right", fontStyle: "bold" } }, `${simboloDoc} ${Number(cotizacion.subtotal).toFixed(2)}`],
+          [{ content: "IGV 18%:", colSpan: 4, styles: { halign: "right", fontStyle: "bold" } }, `${simboloDoc} ${Number(cotizacion.igv).toFixed(2)}`],
+          [{ content: "TOTAL:", colSpan: 4, styles: { halign: "right", fontStyle: "bold" } }, `${simboloDoc} ${Number(cotizacion.total).toFixed(2)}`],
         ]
       : [
-          [{ content: "Subtotal:", colSpan: 5, styles: { halign: "right", fontStyle: "bold" } }, Number(cotizacion.subtotal).toFixed(2)],
-          [{ content: "IGV 18%:", colSpan: 5, styles: { halign: "right", fontStyle: "bold" } }, Number(cotizacion.igv).toFixed(2)],
-          [{ content: "TOTAL:", colSpan: 5, styles: { halign: "right", fontStyle: "bold" } }, Number(cotizacion.total).toFixed(2)],
+          [{ content: "Subtotal:", colSpan: 5, styles: { halign: "right", fontStyle: "bold" } }, `${simboloDoc} ${Number(cotizacion.subtotal).toFixed(2)}`],
+          [{ content: "IGV 18%:", colSpan: 5, styles: { halign: "right", fontStyle: "bold" } }, `${simboloDoc} ${Number(cotizacion.igv).toFixed(2)}`],
+          [{ content: "TOTAL:", colSpan: 5, styles: { halign: "right", fontStyle: "bold" } }, `${simboloDoc} ${Number(cotizacion.total).toFixed(2)}`],
         ],
     theme: "grid",
     margin: { left: 10, right: 10 },
@@ -196,42 +210,17 @@ export const exportarCotizacionPdf = async (cotizacion) => {
           4: { cellWidth: 12, halign: "center" },
           5: { cellWidth: 26, halign: "right" },
         },
-    // autoTable no soporta estilos mixtos dentro de una misma celda — la
-    // tabla ya dibujó la descripción completa (grupo + sub-ítems) en peso
-    // normal. Acá se tapa esa franja (negrita y normal no ocupan el mismo
-    // ancho por carácter, así que solo superponer dejaba un "fantasma" del
-    // texto normal más angosto asomando al costado) y se vuelve a dibujar
-    // SOLO la línea del grupo padre en negrita, limpia, encima.
-    didDrawCell: (data) => {
+    // Cada sub-ítem ahora es su propia fila (ver `esSubfila` más arriba), así
+    // que ya no hay que mezclar negrita+normal dentro de una misma celda:
+    // alcanza con negrita en la columna Descripción de las filas padre, y
+    // peso normal (con sangría) en las filas de sub-ítem.
+    didParseCell: (data) => {
       if (esVenta || data.section !== "body" || data.column.index !== 1) return;
-      const item = cotizacion.items[data.row.index];
-      if (!item?.descripcion) return;
-      const { cell } = data;
-      const fontSize = cell.styles.fontSize;
-      doc.setFontSize(fontSize);
-      const maxWidth = cell.width - cell.padding("left") - cell.padding("right");
-      const lineasPadre = doc.splitTextToSize(item.descripcion, maxWidth);
-
-      // doc.getLineHeight() no coincidía con el alto real de línea que usa
-      // autoTable internamente (tapaba de más, comiéndose sub-ítems de
-      // abajo) — se calcula el alto real de línea a partir de lo que
-      // autoTable YA calculó para esta celda: alto interior ÷ total de
-      // líneas envueltas (cell.text ya viene con el wrap final aplicado).
-      const totalLineas = Array.isArray(cell.text) && cell.text.length > 0 ? cell.text.length : lineasPadre.length;
-      const padTop = cell.padding("top");
-      const padBottom = cell.padding("bottom");
-      const alturaInterior = cell.height - padTop - padBottom;
-      const lineHeight = alturaInterior / totalLineas;
-      const bandHeight = lineasPadre.length * lineHeight;
-
-      doc.setFillColor(255, 255, 255);
-      doc.rect(cell.x + 0.3, cell.y + padTop - 0.2, cell.width - 0.6, bandHeight + 0.2, "F");
-
-      const x = cell.x + cell.padding("left");
-      let ly = cell.y + padTop + lineHeight * 0.75;
-      doc.setFont("helvetica", "bold");
-      lineasPadre.forEach((linea) => { doc.text(linea, x, ly); ly += lineHeight; });
-      doc.setFont("helvetica", "normal");
+      if (esSubfila[data.row.index]) {
+        data.cell.styles.cellPadding = { ...data.cell.styles.cellPadding, left: (data.cell.styles.cellPadding.left || 0) + 4 };
+      } else {
+        data.cell.styles.fontStyle = "bold";
+      }
     },
   });
 

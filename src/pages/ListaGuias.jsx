@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { fetchAuth } from "../utils/fetchAuth";
 import {
   TIPO_GUIA,
@@ -21,6 +22,7 @@ const labelModalidad = (v) => MODALIDAD_TRASLADO.find((m) => m.valor === v)?.lab
 const esFalloDeConsulta = (mensaje) => /^\[[45]\d{2}\]/.test(mensaje || "");
 
 export default function ListaGuias() {
+  const navigate = useNavigate();
   const [guias, setGuias] = useState([]);
   const [filtros, setFiltros] = useState(FILTROS_VACIO);
   const [filtrosAplicados, setFiltrosAplicados] = useState(FILTROS_VACIO);
@@ -108,6 +110,15 @@ export default function ListaGuias() {
         <div>
           <h2 className="text-xl font-semibold text-ink">Guías de Remisión SUNAT</h2>
           <span className="text-sm text-ink-muted">{paginacion.total} guía{paginacion.total !== 1 ? "s" : ""}</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <button onClick={() => navigate("/facturacion-electronica")}
+            className="text-sm text-blue-600 hover:text-blue-800 underline">
+            Ver Comprobantes
+          </button>
+          <button onClick={() => navigate("/facturacion-electronica/guias/emitir")} className="btn-primary">
+            + Emitir Guía
+          </button>
         </div>
       </div>
 

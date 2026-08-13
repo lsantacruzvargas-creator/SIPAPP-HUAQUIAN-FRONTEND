@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
-import { fetchAuth, uploadAuth, imgUrl } from "../utils/fetchAuth";
+import { fetchAuth, uploadAuth, abrirArchivoProtegido } from "../utils/fetchAuth";
 import DetalleDocumento from "../components/DetalleDocumento";
 import ModalCrearOrdenCompra   from "../components/ModalCrearOrdenCompra";
 import ModalImportarExcel, { COLS_OC, COLS_CADENA } from "../components/ModalImportarExcel";
-import { DotChip, badgeOT, badgePago, dotOT, dotPago } from "../components/detalleShared";
+import { DotChip, badgeOT, dotOT } from "../components/detalleShared";
 import * as XLSX from "xlsx";
 
 const ESTADOS_OT = ["", "pendiente", "en progreso", "completado"];
@@ -27,7 +27,16 @@ const compararTexto = (na, nb) => {
   return String(nb).localeCompare(String(na));
 };
 
-function TablaOC({ titulo, acento, ordenes, otMap, factMap, factByOCMap, otNumeroMap, onSelect, subirDocumento, vacioMsg }) {
+// El monto de la OC no tiene moneda propia (a diferencia de Cotizacion) —
+// se trata como Soles por convención, igual que el resto de la cadena
+// (OT/Factura), y se convierte a US$ con el Tipo de Cambio compartido.
+const totalesDuales = (monto, tipoCambio) => {
+  const m = Number(monto) || 0;
+  const tc = Number(tipoCambio) || 0;
+  return { pen: m, usd: tc > 0 ? m / tc : null };
+};
+
+function TablaOC({ titulo, acento, ordenes, otMap, factMap, factByOCMap, tipoCambio, onSelect, subirDocumento, vacioMsg }) {
   return (
     <div className="mb-6">
       <div className="flex items-center gap-2 mb-3">
@@ -40,35 +49,31 @@ function TablaOC({ titulo, acento, ordenes, otMap, factMap, factByOCMap, otNumer
         <table className="w-full text-sm min-w-[600px]">
           <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-200">
             <tr>
-              <th className={`${TH} text-left`}>N° OT</th>
+              <th className={`${TH} text-left`}>Cotización</th>
               <th className={`${TH} text-left`}>N° Orden de Compra</th>
               <th className={`${TH} text-left`}>N° Factura</th>
-              <th className={`${TH} text-left`}>Cotización</th>
               <th className={`${TH} text-left`}>Empresa</th>
-              <th className={`${TH} text-left`}>Planta</th>
-              <th className={`${TH} text-left`}>Encargado</th>
               <th className={`${TH} text-left`}>Título</th>
-              <th className={`${TH} text-right`}>Total sin IGV (S/)</th>
-              <th className={`${TH} text-center`}>Fecha</th>
+              <th className={`${TH} text-right`}>Total (S/)</th>
+              <th className={`${TH} text-right`}>Total (US$)</th>
+              <th className={`${TH} text-center`}>Estado Cotización</th>
               <th className={`${TH} text-center`}>Estado OT</th>
-              <th className={`${TH} text-center`}>Estado Pago</th>
               <th className={`${TH} text-center`}>Documento</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {ordenes.length === 0 ? (
-              <tr><td colSpan={13} className="px-4 py-8 text-center text-gray-400">{vacioMsg}</td></tr>
+              <tr><td colSpan={10} className="px-4 py-8 text-center text-gray-400">{vacioMsg}</td></tr>
             ) : ordenes.map((o) => {
               const cotId = o.cotizacion?._id || o.cotizacion;
               const estadoActual = otMap[cotId];
               const factura = factByOCMap[o._id] || factMap[cotId];
+              const { pen, usd } = totalesDuales(o.monto, tipoCambio);
               return (
                 <tr key={o._id}
                   className={`hover:bg-gray-50 cursor-pointer transition-colors ${o.anulado ? "opacity-50" : ""}`}
                   onClick={() => onSelect(o)}>
-                  <td className="px-4 py-3.5 text-gray-600 whitespace-nowrap">
-                    {otNumeroMap[o.numeroDocumento] || <span className="text-gray-300">—</span>}
-                  </td>
+                  <td className="px-4 py-3.5 font-semibold text-gray-800 whitespace-nowrap">{o.cotizacion?.numeroCotizacion || <span className="text-gray-300">—</span>}</td>
                   <td className="px-4 py-3.5 font-semibold text-gray-800 whitespace-nowrap">
                     <div className="flex items-center gap-1.5">
                       {o.numeroOrden || <span className="text-gray-300">—</span>}
@@ -80,29 +85,29 @@ function TablaOC({ titulo, acento, ordenes, otMap, factMap, factByOCMap, otNumer
                     </div>
                   </td>
                   <td className="px-4 py-3.5 text-gray-600 whitespace-nowrap">{o.numeroFactura || factura?.numeroFactura || <span className="text-gray-300">—</span>}</td>
-                  <td className="px-4 py-3.5 font-semibold text-gray-800 whitespace-nowrap">{o.cotizacion?.numeroCotizacion || <span className="text-gray-300">—</span>}</td>
                   <td className="px-4 py-3.5 text-gray-700">{o.empresa?.razonSocial || "—"}</td>
-                  <td className="px-4 py-3.5 text-gray-600">{o.planta || <span className="text-gray-300">—</span>}</td>
-                  <td className="px-4 py-3.5 text-gray-600">{o.encargado || <span className="text-gray-300">—</span>}</td>
                   <td className="px-4 py-3.5 text-gray-600">{o.titulo}</td>
                   <td className="px-4 py-3.5 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap">
-                    {Number(o.monto).toLocaleString("es-PE", { minimumFractionDigits: 2 })}
+                    {pen.toLocaleString("es-PE", { minimumFractionDigits: 2 })}
                   </td>
-                  <td className="px-4 py-3.5 text-center text-gray-500 whitespace-nowrap">
-                    {new Date(o.fecha).toLocaleDateString("es-PE")}
+                  <td className="px-4 py-3.5 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap">
+                    {usd != null ? usd.toLocaleString("es-PE", { minimumFractionDigits: 2 }) : "—"}
+                  </td>
+                  <td className="px-4 py-3.5 text-center">
+                    <div className="flex flex-col items-center gap-1">
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full uppercase tracking-wide whitespace-nowrap ${o.cotizacion?.aprobado ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                        {o.cotizacion?.aprobado ? "Aprobada" : "Pendiente"}
+                      </span>
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full uppercase tracking-wide whitespace-nowrap ${o.cotizacion?.enviado ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                        {o.cotizacion?.enviado ? "Enviada" : "No enviada"}
+                      </span>
+                    </div>
                   </td>
                   <td className="px-4 py-3.5 text-center">
                     {estadoActual ? (
                       <DotChip chip={badgeOT(estadoActual)} dot={dotOT(estadoActual)}>{estadoActual}</DotChip>
                     ) : (
                       <span className="text-gray-300 text-xs">Sin OT</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3.5 text-center">
-                    {factura?.estadoPago ? (
-                      <DotChip chip={badgePago(factura.estadoPago)} dot={dotPago(factura.estadoPago)}>{factura.estadoPago}</DotChip>
-                    ) : (
-                      <span className="text-gray-300 text-xs">—</span>
                     )}
                   </td>
                   <td className="px-4 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
@@ -115,15 +120,13 @@ function TablaOC({ titulo, acento, ordenes, otMap, factMap, factByOCMap, otNumer
                       />
                       {o.documento ? (
                         <div className="flex items-center gap-2">
-                          <a
-                            href={imgUrl(o.documento)}
-                            target="_blank"
-                            rel="noreferrer"
-                            onClick={(e) => e.stopPropagation()}
+                          <button
+                            type="button"
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); abrirArchivoProtegido(o.documento); }}
                             className="text-blue-600 hover:text-blue-800 text-xs font-medium underline"
                           >
                             Ver PDF
-                          </a>
+                          </button>
                           <span className="text-gray-300">|</span>
                           <span className="text-xs text-gray-400 hover:text-gray-600 underline">Reemplazar</span>
                         </div>
@@ -150,6 +153,7 @@ export default function ListaOrdenesCompra() {
   const [otNumeroMap, setOtNumeroMap] = useState({});
   const [factMap, setFactMap]       = useState({});
   const [factByOCMap, setFactByOCMap] = useState({});
+  const [tipoCambio, setTipoCambio] = useState(null);
   const [sortBy, setSortBy]         = useState("fecha");
   const [ordenSeleccionada, setOrdenSeleccionada] = useState(null);
   const [crearOpen, setCrearOpen]   = useState(false);
@@ -167,8 +171,10 @@ export default function ListaOrdenesCompra() {
       fetchAuth("/ordenes-compra").then((r) => r.ok ? r.json() : []),
       fetchAuth("/ordenes-trabajo").then((r) => r.ok ? r.json() : []),
       fetchAuth("/facturas").then((r) => r.ok ? r.json() : []),
-    ]).then(([ocs, ots, facts]) => {
+      fetchAuth("/tipo-cambio").then((r) => r.ok ? r.json() : null),
+    ]).then(([ocs, ots, facts, tc]) => {
       setOrdenes(ocs);
+      setTipoCambio(tc?.valor ?? null);
       const otM = {};
       const otNumM = {};
       ots.forEach((ot) => {
@@ -258,19 +264,18 @@ export default function ListaOrdenesCompra() {
     const cotId = o.cotizacion?._id || o.cotizacion;
     const estadoActual = otMap[cotId];
     const factura = factByOCMap[o._id] || factMap[cotId];
+    const { pen, usd } = totalesDuales(o.monto, tipoCambio);
     return {
-      "N° OT":            otNumeroMap[o.numeroDocumento] || "—",
+      "Cotización":         o.cotizacion?.numeroCotizacion || "—",
       "N° Orden de Compra": o.numeroOrden || "—",
-      "N° Factura":       o.numeroFactura || factura?.numeroFactura || "—",
-      "Cotización":       o.cotizacion?.numeroCotizacion || "—",
-      "Empresa":          o.empresa?.razonSocial || "—",
-      "Planta":           o.planta || "—",
-      "Encargado":        o.encargado || "—",
-      "Título":           o.titulo || "—",
-      "Total sin IGV":    Number(o.monto).toFixed(2),
-      "Fecha":            new Date(o.fecha).toLocaleDateString("es-PE"),
-      "Estado OT":        estadoActual || "Sin OT",
-      "Estado Pago":      factura?.estadoPago || "—",
+      "N° Factura":         o.numeroFactura || factura?.numeroFactura || "—",
+      "Empresa":            o.empresa?.razonSocial || "—",
+      "Título":             o.titulo || "—",
+      "Total (S/)":         pen.toFixed(2),
+      "Total (US$)":        usd != null ? usd.toFixed(2) : "—",
+      "Aprobado":           o.cotizacion?.aprobado ? "Aprobada" : "Pendiente",
+      "Enviado":            o.cotizacion?.enviado ? "Enviada" : "No enviada",
+      "Estado OT":          estadoActual || "Sin OT",
     };
   };
 
@@ -403,7 +408,7 @@ export default function ListaOrdenesCompra() {
         titulo="Órdenes de Compra sin factura"
         acento="bg-amber-500"
         ordenes={sinFactura}
-        otMap={otMap} factMap={factMap} factByOCMap={factByOCMap} otNumeroMap={otNumeroMap}
+        otMap={otMap} factMap={factMap} factByOCMap={factByOCMap} tipoCambio={tipoCambio}
         onSelect={setOrdenSeleccionada}
         subirDocumento={subirDocumento}
         vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de compra sin factura"}
@@ -413,7 +418,7 @@ export default function ListaOrdenesCompra() {
         titulo="Órdenes de Compra con factura"
         acento="bg-emerald-500"
         ordenes={conFactura}
-        otMap={otMap} factMap={factMap} factByOCMap={factByOCMap} otNumeroMap={otNumeroMap}
+        otMap={otMap} factMap={factMap} factByOCMap={factByOCMap} tipoCambio={tipoCambio}
         onSelect={setOrdenSeleccionada}
         subirDocumento={subirDocumento}
         vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de compra con factura"}
@@ -423,7 +428,7 @@ export default function ListaOrdenesCompra() {
         titulo="Órdenes de Compra cerradas"
         acento="bg-gray-500"
         ordenes={cerradas}
-        otMap={otMap} factMap={factMap} factByOCMap={factByOCMap} otNumeroMap={otNumeroMap}
+        otMap={otMap} factMap={factMap} factByOCMap={factByOCMap} tipoCambio={tipoCambio}
         onSelect={setOrdenSeleccionada}
         subirDocumento={subirDocumento}
         vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de compra cerradas"}

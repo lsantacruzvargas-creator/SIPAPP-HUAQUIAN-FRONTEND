@@ -15,6 +15,7 @@ const hoy = () => new Date().toISOString().split("T")[0];
 export default function Cotizaciones() {
   const [empresas, setEmpresas] = useState([]);
   const [tipo, setTipo] = useState("venta");
+  const [moneda, setMoneda] = useState("PEN");
   const [form, setForm] = useState({ empresa: "", condicionPago: "", fecha: hoy(), titulo: "" });
   const [items, setItems] = useState([itemVacioVenta()]);
   const [guardado, setGuardado] = useState(null);
@@ -116,6 +117,7 @@ export default function Cotizaciones() {
       const body = {
         ...form,
         tipo,
+        moneda,
         items: items.map((i) => {
           const item = {
             descripcion: i.descripcion,
@@ -153,6 +155,7 @@ export default function Cotizaciones() {
 
   const nueva = () => {
     setTipo("venta");
+    setMoneda("PEN");
     setForm({ empresa: "", condicionPago: "", fecha: hoy(), titulo: "" });
     setItems([itemVacioVenta()]);
     setGuardado(null);
@@ -198,6 +201,13 @@ export default function Cotizaciones() {
               {t.charAt(0).toUpperCase() + t.slice(1)}
             </button>
           ))}
+          <span className="w-px h-6 bg-gray-200 mx-1" />
+          <span className="text-sm font-medium text-gray-500">Moneda:</span>
+          <select value={moneda} disabled={ro} onChange={(e) => setMoneda(e.target.value)}
+            className="border border-gray-300 rounded-full px-4 py-1.5 text-sm disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500">
+            <option value="PEN">Soles (S/)</option>
+            <option value="USD">Dólares (US$)</option>
+          </select>
         </div>
 
         {/* Origen OT — solo para servicio */}
@@ -456,17 +466,17 @@ export default function Cotizaciones() {
               <tfoot className="border-t-2 border-gray-200 bg-gray-50">
                 <tr>
                   <td colSpan={7} className="px-4 py-2 text-right text-xs text-gray-500">Subtotal</td>
-                  <td className="px-3 py-2 text-right font-medium">{subtotalGeneral.toFixed(2)}</td>
+                  <td className="px-3 py-2 text-right font-medium">{moneda === "USD" ? "US$" : "S/"} {subtotalGeneral.toFixed(2)}</td>
                   {!ro && <td />}
                 </tr>
                 <tr>
                   <td colSpan={7} className="px-4 py-2 text-right text-xs text-gray-500">IGV 18%</td>
-                  <td className="px-3 py-2 text-right font-medium">{igv.toFixed(2)}</td>
+                  <td className="px-3 py-2 text-right font-medium">{moneda === "USD" ? "US$" : "S/"} {igv.toFixed(2)}</td>
                   {!ro && <td />}
                 </tr>
                 <tr>
                   <td colSpan={7} className="px-4 py-2 text-right text-sm font-semibold text-gray-800">Total</td>
-                  <td className="px-3 py-2 text-right font-bold text-gray-900 text-base">{total.toFixed(2)}</td>
+                  <td className="px-3 py-2 text-right font-bold text-gray-900 text-base">{moneda === "USD" ? "US$" : "S/"} {total.toFixed(2)}</td>
                   {!ro && <td />}
                 </tr>
               </tfoot>

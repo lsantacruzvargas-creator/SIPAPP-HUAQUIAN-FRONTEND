@@ -63,7 +63,7 @@ function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg }) {
                   <td colSpan={8} className="px-4 py-8 text-center text-gray-400">{vacioMsg}</td>
                 </tr>
               ) : (
-                ordenes.map((o) => (
+                ordenes.flatMap((o) => [
                   <tr
                     key={o._id}
                     className={`hover:bg-gray-50 cursor-pointer transition-colors ${o.anulado ? "opacity-50" : ""}`}
@@ -94,8 +94,32 @@ function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg }) {
                     <td className="px-4 py-3.5 text-center">
                       <DotChip chip={badgeOT(o.estado)} dot={dotOT(o.estado)}>{o.estado}</DotChip>
                     </td>
-                  </tr>
-                ))
+                  </tr>,
+                  ...(o.subOTs || []).map((s) => (
+                    <tr
+                      key={s._id}
+                      className={`hover:bg-gray-50 cursor-pointer transition-colors bg-indigo-50/30 ${s.anulado ? "opacity-50" : ""}`}
+                      onClick={() => onSelect(s)}
+                    >
+                      <td className="px-4 py-3 font-semibold text-indigo-700 whitespace-nowrap pl-8">
+                        ↳ {s.numeroOT}
+                      </td>
+                      <td className="px-4 py-3 text-gray-400 whitespace-nowrap">—</td>
+                      <td className="px-4 py-3 text-center text-gray-500 whitespace-nowrap">
+                        {s.fechaEntrega ? new Date(s.fechaEntrega).toLocaleDateString("es-PE") : <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-4 py-3 text-gray-700">
+                        {s.empresa?.razonSocial || o.empresa?.razonSocial || <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">{s.planta || o.planta || <span className="text-gray-300">—</span>}</td>
+                      <td className="px-4 py-3 text-gray-600">{s.encargado || <span className="text-gray-300">—</span>}</td>
+                      <td className="px-4 py-3 text-gray-700">{s.titulo || <span className="text-gray-300">—</span>}</td>
+                      <td className="px-4 py-3 text-center">
+                        <DotChip chip={badgeOT(s.estado)} dot={dotOT(s.estado)}>{s.estado}</DotChip>
+                      </td>
+                    </tr>
+                  )),
+                ])
               )}
             </tbody>
           </table>
@@ -139,9 +163,18 @@ export default function ListaOrdenesTrabajo() {
     (a, b) => b - a
   );
 
+  // Las sub-OTs (ordenPadre != null) no aparecen como filas propias en
+  // `ordenes` — se agrupan bajo `subOTs` de su padre y TablaOTs las renderiza
+  // como filas propias justo debajo de la fila padre (ver flatMap ahí).
+  const padres = ordenes.filter((o) => !o.ordenPadre);
+  const conSubOTs = padres.map((p) => ({
+    ...p,
+    subOTs: ordenes.filter((o) => (o.ordenPadre?._id || o.ordenPadre) === p._id),
+  }));
+
   const empresasLista = [
     ...new Map(
-      ordenes
+      conSubOTs
         .filter((o) => o.empresa?._id)
         .map((o) => [o.empresa._id, o.empresa])
     ).values(),
@@ -149,7 +182,7 @@ export default function ListaOrdenesTrabajo() {
 
   const plantasLista = [
     ...new Set(
-      (filtros.empresa ? ordenes.filter((o) => o.empresa?._id === filtros.empresa) : ordenes)
+      (filtros.empresa ? conSubOTs.filter((o) => o.empresa?._id === filtros.empresa) : conSubOTs)
         .map((o) => o.planta)
         .filter(Boolean)
     ),
@@ -158,7 +191,7 @@ export default function ListaOrdenesTrabajo() {
   const handleFiltro = (e) => setFiltros({ ...filtros, [e.target.name]: e.target.value });
   const handleEmpresa = (e) => setFiltros({ ...filtros, empresa: e.target.value, planta: "" });
 
-  const filtradas = ordenes.filter((o) => {
+  const filtradas = conSubOTs.filter((o) => {
     const fecha = new Date(o.createdAt);
     const q = filtros.busqueda.toLowerCase();
     return (
@@ -174,7 +207,8 @@ export default function ListaOrdenesTrabajo() {
         ocPorNumDoc.get(o.numeroDocumento)?.toLowerCase().includes(q) ||
         facturaPorNumDoc.get(o.numeroDocumento)?.toLowerCase().includes(q) ||
         o.empresa?.razonSocial?.toLowerCase().includes(q) ||
-        o.empresa?.ruc?.includes(q))
+        o.empresa?.ruc?.includes(q) ||
+        o.subOTs.some((s) => s.numeroOT?.toLowerCase().includes(q) || s.titulo?.toLowerCase().includes(q)))
     );
   });
 
@@ -184,14 +218,26 @@ export default function ListaOrdenesTrabajo() {
     return new Date(b.createdAt) - new Date(a.createdAt);
   });
 
+  // "Cerrada" (cadena cerrada, ver cerrarCadena) manda por encima del `estado`
+  // propio de la OT — es la bandeja de archivado final, sin importar en qué
+  // estado de trabajo se haya quedado. Mientras la cadena sigue abierta, la
+  // OT vive en la tabla que corresponde a su `estado` actual (el mismo valor
+  // que arma el filtro "Todo estado" de arriba) — así una OT que pasa a
+  // "completado" se mueve sola a la tabla de Completadas sin quedarse
+  // mezclada con las pendientes.
   const esCerrada = (o) => o.estadoCadena === "cerrado";
+  const abiertas = filtradas.filter((o) => !esCerrada(o));
+  const pendientes = abiertas.filter((o) => o.estado === "pendiente");
+  const enProgreso = abiertas.filter((o) => o.estado === "en progreso");
+  const completadas = abiertas.filter((o) => o.estado === "completado");
+  const entregadas = abiertas.filter((o) => o.estado === "entregado");
   const cerradas = filtradas.filter((o) => esCerrada(o));
-  const pendientes = filtradas.filter((o) => !esCerrada(o));
   const hayFiltro = Object.values(filtros).some(Boolean);
 
   // Mismas columnas que TablaOTs — una hoja por cada tabla visible.
   const filaOT = (o) => ({
     "N° OT":          o.numeroOT || "—",
+    "Sub-OTs":        o.subOTs?.map((s) => s.numeroOT).join(", ") || "—",
     "N° Cotización":  o.cotizacion?.numeroCotizacion || "—",
     "Fecha recibida": o.fechaRecibida ? new Date(o.fechaRecibida).toLocaleDateString("es-PE") : "—",
     "Empresa":        o.empresa?.razonSocial || "—",
@@ -205,6 +251,9 @@ export default function ListaOrdenesTrabajo() {
     const wb = XLSX.utils.book_new();
     [
       ["Pendientes", pendientes],
+      ["En progreso", enProgreso],
+      ["Completadas", completadas],
+      ["Entregadas", entregadas],
       ["Cerradas", cerradas],
     ].forEach(([nombre, lista]) => {
       const ws = XLSX.utils.json_to_sheet(lista.map(filaOT));
@@ -312,6 +361,30 @@ export default function ListaOrdenesTrabajo() {
         ordenes={pendientes}
         onSelect={setSeleccionada}
         vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes pendientes"}
+      />
+
+      <TablaOTs
+        titulo="Órdenes en progreso"
+        acento="bg-blue-500"
+        ordenes={enProgreso}
+        onSelect={setSeleccionada}
+        vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes en progreso"}
+      />
+
+      <TablaOTs
+        titulo="Órdenes completadas"
+        acento="bg-green-500"
+        ordenes={completadas}
+        onSelect={setSeleccionada}
+        vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes completadas"}
+      />
+
+      <TablaOTs
+        titulo="Órdenes entregadas"
+        acento="bg-teal-500"
+        ordenes={entregadas}
+        onSelect={setSeleccionada}
+        vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes entregadas"}
       />
 
       <TablaOTs

@@ -1,7 +1,7 @@
 import ExcelJS from "exceljs";
 import JSZip from "jszip";
 import { tipoInformePorValor, claveChecklist } from "./informesTecnicos";
-import { imgUrl } from "./fetchAuth";
+import { fetchUpload } from "./fetchAuth";
 
 // exceljs solo puede incrustar estos 3 formatos — si la foto subida es de
 // otro tipo (ej. webp/heic) se omite del Excel (sigue disponible en la app).
@@ -661,7 +661,7 @@ export async function exportarInformeTecnicoExcel(informe, ot) {
         const extension = EXTENSION_SOPORTADA(ruta);
         if (!extension) { console.warn("Formato de imagen no soportado para Excel:", ruta); continue; }
         try {
-          const resImg = await fetch(imgUrl(ruta));
+          const resImg = await fetchUpload(ruta);
           const bufferImg = await resImg.arrayBuffer();
           const imageId = wb.addImage({ buffer: bufferImg, extension });
           escribirFilaDerecha(filaFotos, grupo.titulo);

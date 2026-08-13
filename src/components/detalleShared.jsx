@@ -210,8 +210,8 @@ export const dotOT = (e) => {
   return "bg-gray-300";
 };
 
-export const money = (v) =>
-  "S/ " + Number(v ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2 });
+export const money = (v, moneda = "PEN") =>
+  (moneda === "USD" ? "US$ " : "S/ ") + Number(v ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2 });
 
 /* ─── Anulación de documentos ────────────────────────────────────── */
 export function BotonAnular({ onAnular }) {

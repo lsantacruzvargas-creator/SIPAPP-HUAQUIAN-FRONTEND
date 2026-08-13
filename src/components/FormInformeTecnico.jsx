@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { fetchAuth, uploadAuth, imgUrl, getUsuario } from "../utils/fetchAuth";
+import { fetchAuth, uploadAuth, getUsuario } from "../utils/fetchAuth";
 import { tipoInformePorValor, claveChecklist } from "../utils/informesTecnicos";
+import ImagenProtegida from "./ImagenProtegida";
 
 const INP = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 w-full transition";
 
@@ -164,7 +165,7 @@ function SeccionEvidencias({ seccion, campos, onCampos }) {
             </div>
             <div className="flex flex-wrap gap-2">
               {g.imagenes.map((img, i) => (
-                <img key={i} src={imgUrl(img)} alt="" className="w-16 h-16 object-cover rounded-lg border border-gray-200" />
+                <ImagenProtegida key={i} src={img} className="w-16 h-16 object-cover rounded-lg border border-gray-200" />
               ))}
               {["environment", null].map((capture) => (
                 <label key={capture || "galeria"}

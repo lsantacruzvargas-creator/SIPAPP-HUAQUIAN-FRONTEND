@@ -1,6 +1,7 @@
-import { imgUrl } from "../utils/fetchAuth";
+import { abrirArchivoProtegido } from "../utils/fetchAuth";
 import { tipoInformePorValor, claveChecklist } from "../utils/informesTecnicos";
 import { exportarInformeTecnicoExcel } from "../utils/informeTecnicoExcel";
+import ImagenProtegida from "./ImagenProtegida";
 
 function Campo({ label, valor }) {
   return (
@@ -94,7 +95,7 @@ function BloqueSeccion({ seccion, campos }) {
             {g.titulo && <p className="text-sm font-semibold text-gray-700">{g.titulo}</p>}
             <div className="flex flex-wrap gap-2">
               {(g.imagenes || []).map((img, j) => (
-                <img key={j} src={imgUrl(img)} alt="" onClick={() => window.open(imgUrl(img), "_blank")}
+                <ImagenProtegida key={j} src={img} onClick={() => abrirArchivoProtegido(img)}
                   className="w-24 h-24 object-cover rounded-lg border border-gray-200 cursor-pointer hover:opacity-80 transition" />
               ))}
             </div>

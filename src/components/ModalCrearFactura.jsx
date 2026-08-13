@@ -4,33 +4,26 @@ import { fetchAuth } from "../utils/fetchAuth";
 const INP     = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 w-full";
 const INP_DIS = "border border-gray-100 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500 w-full";
 
-// Empresa emisora fija para la emisión electrónica SUNAT. Las credenciales
-// SUNAT las resuelve el hub central por RUC (Backend/src/services/hub.service.js)
-// — este ERP no guarda ningún registro de credenciales.
-// TODO: RUC/razón social/serie reales pendientes de configurar (deben coincidir
-// con RUC_EMISOR/RAZON_SOCIAL_EMISOR del backend) antes de usar el toggle
-// "Emitir factura electrónica SUNAT" contra SUNAT de verdad.
-const RUC_EMISOR = "00000000000";
-const NOMBRE_EMISOR = "HUAQUIAN (RUC pendiente de configurar)";
-const SERIE_FACTURA = "F001";
+// Empresa emisora y serie fijas — Huaquian solo factura a su propio nombre
+// ante SUNAT (el hub central resuelve las credenciales por RUC, ver
+// Backend/src/services/hub.service.js). Deben coincidir con RUC_EMISOR /
+// RAZON_SOCIAL_EMISOR de Backend/.env. Serie terminada en "2", igual que
+// EmitirComprobante.jsx, para evitar conflictos de correlativo con series
+// de prueba/históricas.
+const RUC_EMISOR = "20601565235";
+const NOMBRE_EMISOR = "HUAQUIAN";
+const SERIE_FACTURA = "F002";
 
-function calcular(sub) {
-  const s = Math.round(Number(sub) * 100) / 100 || 0;
-  const igv = Math.round(s * 0.18 * 100) / 100;
-  const total = Math.round((s + igv) * 100) / 100;
+function calcular(subtotal, descuentoPct) {
+  const sub = Math.round(Number(subtotal) * 100) / 100 || 0;
+  const desc = Number(descuentoPct) || 0;
+  const base = Math.round(sub * (1 - desc / 100) * 100) / 100;
+  const igv = Math.round(base * 0.18 * 100) / 100;
+  const total = Math.round((base + igv) * 100) / 100;
   // R.S. 178-2005/SUNAT: aplica solo si el total (con IGV) es >= S/ 701, y el
   // depósito se hace en números enteros (sin decimales).
   const detraccion = total >= 701 ? Math.round(total * 0.12) : 0;
-  return { igv, total, detraccion, totalAPagar: Math.round((total - detraccion) * 100) / 100 };
-}
-
-// Base facturable: con el toggle SUNAT activo se factura el subtotal ya neto
-// del descuento (igual que el ítem del CPE); en modo manual no hay descuento.
-function baseFacturable(subtotal, descuentoPorcentaje, emitirSunat) {
-  const sub = Number(subtotal) || 0;
-  if (!emitirSunat) return sub;
-  const desc = Number(descuentoPorcentaje) || 0;
-  return Math.round(sub * (1 - desc / 100) * 100) / 100;
+  return { base, igv, total, detraccion, totalAPagar: Math.round((total - detraccion) * 100) / 100 };
 }
 
 function BuscadorOrdenCompra({ onSelect, onClose }) {
@@ -73,6 +66,10 @@ function BuscadorOrdenCompra({ onSelect, onClose }) {
   );
 }
 
+// Este modal emite siempre la Factura SUNAT real (POST /cpe/factura — mismo
+// endpoint y correlativo atómico que "Emitir CPE") y, si la emisión no es
+// rechazada, crea además el registro interno Factura (POST /facturas) con
+// ese mismo número — igual que ModalFactura.jsx en SIPAPP-IMAQUITEC.
 export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
   const hoy = new Date().toISOString().split("T")[0];
   // Si viene una OC ya conocida (p.ej. al crear la Factura desde la tarjeta
@@ -80,7 +77,7 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
   // manualmente — sin useEffect, para no disparar un setState en el montaje.
   const [form, setForm] = useState(() => {
     const base = {
-      numeroFactura: "", numeroOrdenCompra: "",
+      numeroOrdenCompra: "",
       fechaEmision: hoy, fechaCancelacion: "",
       empresa: "", subtotal: "", descuentoPorcentaje: "0", descripcion: "",
       encargado: "", planta: "", numeroGuiaEmision: "", numeroGuiaRemision: "",
@@ -98,17 +95,27 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
       numeroGuiaRemision: ocInicial.numeroGuiaRemision || "",
     };
   });
-  // Emitir vía SUNAT es el modo por defecto; el toggle permite volver al
-  // registro manual de siempre (sin llamar a /cpe/factura) para casos que no
-  // requieren comprobante electrónico.
-  const [emitirSunat, setEmitirSunat] = useState(true);
-  const [calc, setCalc]           = useState(() => calcular(baseFacturable(ocInicial?.subtotal > 0 ? ocInicial.subtotal : 0, 0, true)));
+  const [calc, setCalc]           = useState(() => calcular(ocInicial?.subtotal > 0 ? ocInicial.subtotal : 0, 0));
   const [ocVinculada, setOcVinc]  = useState(ocInicial || null);
   const [empresas, setEmpresas]   = useState([]);
   const [buscadorOC, setBOC]      = useState(false);
+  const [formaPago, setFormaPago] = useState("Contado");
+  const [cuotas, setCuotas]       = useState([]);
   const [guardando, setGuardando] = useState(false);
   const [error, setError]         = useState("");
   const [exito, setExito]         = useState(null);
+
+  const cambiarFormaPago = (v) => {
+    setFormaPago(v);
+    if (v === "Credito" && cuotas.length === 0) {
+      setCuotas([{ _key: Date.now(), monto: "", fechaVencimiento: "" }]);
+    }
+  };
+  const agregarCuota = () => setCuotas([...cuotas, { _key: Date.now() + Math.random(), monto: "", fechaVencimiento: "" }]);
+  const eliminarCuota = (key) => setCuotas(cuotas.filter((c) => c._key !== key));
+  const handleCuota = (key, campo, valor) =>
+    setCuotas(cuotas.map((c) => (c._key === key ? { ...c, [campo]: valor } : c)));
+  const sumaCuotas = cuotas.reduce((s, c) => s + (Number(c.monto) || 0), 0);
 
   useEffect(() => {
     fetchAuth("/empresas").then(r => r.ok && r.json()).then(d => setEmpresas(d || []));
@@ -117,18 +124,13 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
   const plantasEmpresa = empresas.find(e => e._id === form.empresa)?.plantas ?? [];
   const empresaSeleccionada = empresas.find(e => e._id === form.empresa) ?? null;
 
-  const recalcular = (subtotal, descuento, sunat) => {
-    setCalc(calcular(baseFacturable(subtotal, descuento, sunat)));
-  };
-
   const handleChange = (e) => {
     const { name, value } = e.target;
     if (name === "subtotal" || name === "descuentoPorcentaje") {
-      recalcular(
+      setCalc(calcular(
         name === "subtotal" ? value : form.subtotal,
         name === "descuentoPorcentaje" ? value : form.descuentoPorcentaje,
-        emitirSunat
-      );
+      ));
     }
     setForm(prev => ({
       ...prev,
@@ -137,20 +139,12 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
     }));
   };
 
-  const toggleSunat = () => {
-    setEmitirSunat(prev => {
-      const next = !prev;
-      recalcular(form.subtotal, form.descuentoPorcentaje, next);
-      return next;
-    });
-  };
-
   const seleccionarOC = (oc) => {
     setOcVinc(oc);
     setBOC(false);
     setForm(prev => {
       const nuevoSub = prev.subtotal || (oc.subtotal > 0 ? String(oc.subtotal) : prev.subtotal);
-      if (!prev.subtotal && oc.subtotal > 0) recalcular(oc.subtotal, prev.descuentoPorcentaje, emitirSunat);
+      if (!prev.subtotal && oc.subtotal > 0) setCalc(calcular(oc.subtotal, prev.descuentoPorcentaje));
       return {
         ...prev,
         numeroOrdenCompra:  oc.numeroOrden   || prev.numeroOrdenCompra,
@@ -165,23 +159,22 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
     });
   };
 
-  // Resuelve la OC vinculada (o crea una nueva) — paso compartido por el
-  // registro manual y por la emisión SUNAT, para que la Factura nazca con
-  // `ordenCompra` ya seteado (así hereda su numeroDocumento).
+  // Resuelve la OC vinculada (o crea una nueva) — paso previo a la emisión
+  // SUNAT, para que la Factura nazca con `ordenCompra` ya seteado (así
+  // hereda su numeroDocumento).
   const resolverOrdenCompra = async () => {
     if (ocVinculada) return { ocId: ocVinculada._id };
 
     const ocPayload = {
-      titulo:        form.descripcion || "por definir",
-      numeroOrden:   form.numeroOrdenCompra || "",
-      numeroFactura: form.numeroFactura,
-      subtotal:      Number(form.subtotal),
-      igv:           calc.igv,
-      total:         calc.total,
-      monto:         Number(form.subtotal),
-      descripcion:   form.descripcion,
-      planta:        form.planta,
-      encargado:     form.encargado,
+      titulo:      form.descripcion || "por definir",
+      numeroOrden: form.numeroOrdenCompra || "",
+      subtotal:    Number(form.subtotal),
+      igv:         calc.igv,
+      total:       calc.total,
+      monto:       Number(form.subtotal),
+      descripcion: form.descripcion,
+      planta:      form.planta,
+      encargado:   form.encargado,
     };
     if (form.empresa) ocPayload.empresa = form.empresa;
     const resOC = await fetchAuth("/ordenes-compra", {
@@ -194,55 +187,21 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
     return { ocId: newOC._id };
   };
 
-  const guardarManual = async () => {
-    if (!form.numeroFactura.trim()) return setError("El N° de factura es obligatorio.");
-    if (!form.subtotal || Number(form.subtotal) <= 0) return setError("El subtotal debe ser mayor a 0.");
-    setError(""); setGuardando(true);
-
-    const { ocId, error: errorOC } = await resolverOrdenCompra();
-    if (errorOC) { setError(errorOC); setGuardando(false); return; }
-
-    const factPayload = {
-      numeroFactura:      form.numeroFactura,
-      fechaEmision:       form.fechaEmision,
-      subtotal:           Number(form.subtotal),
-      descripcion:        form.descripcion,
-      encargado:          form.encargado,
-      planta:             form.planta,
-      numeroGuiaEmision:  form.numeroGuiaEmision,
-      numeroGuiaRemision: form.numeroGuiaRemision,
-      ordenCompra:        ocId,
-    };
-    if (form.fechaCancelacion) factPayload.fechaCancelacion = form.fechaCancelacion;
-    if (form.empresa)          factPayload.empresa          = form.empresa;
-    if (ocVinculada) {
-      factPayload.codigoSap   = ocVinculada.codigoSap;
-      factPayload.fechaSalida = ocVinculada.fechaSalida;
-    }
-
-    const resF = await fetchAuth("/facturas", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(factPayload),
-    });
-    if (!resF.ok) {
-      setError("No se pudo guardar la factura.");
-      setGuardando(false);
-      return;
-    }
-    const factura = await resF.json();
-
-    setExito(factura.codigo);
-    setTimeout(() => onCreada(factura), 1800);
-    // No se reactiva `guardando`: el botón queda deshabilitado durante el
-    // mensaje de éxito, evitando una segunda creación por doble click.
-  };
-
-  const guardarConSunat = async () => {
+  const guardar = async () => {
     if (!form.descripcion.trim()) return setError("La descripción es obligatoria.");
-    if (!form.subtotal || Number(form.subtotal) <= 0) return setError("El subtotal debe ser mayor a 0.");
+    if (!form.subtotal || Number(form.subtotal) <= 0) return setError("El valor unitario debe ser mayor a 0.");
     if (!empresaSeleccionada?.ruc || !/^\d{11}$/.test(empresaSeleccionada.ruc))
       return setError("La empresa seleccionada no tiene un RUC válido — la factura SUNAT requiere un receptor con RUC.");
+    if (formaPago === "Credito") {
+      if (cuotas.length === 0) return setError("Agrega al menos una cuota de pago para el crédito.");
+      for (const c of cuotas) {
+        if (!c.monto || Number(c.monto) <= 0) return setError("Cada cuota debe tener un monto mayor a 0.");
+        if (!c.fechaVencimiento) return setError("Cada cuota debe tener una fecha de vencimiento.");
+      }
+      if (Math.abs(sumaCuotas - calc.total) >= 0.01) {
+        return setError(`La suma de las cuotas (S/ ${sumaCuotas.toFixed(2)}) debe ser igual al total (S/ ${calc.total.toFixed(2)}).`);
+      }
+    }
     setError(""); setGuardando(true);
 
     const { ocId, error: errorOC } = await resolverOrdenCompra();
@@ -265,7 +224,14 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
           afectacion: "10",
           descuentoPorcentaje: (Number(form.descuentoPorcentaje) || 0) / 100,
         }],
-        formaPago: "Contado",
+        formaPago,
+        ...(formaPago === "Credito" && cuotas.length ? {
+          cuotas: cuotas.map((c, idx) => ({
+            numero: idx + 1,
+            monto: Number(c.monto),
+            fechaVencimiento: c.fechaVencimiento,
+          })),
+        } : {}),
         moneda: "PEN",
         numeroOrdenCompra: form.numeroOrdenCompra || "",
         ordenCompra: ocId,
@@ -282,7 +248,7 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
     const factPayload = {
       numeroFactura:      dataCpe.serie,
       fechaEmision:       form.fechaEmision,
-      subtotal:           baseFacturable(form.subtotal, form.descuentoPorcentaje, true),
+      subtotal:           calc.base,
       descripcion:        form.descripcion,
       encargado:          form.encargado,
       planta:             form.planta,
@@ -311,9 +277,9 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
 
     setExito(factura.codigo);
     setTimeout(() => onCreada(factura), 1800);
+    // No se reactiva `guardando`: el botón queda deshabilitado durante el
+    // mensaje de éxito, evitando una segunda creación por doble click.
   };
-
-  const guardar = () => (emitirSunat ? guardarConSunat() : guardarManual());
 
   return (
     <>
@@ -327,35 +293,27 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
 
         <div className="flex-1 overflow-y-auto p-6 space-y-5">
 
-          {/* Toggle emisión SUNAT vs registro manual */}
-          <label className="flex items-center gap-3 bg-gray-50 rounded-xl p-4 cursor-pointer">
-            <input type="checkbox" checked={emitirSunat} onChange={toggleSunat} className="w-4 h-4" />
-            <div>
-              <p className="text-sm font-medium text-gray-800">Emitir factura electrónica SUNAT</p>
-              <p className="text-xs text-gray-500">
-                {emitirSunat
-                  ? "Se emite un comprobante real ante SUNAT y el N° de factura se asigna automáticamente."
-                  : "Se registra solo en el ERP, sin comprobante electrónico — el N° de factura se ingresa a mano."}
-              </p>
+          {/* Datos fijos de emisión SUNAT — autocompletados internamente */}
+          <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Emisión SUNAT</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Tipo</label>
+                <input value="Factura" disabled className={INP_DIS} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Serie</label>
+                <input value={SERIE_FACTURA} disabled className={INP_DIS} />
+              </div>
+              <div className="col-span-2">
+                <label className="text-xs text-gray-500 block mb-1">Empresa emisora</label>
+                <input value={`${NOMBRE_EMISOR} — RUC ${RUC_EMISOR}`} disabled className={INP_DIS} />
+              </div>
             </div>
-          </label>
-
-          {emitirSunat && (
-            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-xs text-blue-700 space-y-1">
-              <p><strong>Empresa emisora:</strong> {NOMBRE_EMISOR} — RUC {RUC_EMISOR}</p>
-              <p><strong>Serie:</strong> {SERIE_FACTURA} · <strong>Tipo:</strong> Factura (01)</p>
-            </div>
-          )}
+          </div>
 
           {/* Datos principales */}
           <div className="grid grid-cols-2 gap-4">
-            {!emitirSunat && (
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">N° Factura *</label>
-                <input name="numeroFactura" value={form.numeroFactura} onChange={handleChange}
-                  placeholder="Ej. F001-00123" className={INP} />
-              </div>
-            )}
             <div>
               <label className="text-xs text-gray-500 block mb-1">N° Orden de Compra</label>
               {ocVinculada ? (
@@ -388,7 +346,7 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
               <input type="date" name="fechaCancelacion" value={form.fechaCancelacion} onChange={handleChange} className={INP} />
             </div>
             <div className="col-span-2">
-              <label className="text-xs text-gray-500 block mb-1">Empresa{emitirSunat ? " (receptor SUNAT) *" : ""}</label>
+              <label className="text-xs text-gray-500 block mb-1">Empresa (receptor SUNAT) *</label>
               <select name="empresa" value={form.empresa} onChange={handleChange} className={INP}>
                 <option value="">— Sin empresa —</option>
                 {empresas.map(e => (
@@ -400,20 +358,16 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
 
           {/* Cálculos */}
           <div className="bg-gray-50 rounded-xl p-4 grid grid-cols-2 gap-4">
-            <div className={emitirSunat ? "" : "col-span-2"}>
-              <label className="text-xs text-gray-500 block mb-1">
-                {emitirSunat ? "Valor unitario sin IGV *" : "Subtotal sin IGV *"}
-              </label>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Valor unitario sin IGV *</label>
               <input type="number" name="subtotal" value={form.subtotal} onChange={handleChange}
                 step="0.01" min="0" placeholder="0.00" className={INP} />
             </div>
-            {emitirSunat && (
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Descuento %</label>
-                <input type="number" name="descuentoPorcentaje" value={form.descuentoPorcentaje} onChange={handleChange}
-                  step="0.01" min="0" max="100" className={INP} />
-              </div>
-            )}
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Descuento %</label>
+              <input type="number" name="descuentoPorcentaje" value={form.descuentoPorcentaje} onChange={handleChange}
+                step="0.01" min="0" max="100" className={INP} />
+            </div>
             <div>
               <label className="text-xs text-gray-500 block mb-1">IGV 18%</label>
               <input value={calc.igv.toFixed(2)} disabled className={INP_DIS} />
@@ -431,6 +385,76 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
               <input value={calc.totalAPagar.toFixed(2)} disabled className={`${INP_DIS} font-semibold`} />
             </div>
           </div>
+
+          {/* Forma de pago — igual que "Emitir CPE": Crédito exige cuotas con fecha de
+              vencimiento (SUNAT rechaza con error 3249 si falta la info de cuotas). */}
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Forma de pago</label>
+            <div className="flex gap-3">
+              {["Contado", "Credito"].map((v) => (
+                <button
+                  key={v} type="button"
+                  onClick={() => cambiarFormaPago(v)}
+                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
+                    formaPago === v
+                      ? "bg-gray-900 text-white"
+                      : "border border-gray-300 text-gray-500 hover:border-gray-400 hover:text-gray-700"
+                  }`}
+                >
+                  {v === "Contado" ? "Contado" : "Crédito"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {formaPago === "Credito" && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs text-gray-500">Cuotas de pago</label>
+                <span className="text-xs text-gray-400">Total: S/ {calc.total.toFixed(2)}</span>
+              </div>
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b border-gray-200">
+                    <tr>
+                      <th className="px-3 py-2 text-left w-20">Cuota</th>
+                      <th className="px-3 py-2 text-left">Monto</th>
+                      <th className="px-3 py-2 text-left">Fecha de vencimiento</th>
+                      <th className="px-3 py-2 w-8"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {cuotas.map((c, idx) => (
+                      <tr key={c._key}>
+                        <td className="px-3 py-2 text-gray-400">Cuota{String(idx + 1).padStart(3, "0")}</td>
+                        <td className="px-3 py-2">
+                          <input type="number" min="0" step="0.01" value={c.monto}
+                            onChange={(e) => handleCuota(c._key, "monto", e.target.value)}
+                            required className={INP} />
+                        </td>
+                        <td className="px-3 py-2">
+                          <input type="date" value={c.fechaVencimiento}
+                            onChange={(e) => handleCuota(c._key, "fechaVencimiento", e.target.value)}
+                            required className={INP} />
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <button type="button" onClick={() => eliminarCuota(c._key)} className="text-red-400 hover:text-red-600">✕</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="px-3 py-2 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
+                  <button type="button" onClick={agregarCuota} className="text-sm text-gray-500 hover:text-gray-700 transition">
+                    + Agregar cuota
+                  </button>
+                  <span className={`text-xs font-medium ${Math.abs(sumaCuotas - calc.total) < 0.01 ? "text-green-600" : "text-red-500"}`}>
+                    Suma de cuotas: S/ {sumaCuotas.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Descripción y personal */}
           <div className="grid grid-cols-2 gap-4">
@@ -483,7 +507,7 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
           </button>
           <button onClick={guardar} disabled={guardando}
             className="text-sm bg-blue-700 text-white px-5 py-2 rounded-lg hover:bg-blue-800 disabled:opacity-50 transition font-medium">
-            {guardando ? (emitirSunat ? "Emitiendo…" : "Guardando…") : (emitirSunat ? "Emitir y crear factura" : "Crear factura")}
+            {guardando ? "Emitiendo…" : "Emitir y crear factura"}
           </button>
         </div>
       </div>

@@ -22,12 +22,13 @@ const TRANSPORTISTA_VACIO = { ruc: "", razonSocial: "", registroMTC: "" };
 
 // Empresa emisora fija — este ERP emite GRE únicamente a nombre de Huaquian.
 // Las credenciales SUNAT (incluidas las de GRE) las resuelve el hub central por
-// RUC — no hay registro de credenciales en el ERP. TODO: RUC/razón social reales
-// pendientes de confirmar — deben coincidir con RUC_EMISOR/RAZON_SOCIAL_EMISOR
-// del backend. Serie fija por tipo de guía, terminada en "2" igual que las
-// series de CPE (ver EmitirComprobante.jsx) para evitar futuros conflictos de correlativo.
-const RUC_EMISOR = "00000000000";
-const NOMBRE_EMISOR = "HUAQUIAN (RUC pendiente de configurar)";
+// RUC — no hay registro de credenciales en el ERP. Deben coincidir con
+// RUC_EMISOR/RAZON_SOCIAL_EMISOR de Backend/.env. Serie fija por tipo de guía,
+// terminada en "2" igual que las series de CPE (ver EmitirComprobante.jsx)
+// para evitar futuros conflictos de correlativo. Motivo de traslado por
+// defecto: "01" (Venta) — catálogo 20 SUNAT.
+const RUC_EMISOR = "20601565235";
+const NOMBRE_EMISOR = "HUAQUIAN";
 const SERIE_POR_TIPO_GUIA = { REMITENTE: "T002", TRANSPORTISTA: "V002" };
 
 // Motivo de traslado (catálogo 20) para el que aplican Proveedor/Comprador — confirmado contra la

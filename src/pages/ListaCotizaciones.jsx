@@ -44,7 +44,20 @@ const compararTexto = (na, nb) => {
 const numerosOT = (ots) =>
   ots?.length ? ots.map((o) => o.numeroOT).filter(Boolean).join(", ") : null;
 
-function TablaCotizaciones({ titulo, acento, cotizaciones, otsPorCot, onSelect, vacioMsg }) {
+// Total real (tal como se guardó, en la moneda de la cotización) + su
+// conversión a la otra moneda usando el Tipo de Cambio compartido — la
+// cotización nunca recalcula subtotal/igv/total, solo se muestra la
+// conversión acá para comparar de un vistazo.
+const totalesDuales = (c, tipoCambio) => {
+  const total = Number(c.subtotal || Number(c.total) / 1.18) || 0;
+  const tc = Number(tipoCambio) || 0;
+  if (c.moneda === "USD") {
+    return { pen: tc > 0 ? total * tc : null, usd: total };
+  }
+  return { pen: total, usd: tc > 0 ? total / tc : null };
+};
+
+function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, tipoCambio }) {
   return (
     <div className="mb-6">
       <div className="flex items-center gap-2 mb-3">
@@ -57,7 +70,6 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, otsPorCot, onSelect, 
         <table className="w-full text-sm" style={{ minWidth: "1000px" }}>
           <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-200">
             <tr>
-              <th className={`${TH} text-left`}>N° OT</th>
               <th className={`${TH} text-left`}>N° Cotización</th>
               <th className={`${TH} text-center`}>Fecha recibida</th>
               <th className={`${TH} text-left`}>Empresa</th>
@@ -65,23 +77,25 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, otsPorCot, onSelect, 
               <th className={`${TH} text-left`}>Encargado</th>
               <th className={`${TH} text-left`}>Descripción</th>
               <th className={`${TH} text-right`}>Total sin IGV (S/)</th>
+              <th className={`${TH} text-right`}>Total sin IGV (US$)</th>
+              <th className={`${TH} text-center`}>Aprobado</th>
+              <th className={`${TH} text-center`}>Enviado</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {cotizaciones.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-gray-400">{vacioMsg}</td>
+                <td colSpan={10} className="px-4 py-8 text-center text-gray-400">{vacioMsg}</td>
               </tr>
             ) : (
-              cotizaciones.map((c) => (
+              cotizaciones.map((c) => {
+                const { pen, usd } = totalesDuales(c, tipoCambio);
+                return (
                 <tr
                   key={c._id}
                   className={`hover:bg-gray-50 cursor-pointer transition-colors ${c.anulado ? "opacity-50" : ""} ${c._esOT ? "bg-indigo-50/30" : ""}`}
                   onClick={() => onSelect(c)}
                 >
-                  <td className="px-4 py-3.5 font-semibold text-gray-800 whitespace-nowrap">
-                    {numerosOT(otsPorCot.get(c._id)) || <span className="text-gray-300 font-sans">—</span>}
-                  </td>
                   <td className="px-4 py-3.5 font-semibold text-gray-800 whitespace-nowrap">
                     <div className="flex items-center gap-1.5">
                       {c._esOT ? (
@@ -108,10 +122,28 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, otsPorCot, onSelect, 
                   <td className="px-4 py-3.5 text-gray-600">{c.encargado || <span className="text-gray-300">—</span>}</td>
                   <td className="px-4 py-3.5 text-gray-700">{c.titulo}</td>
                   <td className="px-4 py-3.5 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap">
-                    {Number(c.subtotal || Number(c.total) / 1.18).toLocaleString("es-PE", { minimumFractionDigits: 2 })}
+                    {pen != null ? pen.toLocaleString("es-PE", { minimumFractionDigits: 2 }) : "—"}
+                  </td>
+                  <td className="px-4 py-3.5 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap">
+                    {usd != null ? usd.toLocaleString("es-PE", { minimumFractionDigits: 2 }) : "—"}
+                  </td>
+                  <td className="px-4 py-3.5 text-center">
+                    {c._esOT ? <span className="text-gray-300">—</span> : (
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full uppercase tracking-wide whitespace-nowrap ${c.aprobado ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                        {c.aprobado ? "Aprobada" : "Pendiente"}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3.5 text-center">
+                    {c._esOT ? <span className="text-gray-300">—</span> : (
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full uppercase tracking-wide whitespace-nowrap ${c.enviado ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                        {c.enviado ? "Enviada" : "No enviada"}
+                      </span>
+                    )}
                   </td>
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>
@@ -140,6 +172,7 @@ export default function ListaCotizaciones() {
   const [facturaPorNumDoc, setFacturaPorNumDoc] = useState(new Map());
   const [sortBy, setSortBy] = useState("numeroOT");
   const [vista, setVista] = useState("pendientes");
+  const [tipoCambio, setTipoCambio] = useState(null);
 
   const buildOtsMap = (ots) => {
     const m = new Map();
@@ -175,12 +208,14 @@ export default function ListaCotizaciones() {
       fetchAuth("/ordenes-trabajo").then((r) => r.ok ? r.json() : []),
       fetchAuth("/ordenes-compra").then((r) => r.ok ? r.json() : []),
       fetchAuth("/facturas").then((r) => r.ok ? r.json() : []),
-    ]).then(([cots, ots, ocs, facts]) => {
+      fetchAuth("/tipo-cambio").then((r) => r.ok ? r.json() : null),
+    ]).then(([cots, ots, ocs, facts, tc]) => {
       setCotizaciones(cots);
       setOtsSinCotizacion(ots.filter((o) => !o.cotizacion));
       setOtsPorCot(buildOtsMap(ots));
       setOcPorCot(buildOcMap(ocs));
       setOcPorNumDoc(buildOcPorNumDoc(ocs));
+      setTipoCambio(tc?.valor ?? null);
       // Una cotización está "facturada" si su cadena (mismo numeroDocumento)
       // tiene una factura con número de factura.
       setFacturaPorNumDoc(new Map(
@@ -282,16 +317,22 @@ export default function ListaCotizaciones() {
   const vistaEfectiva = filtros.busqueda ? "todas" : vista;
 
   // Misma columnas que TablaCotizaciones — una hoja por cada tabla visible.
-  const filaCotizacion = (c) => ({
-    "N° OT":           numerosOT(otsPorCot.get(c._id)) || "—",
-    "N° Cotización":   c._esOT ? "Sin cotización" : (c.numeroCotizacion || "—"),
-    "Fecha recibida":  c.fechaRecibida ? new Date(c.fechaRecibida).toLocaleDateString("es-PE") : "—",
-    "Empresa":         c.empresa?.razonSocial || "—",
-    "Planta":          c.planta || "—",
-    "Encargado":       c.encargado || "—",
-    "Descripción":     c.titulo,
-    "Total sin IGV":   Number(c.subtotal || Number(c.total) / 1.18).toFixed(2),
-  });
+  const filaCotizacion = (c) => {
+    const { pen, usd } = totalesDuales(c, tipoCambio);
+    return {
+      "N° OT":                  numerosOT(otsPorCot.get(c._id)) || "—",
+      "N° Cotización":          c._esOT ? "Sin cotización" : (c.numeroCotizacion || "—"),
+      "Fecha recibida":         c.fechaRecibida ? new Date(c.fechaRecibida).toLocaleDateString("es-PE") : "—",
+      "Empresa":                c.empresa?.razonSocial || "—",
+      "Planta":                 c.planta || "—",
+      "Encargado":              c.encargado || "—",
+      "Descripción":            c.titulo,
+      "Total sin IGV (S/)":     pen != null ? pen.toFixed(2) : "—",
+      "Total sin IGV (US$)":    usd != null ? usd.toFixed(2) : "—",
+      "Aprobado":               c._esOT ? "—" : (c.aprobado ? "Aprobada" : "Pendiente"),
+      "Enviado":                c._esOT ? "—" : (c.enviado ? "Enviada" : "No enviada"),
+    };
+  };
 
   const exportarExcel = () => {
     const wb = XLSX.utils.book_new();
@@ -407,9 +448,9 @@ export default function ListaCotizaciones() {
           titulo="Cotizaciones sin OT"
           acento="bg-indigo-500"
           cotizaciones={sinOT}
-          otsPorCot={otsPorCot}
           onSelect={seleccionarFila}
           vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Todas las cotizaciones ya tienen OT"}
+          tipoCambio={tipoCambio}
         />
       )}
 
@@ -418,9 +459,9 @@ export default function ListaCotizaciones() {
           titulo="Cotizaciones pendientes de OC"
           acento="bg-amber-500"
           cotizaciones={pendientes}
-          otsPorCot={otsPorCot}
           onSelect={seleccionarFila}
           vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin cotizaciones pendientes"}
+          tipoCambio={tipoCambio}
         />
       )}
 
@@ -429,9 +470,9 @@ export default function ListaCotizaciones() {
           titulo="Cotización con OC"
           acento="bg-emerald-500"
           cotizaciones={conOC}
-          otsPorCot={otsPorCot}
           onSelect={seleccionarFila}
           vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin cotizaciones con OC"}
+          tipoCambio={tipoCambio}
         />
       )}
 
@@ -440,9 +481,9 @@ export default function ListaCotizaciones() {
           titulo="Cotizaciones cerradas"
           acento="bg-gray-500"
           cotizaciones={cerradas}
-          otsPorCot={otsPorCot}
           onSelect={seleccionarFila}
           vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin cotizaciones cerradas"}
+          tipoCambio={tipoCambio}
         />
       )}
     </div>

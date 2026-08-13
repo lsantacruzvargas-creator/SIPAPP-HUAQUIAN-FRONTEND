@@ -15,12 +15,18 @@ const INP = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-n
 export default function TablaItemsCotizacion({
   items, onItemsChange,
   tipo, puedeEditar, disabled, intentoGuardar, totalesMostrados,
-  seleccionables = false, seleccionados = new Set(), onToggleSeleccion, onGenerarOT, generando = false, onVerOT,
+  seleccionables = false, seleccionados = new Set(), onToggleSeleccion, onGenerarOT, generando = false, onVerOT, onQuitarOT,
 }) {
   const [catalogoOpen, setCatalogoOpen] = useState(false);
   const [catalogoTarget, setCatalogoTarget] = useState(null); // null = "+ Agregar ítem de plantilla" (fusiona/crea fila); _key = agregar descripción a esa fila puntual
 
-  const puedeAgregar = puedeEditar && !disabled;
+  // `puedeEditar` es el permiso de rol (admin/asistente); `disabled` es un
+  // bloqueo por estado del documento (anulado o enviado) que aplica incluso
+  // a quien sí tiene el rol. Los campos/acciones de cada fila deben respetar
+  // ambos — antes solo revisaban `puedeEditar`, así que una cotización
+  // "enviada" seguía siendo editable ítem por ítem pese al `disabled`.
+  const editable = puedeEditar && !disabled;
+  const puedeAgregar = editable;
 
   const handleItem = (key, campo, valor) =>
     onItemsChange(items.map(i => (i._key === key ? { ...i, [campo]: valor } : i)));
@@ -163,10 +169,23 @@ export default function TablaItemsCotizacion({
                   {seleccionables && (
                     <td className="px-3 py-3 text-center">
                       {item.otGenerada ? (
-                        <button type="button" onClick={() => onVerOT?.(item.otGenerada)}
-                          className="text-[11px] font-mono font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 hover:bg-emerald-100 transition whitespace-nowrap">
-                          {item.otGenerada.numeroOT || item.otGenerada.codigo}
-                        </button>
+                        <div className="flex items-center justify-center gap-1">
+                          <button type="button" onClick={() => onVerOT?.(item.otGenerada)}
+                            className="text-[11px] font-mono font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 hover:bg-emerald-100 transition whitespace-nowrap">
+                            {item.otGenerada.numeroOT || item.otGenerada.codigo}
+                          </button>
+                          {editable && onQuitarOT && (
+                            <button type="button" title="Quitar OT (no se anula, queda sin cotización)"
+                              onClick={() => {
+                                if (window.confirm("¿Quitar el vínculo con esta OT? La OT no se anula, solo queda sin cotización asociada.")) {
+                                  onQuitarOT(idx);
+                                }
+                              }}
+                              className="text-gray-300 hover:text-red-500 text-sm leading-none transition">
+                              ✕
+                            </button>
+                          )}
+                        </div>
                       ) : (
                         <input type="checkbox" checked={seleccionados.has(idx)}
                           onChange={() => onToggleSeleccion?.(idx)} disabled={disabled}
@@ -176,7 +195,7 @@ export default function TablaItemsCotizacion({
                   )}
                   <td className="px-3 py-3 text-center text-gray-400">{idx + 1}</td>
                   <td className="px-3 py-3">
-                    {puedeEditar ? (
+                    {editable ? (
                       <input value={item.descripcion}
                         onChange={(e) => handleItem(item._key, "descripcion", e.target.value)}
                         placeholder="Descripción del ítem"
@@ -189,7 +208,7 @@ export default function TablaItemsCotizacion({
                         {item.subItems.map(sub => (
                           <li key={sub._subKey} className="flex items-start gap-1.5 text-xs text-gray-600">
                             <span className="text-sky-400 shrink-0">•</span>
-                            {puedeEditar ? (
+                            {editable ? (
                               <>
                                 <input value={sub.texto}
                                   onChange={(e) => handleSubItem(item._key, sub._subKey, e.target.value)}
@@ -204,7 +223,7 @@ export default function TablaItemsCotizacion({
                         ))}
                       </ul>
                     )}
-                    {puedeEditar && (
+                    {editable && (
                       <div className="mt-1.5 flex items-center gap-3">
                         <button type="button" onClick={() => agregarSubItem(item._key)}
                           className="text-xs text-gray-400 hover:text-sky-600 transition">
@@ -220,22 +239,24 @@ export default function TablaItemsCotizacion({
                     )}
                   </td>
                   <td className="px-3 py-3">
-                    <input type="number" min="0" step="1" value={item.cantidad} disabled={!puedeEditar}
+                    <input type="number" min="0" step="1" value={item.cantidad} disabled={!editable}
                       onChange={(e) => handleItem(item._key, "cantidad", parseFloat(e.target.value) || 0)}
-                      className={`w-full text-center ${puedeEditar ? INP : "bg-transparent border-transparent text-sm px-2 py-1"} ${intentoGuardar && cantidadInvalida(item) ? "border-red-400 ring-1 ring-red-300" : ""}`} />
+                      className={`w-full text-center ${editable ? INP : "bg-transparent border-transparent text-sm px-2 py-1"} ${intentoGuardar && cantidadInvalida(item) ? "border-red-400 ring-1 ring-red-300" : ""}`} />
                   </td>
                   <td className="px-3 py-3">
-                    <input type="number" min="0" step="0.01" value={item.precio} disabled={!puedeEditar}
+                    <input type="number" min="0" step="0.01" value={item.precio} disabled={!editable}
                       onChange={(e) => handleItem(item._key, "precio", parseFloat(e.target.value) || 0)}
-                      className={`w-full text-right ${puedeEditar ? INP : "bg-transparent border-transparent text-sm px-2 py-1"} ${intentoGuardar && precioInvalido(item) ? "border-red-400 ring-1 ring-red-300" : ""}`} />
+                      className={`w-full text-right ${editable ? INP : "bg-transparent border-transparent text-sm px-2 py-1"} ${intentoGuardar && precioInvalido(item) ? "border-red-400 ring-1 ring-red-300" : ""}`} />
                   </td>
                   <td className="px-3 py-3 text-right font-medium text-gray-700 tabular-nums">
                     {calcSubtotal(item).toFixed(2)}
                   </td>
                   {puedeEditar && (
                     <td className="px-3 py-3 text-center">
-                      <button type="button" onClick={() => eliminarItem(item._key)}
-                        className="text-red-400 hover:text-red-600">✕</button>
+                      {editable && (
+                        <button type="button" onClick={() => eliminarItem(item._key)}
+                          className="text-red-400 hover:text-red-600">✕</button>
+                      )}
                     </td>
                   )}
                 </tr>

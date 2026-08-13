@@ -18,7 +18,7 @@ const FORM_VACIO = {
   titulo: "", encargado: "", planta: "", condicionPago: "",
   plazoEntrega: "", lugarEntrega: "", validezOferta: "",
   numeroGuiaEmision: "", numeroGuiaRemision: "", codigoSap: "", fechaSalida: "",
-  subtotal: "",
+  subtotal: "", moneda: "PEN",
 };
 
 const PASOS_VACIOS = [
@@ -84,6 +84,7 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
       plazoEntrega: form.plazoEntrega,
       lugarEntrega: form.lugarEntrega,
       validezOferta: form.validezOferta,
+      moneda: form.moneda,
       subtotal: totalesMostrados.subtotal,
       igv: totalesMostrados.igv,
       total: totalesMostrados.total,
@@ -141,7 +142,7 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
           <div className="flex items-center gap-4">
             <div className="text-right">
               <p className="text-[10px] text-white/60 uppercase tracking-widest leading-none">Total</p>
-              <p className="text-lg font-bold leading-tight">{money(totalesMostrados.total)}</p>
+              <p className="text-lg font-bold leading-tight">{money(totalesMostrados.total, form.moneda)}</p>
             </div>
             <button onClick={guardar} disabled={guardando}
               className="bg-white text-sky-700 text-sm px-5 py-2 rounded-lg hover:bg-sky-50 disabled:opacity-60 transition font-semibold shadow-sm shrink-0">
@@ -221,6 +222,16 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
                 <select name="tipo" value={form.tipo} onChange={handleChange} className={INP}>
                   <option value="venta">Venta</option>
                   <option value="servicio">Servicio</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Moneda de la cotización</label>
+                <select name="moneda" value={form.moneda} onChange={handleChange} className={INP}>
+                  <option value="PEN">Soles (S/)</option>
+                  <option value="USD">Dólares (US$)</option>
                 </select>
               </div>
             </div>

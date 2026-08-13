@@ -84,6 +84,15 @@ export default function ListaComprobantes() {
           <h2 className="text-xl font-semibold text-ink">Comprobantes SUNAT</h2>
           <span className="text-sm text-ink-muted">{paginacion.total} comprobante{paginacion.total !== 1 ? "s" : ""}</span>
         </div>
+        <div className="flex items-center gap-3">
+          <button onClick={() => navigate("/facturacion-electronica/guias")}
+            className="text-sm text-blue-600 hover:text-blue-800 underline">
+            Ver Guías de Remisión
+          </button>
+          <button onClick={() => navigate("/facturacion-electronica/emitir")} className="btn-primary">
+            + Emitir comprobante
+          </button>
+        </div>
       </div>
 
       {/* Filtros */}

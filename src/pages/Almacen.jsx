@@ -291,6 +291,171 @@ function SeccionMateriales() {
   );
 }
 
+// ─── Sección Categorías de Material ─────────────────────────────────────────
+
+const TIPOS_CAMPO = [
+  { id: "texto", label: "Texto" },
+  { id: "numero", label: "Número" },
+  { id: "select", label: "Lista de opciones" },
+];
+
+const slug = (s) => s.trim().toLowerCase()
+  .normalize("NFD").replace(/[̀-ͯ]/g, "")
+  .replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+
+const CAMPO_VACIO = { nombre: "", clave: "", tipo: "texto", opciones: "", requerido: false };
+
+function SeccionCategorias() {
+  const [lista, setLista] = useState([]);
+  const [nombre, setNombre] = useState("");
+  const [campos, setCampos] = useState([]);
+  const [editando, setEditando] = useState(null);
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState("");
+
+  const cargar = useCallback(async () => {
+    const r = await fetchAuth("/categorias-material");
+    if (r.ok) setLista(await r.json());
+  }, []);
+
+  useEffect(() => { cargar(); }, [cargar]);
+
+  const cancelar = () => { setEditando(null); setNombre(""); setCampos([]); setError(""); };
+
+  const iniciarEdicion = (c) => {
+    setEditando(c._id);
+    setNombre(c.nombre);
+    setCampos(c.campos.map((cp) => ({ ...cp, opciones: (cp.opciones || []).join(", ") })));
+  };
+
+  const agregarCampo = () => setCampos((prev) => [...prev, { ...CAMPO_VACIO }]);
+  const quitarCampo = (i) => setCampos((prev) => prev.filter((_, idx) => idx !== i));
+  const cambiarCampo = (i, patch) => setCampos((prev) => prev.map((c, idx) => idx === i
+    ? { ...c, ...patch, ...(patch.nombre !== undefined && !c.clave ? { clave: slug(patch.nombre) } : {}) }
+    : c));
+
+  const guardar = async () => {
+    if (!nombre.trim()) { setError("El nombre de la categoría es obligatorio."); return; }
+    for (const c of campos) {
+      if (!c.nombre.trim() || !c.clave.trim()) { setError("Todos los campos necesitan nombre."); return; }
+    }
+    setGuardando(true);
+    setError("");
+    const body = {
+      nombre: nombre.trim(),
+      campos: campos.map((c) => ({
+        nombre: c.nombre.trim(),
+        clave: c.clave.trim(),
+        tipo: c.tipo,
+        requerido: !!c.requerido,
+        opciones: c.tipo === "select" ? c.opciones.split(",").map((s) => s.trim()).filter(Boolean) : [],
+      })),
+    };
+    const metodo = editando ? "PUT" : "POST";
+    const url = editando ? `/categorias-material/${editando}` : "/categorias-material";
+    const r = await fetchAuth(url, { method: metodo, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (r.ok) {
+      await cargar();
+      cancelar();
+    } else {
+      const d = await r.json();
+      setError(d.mensaje || "Error al guardar la categoría");
+    }
+    setGuardando(false);
+  };
+
+  const eliminar = async (c) => {
+    if (!window.confirm(`¿Desactivar la categoría "${c.nombre}"?`)) return;
+    const r = await fetchAuth(`/categorias-material/${c._id}`, { method: "DELETE" });
+    if (r.ok) await cargar();
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">
+          {editando ? "Editar categoría" : "Nueva categoría de material"}
+        </p>
+        {error && <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg mb-4">{error}</p>}
+
+        <div className="mb-4">
+          <label className="text-xs text-gray-500 block mb-1">Nombre *</label>
+          <input value={nombre} onChange={(e) => setNombre(e.target.value)}
+            className={`w-full max-w-sm ${INP}`} placeholder="Ej: Repuestos eléctricos" />
+        </div>
+
+        <div className="space-y-3">
+          <p className="text-xs text-gray-500">Campos del formulario de solicitud de compra</p>
+          {campos.map((c, i) => (
+            <div key={i} className="grid grid-cols-1 md:grid-cols-[2fr_1fr_2fr_auto_auto] gap-2 items-center bg-gray-50 rounded-lg p-2">
+              <input value={c.nombre} onChange={(e) => cambiarCampo(i, { nombre: e.target.value })}
+                className={INP} placeholder="Nombre del campo" />
+              <select value={c.tipo} onChange={(e) => cambiarCampo(i, { tipo: e.target.value })} className={INP}>
+                {TIPOS_CAMPO.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+              </select>
+              {c.tipo === "select" ? (
+                <input value={c.opciones} onChange={(e) => cambiarCampo(i, { opciones: e.target.value })}
+                  className={INP} placeholder="Opciones separadas por coma" />
+              ) : <span />}
+              <label className="flex items-center gap-1.5 text-xs text-gray-500 whitespace-nowrap">
+                <input type="checkbox" checked={c.requerido} onChange={(e) => cambiarCampo(i, { requerido: e.target.checked })} />
+                Requerido
+              </label>
+              <button onClick={() => quitarCampo(i)} className="text-gray-300 hover:text-red-500 transition">✕</button>
+            </div>
+          ))}
+          <button onClick={agregarCampo}
+            className="text-xs border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition font-medium">
+            + Agregar campo
+          </button>
+        </div>
+
+        <div className="flex gap-2 mt-5">
+          {editando && (
+            <button onClick={cancelar}
+              className="text-sm border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 transition">
+              Cancelar
+            </button>
+          )}
+          <button onClick={guardar} disabled={guardando || !nombre.trim()}
+            className="text-sm bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition font-medium">
+            {guardando ? "Guardando…" : editando ? "Actualizar" : "Crear categoría"}
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 border-b border-gray-100">
+            <tr>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Nombre</th>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Campos</th>
+              <th className="px-5 py-3"></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {lista.length === 0 && (
+              <tr><td colSpan={3} className="text-center py-10 text-gray-300 text-sm">Sin categorías registradas</td></tr>
+            )}
+            {lista.map((c) => (
+              <tr key={c._id} className="hover:bg-gray-50/50 transition">
+                <td className="px-5 py-3 font-medium text-gray-800">{c.nombre}</td>
+                <td className="px-5 py-3 text-gray-500 text-xs">
+                  {c.campos.length === 0 ? "—" : c.campos.map((cp) => cp.nombre).join(", ")}
+                </td>
+                <td className="px-5 py-3 text-right space-x-3">
+                  <button onClick={() => iniciarEdicion(c)} className="text-xs text-blue-500 hover:text-blue-700 transition">Editar</button>
+                  <button onClick={() => eliminar(c)} className="text-xs text-gray-400 hover:text-red-500 transition">Desactivar</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // ─── Modal Ingreso ──────────────────────────────────────────────────────────
 
 function ModalIngreso({ materiales, onClose, onGuardado }) {
@@ -307,8 +472,26 @@ function ModalIngreso({ materiales, onClose, onGuardado }) {
   });
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
+  const [rqPendiente, setRqPendiente] = useState(null);
+  const [cerrarRq, setCerrarRq] = useState(true);
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  // Si este material tiene una solicitud de compra vinculada y pendiente de
+  // cerrar, se ofrece cerrarla al mismo tiempo que se registra el ingreso —
+  // así el almacenero no tiene que recordar ir a Requerimientos después.
+  useEffect(() => {
+    if (!form.material) { setRqPendiente(null); return; }
+    fetchAuth("/requerimientos").then((r) => r.ok ? r.json() : []).then((lista) => {
+      for (const req of lista) {
+        const item = req.items.find((it) =>
+          it.esSolicitudCompra && it.estado === "pendiente" &&
+          (it.materialAsociado?._id || it.materialAsociado) === form.material);
+        if (item) { setRqPendiente({ requerimientoId: req._id, itemId: item._id, codigo: req.codigo, categoria: item.categoriaNombre }); return; }
+      }
+      setRqPendiente(null);
+    });
+  }, [form.material]);
 
   const guardar = async () => {
     if (!form.material || !form.cantidad || !form.precioUnitario) {
@@ -322,7 +505,11 @@ function ModalIngreso({ materiales, onClose, onGuardado }) {
       body: JSON.stringify({ ...form, tipo: "ingreso" }),
     });
     if (r.ok) {
-      onGuardado(await r.json());
+      const movimiento = await r.json();
+      if (rqPendiente && cerrarRq) {
+        await fetchAuth(`/requerimientos/${rqPendiente.requerimientoId}/items/${rqPendiente.itemId}/cerrar`, { method: "PATCH" });
+      }
+      onGuardado(movimiento);
     } else {
       const d = await r.json();
       setError(d.mensaje || "Error al guardar");
@@ -391,6 +578,15 @@ function ModalIngreso({ materiales, onClose, onGuardado }) {
                 className={`w-full ${INP}`} placeholder="Opcional" />
             </div>
           </div>
+
+          {rqPendiente && (
+            <label className="flex items-start gap-2 bg-blue-50 rounded-xl px-4 py-3 text-sm cursor-pointer">
+              <input type="checkbox" checked={cerrarRq} onChange={(e) => setCerrarRq(e.target.checked)} className="mt-0.5" />
+              <span className="text-blue-700">
+                Este material cierra la solicitud de compra <strong>{rqPendiente.codigo}</strong> ({rqPendiente.categoria}) — se marcará como cerrada al guardar.
+              </span>
+            </label>
+          )}
         </div>
 
         <div className="flex gap-2 justify-end px-6 py-4 border-t border-gray-100">
@@ -681,6 +877,7 @@ const TABS = [
   { id: "ubicaciones", label: "Ubicaciones" },
   { id: "materiales", label: "Materiales (SKU)" },
   { id: "movimientos", label: "Movimientos" },
+  { id: "categorias", label: "Categorías de compra" },
 ];
 
 export default function Almacen() {
@@ -713,6 +910,7 @@ export default function Almacen() {
       {tab === "ubicaciones" && <SeccionUbicaciones />}
       {tab === "materiales" && <SeccionMateriales />}
       {tab === "movimientos" && <SeccionMovimientos />}
+      {tab === "categorias" && <SeccionCategorias />}
     </div>
   );
 }

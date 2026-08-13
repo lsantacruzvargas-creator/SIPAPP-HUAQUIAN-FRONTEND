@@ -20,7 +20,31 @@ export function logout() {
   sessionStorage.removeItem("usuario");
 }
 
-export const imgUrl = (ruta) => `${BASE}${ruta}`;
+// /uploads exige auth (authMiddleware, igual que /api) pero vive fuera de
+// /api — por eso no se puede reusar fetchAuth() tal cual (prependea /api).
+// NUNCA pasar el token por query string: queda en logs del servidor,
+// historial del navegador y se puede filtrar por Referer — por eso esto
+// siempre manda el token por header, nunca en la URL. Como <img src>/
+// <a href>/window.open() no pueden mandar headers, los consumidores de
+// /uploads usan el componente ImagenProtegida o abrirArchivoProtegido()
+// (ambos hacen el fetch acá y arman una Object URL de blob, nunca exponen
+// la URL real con el token).
+export const fetchUpload = (ruta) => {
+  const token = getToken();
+  return fetch(`${BASE}${ruta}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+};
+
+// Para "ver en pestaña nueva" (click en una miniatura, un PDF, etc.): trae el
+// archivo con el header de auth y recién ahí genera una Object URL de un solo
+// uso para pasarle al navegador — la URL real con el token nunca se expone.
+export const abrirArchivoProtegido = async (ruta) => {
+  const res = await fetchUpload(ruta);
+  if (!res.ok) return;
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  window.open(url, "_blank");
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+};
 
 export const uploadAuth = (endpoint, formData) => {
   const token = sessionStorage.getItem("token");
