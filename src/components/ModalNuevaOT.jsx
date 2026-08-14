@@ -3,6 +3,7 @@ import { fetchAuth } from "../utils/fetchAuth";
 import SelectorEmpresas from "./SelectorEmpresas";
 
 const INP    = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 w-full";
+const CATEGORIAS_TALLER = ["REPARACION", "MANTENIMIENTO PREVENTIVO", "MANTENIMIENTO CORRECTIVO", "GARANTIA"];
 
 const FORM_VACIO = {
   numeroOT: "",
@@ -12,6 +13,10 @@ const FORM_VACIO = {
   planta: "",
   titulo: "",
   condicion: "",
+  categorizacionTaller: "",
+  micLinea: "",
+  backup: "",
+  entregadoPor: "",
   encargado: "",
   encargado2: "",
   numeroGuiaEmision: "",
@@ -61,6 +66,10 @@ export default function ModalNuevaOT({ onClose, onCreada }) {
       contactoTelefono: plantaSel?.contactoTelefono || "",
       titulo: form.titulo,
       condicion: form.condicion,
+      categorizacionTaller: form.categorizacionTaller || undefined,
+      micLinea: form.micLinea,
+      backup: form.backup,
+      entregadoPor: form.entregadoPor,
       encargado: form.encargado,
       encargado2: form.encargado2,
       numeroGuiaEmision: form.numeroGuiaEmision,
@@ -108,7 +117,7 @@ export default function ModalNuevaOT({ onClose, onCreada }) {
               <label className="text-xs text-gray-500 block mb-1">Fecha de ingreso</label>
               <input type="date" name="fechaRecibida" value={form.fechaRecibida} onChange={handleChange} className={INP} />
             </div>
-            <div>
+            <div hidden>
               <label className="text-xs text-gray-500 block mb-1">Código SAP</label>
               <input name="codigoSap" value={form.codigoSap} onChange={handleChange} className={INP} />
             </div>
@@ -161,10 +170,18 @@ export default function ModalNuevaOT({ onClose, onCreada }) {
             <input name="titulo" value={form.titulo} onChange={handleChange} className={INP} placeholder="Descripción del trabajo" />
           </div>
 
+          <div hidden>
+            <label className="text-xs text-gray-500 block mb-1">Condición</label>
+            <input name="condicion" value={form.condicion} onChange={handleChange} className={INP} />
+          </div>
+
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="text-xs text-gray-500 block mb-1">Condición</label>
-              <input name="condicion" value={form.condicion} onChange={handleChange} className={INP} />
+              <label className="text-xs text-gray-500 block mb-1">Categorización en taller</label>
+              <select name="categorizacionTaller" value={form.categorizacionTaller} onChange={handleChange} className={INP}>
+                <option value="">Seleccionar categoría…</option>
+                {CATEGORIAS_TALLER.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
             </div>
             <div>
               <label className="text-xs text-gray-500 block mb-1">Encargado</label>
@@ -188,20 +205,35 @@ export default function ModalNuevaOT({ onClose, onCreada }) {
 
           <div className="grid grid-cols-3 gap-4">
             <div>
+              <label className="text-xs text-gray-500 block mb-1">MIC/Línea</label>
+              <input name="micLinea" value={form.micLinea} onChange={handleChange} className={INP} />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Backup</label>
+              <input name="backup" value={form.backup} onChange={handleChange} className={INP} />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Entregado por</label>
+              <input name="entregadoPor" value={form.entregadoPor} onChange={handleChange} className={INP} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div>
               <label className="text-xs text-gray-500 block mb-1">Guía de llegada</label>
               <input name="numeroGuiaEmision" value={form.numeroGuiaEmision} onChange={handleChange} className={INP} />
             </div>
-            <div>
+            <div hidden>
               <label className="text-xs text-gray-500 block mb-1">Guía de salida</label>
               <input name="numeroGuiaRemision" value={form.numeroGuiaRemision} onChange={handleChange} className={INP} />
             </div>
-            <div>
+            <div hidden>
               <label className="text-xs text-gray-500 block mb-1">Fecha de salida</label>
               <input type="date" name="fechaSalida" value={form.fechaSalida} onChange={handleChange} className={INP} />
             </div>
           </div>
 
-          <div>
+          <div hidden>
             <label className="text-xs text-gray-500 block mb-1">Protocolo</label>
             <input name="protocolo" value={form.protocolo} onChange={handleChange} className={INP} />
           </div>

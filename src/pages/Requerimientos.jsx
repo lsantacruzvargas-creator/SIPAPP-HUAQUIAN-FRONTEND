@@ -84,10 +84,53 @@ function PanelSalida({ requerimientoId, item, onClose, onListo }) {
   );
 }
 
+// ─── Devolución de un ítem ya atendido: registra un INGRESO en Movimientos ──
+
+function PanelDevolucion({ requerimientoId, item, onClose, onListo }) {
+  const maxDevolvible = item.cantidad - (item.cantidadDevuelta || 0);
+  const [cantidad, setCantidad] = useState(maxDevolvible);
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState("");
+
+  const confirmar = async () => {
+    if (!cantidad || cantidad <= 0) { setError("Ingresa una cantidad válida."); return; }
+    setGuardando(true);
+    const r = await fetchAuth(`/requerimientos/${requerimientoId}/items/${item._id}/devolucion`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cantidad: Number(cantidad) }),
+    });
+    if (r.ok) {
+      onListo(await r.json());
+    } else {
+      const d = await r.json();
+      setError(d.mensaje || "Error al registrar la devolución");
+    }
+    setGuardando(false);
+  };
+
+  return (
+    <div className="bg-red-50/60 rounded-xl p-3 mt-2 space-y-2">
+      {error && <p className="text-xs text-red-500 bg-red-50 px-2 py-1 rounded">{error}</p>}
+      <p className="text-xs text-gray-500">Disponible para devolver: <strong>{maxDevolvible}</strong> {item.material?.unidad}</p>
+      <div className="flex items-center gap-2">
+        <input type="number" min={0.01} max={maxDevolvible} step="any" value={cantidad} onChange={(e) => setCantidad(e.target.value)}
+          className="w-24 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-right bg-white" />
+        <button onClick={confirmar} disabled={guardando || maxDevolvible <= 0}
+          className="text-xs bg-red-600 text-white px-3 py-1.5 rounded-lg hover:bg-red-700 disabled:opacity-50 transition font-medium">
+          {guardando ? "Guardando…" : "Confirmar devolución"}
+        </button>
+        <button onClick={onClose} className="text-xs text-gray-400 hover:text-gray-700">Cancelar</button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Fila de un ítem dentro de un requerimiento ─────────────────────────────
 
 function FilaItem({ requerimiento, item, puedeAtender, onActualizado }) {
   const [panelSalida, setPanelSalida] = useState(false);
+  const [panelDevolucion, setPanelDevolucion] = useState(false);
   const [buscadorAbierto, setBuscadorAbierto] = useState(false);
 
   const accion = async (endpoint, body) => {
@@ -158,12 +201,27 @@ function FilaItem({ requerimiento, item, puedeAtender, onActualizado }) {
             Rechazar
           </button>
         )}
+        {puedeAtender && item.estado === "atendido" && !item.esSolicitudCompra && item.movimientoAlmacen && (
+          <button onClick={() => setPanelDevolucion((v) => !v)}
+            disabled={item.cantidad - (item.cantidadDevuelta || 0) <= 0}
+            className="text-xs bg-red-50 text-red-700 px-2.5 py-1 rounded-lg hover:bg-red-100 disabled:opacity-40 disabled:cursor-not-allowed transition font-medium shrink-0">
+            Devolución
+          </button>
+        )}
       </div>
+      {item.cantidadDevuelta > 0 && (
+        <p className="text-xs text-red-500 mt-1">Devuelto: {item.cantidadDevuelta} {item.material?.unidad}</p>
+      )}
 
       {panelSalida && (
         <PanelSalida requerimientoId={requerimiento._id} item={item}
           onClose={() => setPanelSalida(false)}
           onListo={(r) => { setPanelSalida(false); onActualizado(r); }} />
+      )}
+      {panelDevolucion && (
+        <PanelDevolucion requerimientoId={requerimiento._id} item={item}
+          onClose={() => setPanelDevolucion(false)}
+          onListo={(r) => { setPanelDevolucion(false); onActualizado(r); }} />
       )}
       {buscadorAbierto && (
         <SelectorMateriales onSelect={vincular} onClose={() => setBuscadorAbierto(false)} />
@@ -192,7 +250,16 @@ export default function Requerimientos() {
   };
 
   const tieneItemsPendientes = (r) => r.items.some((it) => it.estado === "pendiente");
-  const filtrados = lista.filter((r) => filtro === "activos" ? tieneItemsPendientes(r) : !tieneItemsPendientes(r));
+  // "Materiales pendientes": solicitudes de compra (sin SKU todavía)
+  // pendientes de comprar — distinto de "Activos", que incluye también los
+  // ítems de stock existente pendientes de dar salida.
+  const esPendientePorComprar = (it) => it.esSolicitudCompra && it.estado === "pendiente";
+  const tieneItemsPendientesCompra = (r) => r.items.some(esPendientePorComprar);
+  const filtrados = lista.filter((r) => {
+    if (filtro === "activos") return tieneItemsPendientes(r);
+    if (filtro === "pendientes-compra") return tieneItemsPendientesCompra(r);
+    return !tieneItemsPendientes(r);
+  });
 
   const fmtFecha = (d) => d ? new Date(d).toLocaleDateString("es-PE", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "—";
 
@@ -204,7 +271,11 @@ export default function Requerimientos() {
       </div>
 
       <div className="flex border-b border-gray-200 gap-1">
-        {[{ id: "activos", label: "Activos" }, { id: "completados", label: "Completados" }].map((t) => (
+        {[
+          { id: "activos", label: "Activos" },
+          { id: "completados", label: "Completados" },
+          { id: "pendientes-compra", label: "Materiales pendientes" },
+        ].map((t) => (
           <button key={t.id} onClick={() => setFiltro(t.id)}
             className={`px-5 py-2.5 text-sm font-medium transition border-b-2 -mb-px ${
               filtro === t.id ? "border-blue-600 text-blue-700" : "border-transparent text-gray-500 hover:text-gray-700"
@@ -216,9 +287,13 @@ export default function Requerimientos() {
 
       <div className="space-y-4">
         {filtrados.length === 0 && (
-          <p className="text-center py-10 text-gray-300 text-sm">Sin requerimientos {filtro === "activos" ? "activos" : "completados"}</p>
+          <p className="text-center py-10 text-gray-300 text-sm">
+            Sin requerimientos {filtro === "activos" ? "activos" : filtro === "pendientes-compra" ? "con materiales pendientes por comprar" : "completados"}
+          </p>
         )}
-        {filtrados.map((r) => (
+        {filtrados.map((r) => {
+          const itemsAMostrar = filtro === "pendientes-compra" ? r.items.filter(esPendientePorComprar) : r.items;
+          return (
           <div key={r._id} className="bg-white border border-gray-100 rounded-2xl shadow-sm p-5">
             <div className="flex flex-wrap justify-between items-start gap-2 mb-2">
               <div>
@@ -232,13 +307,14 @@ export default function Requerimientos() {
             </div>
             {r.observaciones && <p className="text-xs text-gray-400 italic mb-2">{r.observaciones}</p>}
             <div>
-              {r.items.map((item) => (
+              {itemsAMostrar.map((item) => (
                 <FilaItem key={item._id} requerimiento={r} item={item} puedeAtender={puedeAtender}
                   onActualizado={actualizarEnLista} />
               ))}
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

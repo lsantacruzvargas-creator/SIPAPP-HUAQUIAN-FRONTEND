@@ -813,12 +813,16 @@ function SeccionMovimientos() {
                 <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Total</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden lg:table-cell">Lote / Origen</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden lg:table-cell">Detalle</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">OT</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">RQ</th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Cant. Req.</th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Cant. Atendida</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Fecha</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {movimientos.length === 0 && (
-                <tr><td colSpan={9} className="text-center py-10 text-gray-300 text-sm">Sin movimientos</td></tr>
+                <tr><td colSpan={13} className="text-center py-10 text-gray-300 text-sm">Sin movimientos</td></tr>
               )}
               {movimientos.map((mv) => (
                 <tr key={mv._id} className="hover:bg-gray-50/50 transition">
@@ -848,11 +852,13 @@ function SeccionMovimientos() {
                     {mv.tipo === "ingreso" ? (
                       <span>{mv.proveedor || ""}  {mv.guiaProveedor ? `G: ${mv.guiaProveedor}` : ""} {mv.ordenCompra ? `OC: ${mv.ordenCompra}` : ""}</span>
                     ) : (
-                      mv.ordenTrabajo ? (
-                        <span className="font-mono text-blue-600">{mv.ordenTrabajo.codigo}</span>
-                      ) : mv.notas || "—"
+                      mv.notas || "—"
                     )}
                   </td>
+                  <td className="px-4 py-3 text-xs font-mono text-blue-600">{mv.ordenTrabajo?.codigo || "—"}</td>
+                  <td className="px-4 py-3 text-xs font-mono text-orange-600">{mv.requerimiento?.codigo || "—"}</td>
+                  <td className="px-4 py-3 text-right text-xs text-gray-500 font-mono">{mv.cantidadRequerida ?? "—"}</td>
+                  <td className="px-4 py-3 text-right text-xs text-gray-700 font-mono">{mv.requerimiento ? mv.cantidad : "—"}</td>
                   <td className="px-4 py-3 text-xs text-gray-500">{fmtFecha(mv.fecha)}</td>
                 </tr>
               ))}

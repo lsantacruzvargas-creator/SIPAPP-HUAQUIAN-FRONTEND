@@ -118,7 +118,7 @@ export default function App() {
       <Route
         path="/ordenes-compra"
         element={
-          <ProtectedRoute roles={["admin", "asistente", "jefatura"]}>
+          <ProtectedRoute roles={["admin", "asistente", "facturacion", "jefatura"]}>
             <Layout><ListaOrdenesCompra /></Layout>
           </ProtectedRoute>
         }
@@ -145,7 +145,7 @@ export default function App() {
       <Route
         path="/catalogo-servicios"
         element={
-          <ProtectedRoute roles={["admin", "asistente", "jefatura"]}>
+          <ProtectedRoute roles={["admin", "jefatura"]}>
             <Layout><CatalogoServicios /></Layout>
           </ProtectedRoute>
         }
@@ -154,7 +154,7 @@ export default function App() {
       <Route
         path="/almacen"
         element={
-          <ProtectedRoute roles={["admin", "almacenero", "asistente", "jefatura"]}>
+          <ProtectedRoute roles={["admin", "almacenero", "jefatura"]}>
             <Layout><Almacen /></Layout>
           </ProtectedRoute>
         }

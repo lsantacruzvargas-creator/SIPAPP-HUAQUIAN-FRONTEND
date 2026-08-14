@@ -58,9 +58,14 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   const [buscadorOTOpen, setBuscadorOTOpen] = useState(false);
   const [seleccionados, setSeleccionados] = useState(() => new Set());
   const [generandoOT, setGenerandoOT] = useState(false);
-  const puedeEditar = ["admin", "asistente"].includes(getUsuario()?.rol);
-  const puedeAprobar = ["admin", "jefatura"].includes(getUsuario()?.rol);
-  const puedeEnviar = ["admin", "asistente"].includes(getUsuario()?.rol);
+  const rolActual = getUsuario()?.rol;
+  const puedeEditar = ["admin", "asistente"].includes(rolActual);
+  const puedeAprobar = ["admin", "jefatura"].includes(rolActual);
+  const puedeEnviar = ["admin", "asistente"].includes(rolActual);
+  // Asistente solo puede enviar cotizaciones ya aprobadas — Admin conserva
+  // la potestad de enviar sin esperar la aprobación (ver mismo criterio en
+  // el backend, PATCH /cotizaciones/:id/enviar).
+  const bloqueadoPorAprobacion = rolActual === "asistente" && !cot.aprobado;
 
   const cargarRelaciones = () => {
     Promise.all([
@@ -364,14 +369,19 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
               <div className="text-right">
                 <p className="text-[10px] text-white/60 uppercase tracking-widest leading-none">Envío</p>
                 {puedeEnviar ? (
-                  <label className="flex items-center gap-1.5 justify-end mt-0.5 cursor-pointer select-none">
-                    <input type="checkbox" checked={cot.enviado} onChange={toggleEnviar} className="w-4 h-4" />
+                  <label className={`flex items-center gap-1.5 justify-end mt-0.5 select-none ${bloqueadoPorAprobacion && !cot.enviado ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}>
+                    <input type="checkbox" checked={cot.enviado}
+                      disabled={bloqueadoPorAprobacion && !cot.enviado}
+                      onChange={toggleEnviar} className="w-4 h-4" />
                     <span className="text-sm font-medium">{cot.enviado ? "Enviada" : "No enviada"}</span>
                   </label>
                 ) : (
                   <Chip className={`mt-0.5 ${cot.enviado ? "bg-green-500/40 text-white" : "bg-white/20 text-white"}`}>
                     {cot.enviado ? "Enviada" : "No enviada"}
                   </Chip>
+                )}
+                {bloqueadoPorAprobacion && !cot.enviado && (
+                  <p className="text-[10px] text-amber-200 leading-tight mt-0.5">Debe aprobarse antes de enviar</p>
                 )}
                 {cot.enviado && cot.enviadoPor && (
                   <p className="text-[10px] text-white/60 leading-tight mt-0.5">

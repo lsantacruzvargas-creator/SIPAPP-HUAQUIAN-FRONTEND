@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import ModalOrdenCompra from "./ModalOrdenCompra";
 import SelectorEmpresas from "./SelectorEmpresas";
@@ -7,6 +8,7 @@ import FormInformeTecnico from "./FormInformeTecnico";
 import VistaInformeTecnico from "./VistaInformeTecnico";
 import ModalNuevaSubOT from "./ModalNuevaSubOT";
 import ModalRequerimiento from "./ModalRequerimiento";
+import ModalGenerarGRE from "./ModalGenerarGRE";
 import { exportarInformeTecnicoExcel } from "../utils/informeTecnicoExcel";
 import {
   FlujoNegocio, TarjetaRelacion, Chip,
@@ -14,13 +16,14 @@ import {
 } from "./detalleShared";
 
 const INP = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 w-full transition";
-const RO  = "bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 text-sm text-gray-600 w-full";
+const RO = "bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 text-sm text-gray-600 w-full";
 
 const ESTADOS = ["pendiente", "en progreso", "completado", "entregado"];
+const CATEGORIAS_TALLER = ["REPARACION", "MANTENIMIENTO PREVENTIVO", "MANTENIMIENTO CORRECTIVO", "GARANTIA"];
 
 const colorEstado = (e, activo) => {
   if (!activo) return "bg-gray-100 text-gray-500 hover:bg-gray-200";
-  if (e === "entregado")  return "bg-teal-600 text-white";
+  if (e === "entregado") return "bg-teal-600 text-white";
   if (e === "completado") return "bg-green-600 text-white";
   if (e === "en progreso") return "bg-blue-600 text-white";
   return "bg-amber-500 text-white";
@@ -29,50 +32,60 @@ const colorEstado = (e, activo) => {
 export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardada, onNavegar }) {
   const [ot, setOt] = useState(inicial);
   const [form, setForm] = useState({
-    numeroOT:           inicial.numeroOT           || "",
+    numeroOT: inicial.numeroOT || "",
     fechaRecibida: inicial.fechaRecibida
       ? new Date(inicial.fechaRecibida).toISOString().split("T")[0] : "",
-    codigoSap:          inicial.codigoSap          || "",
-    empresa:            inicial.empresa?._id       || "",
-    planta:             inicial.planta             || "",
-    contactoNombre:     inicial.contactoNombre      || "",
-    titulo:             inicial.titulo             || "",
-    condicion:          inicial.condicion          || "",
-    encargado:          inicial.encargado          || "",
-    encargado2:         inicial.encargado2          || "",
-    numeroGuiaEmision:  inicial.numeroGuiaEmision  || "",
+    codigoSap: inicial.codigoSap || "",
+    empresa: inicial.empresa?._id || "",
+    planta: inicial.planta || "",
+    contactoNombre: inicial.contactoNombre || "",
+    titulo: inicial.titulo || "",
+    condicion: inicial.condicion || "",
+    categorizacionTaller: inicial.categorizacionTaller || "",
+    micLinea: inicial.micLinea || "",
+    backup: inicial.backup || "",
+    entregadoPor: inicial.entregadoPor || "",
+    encargado: inicial.encargado || "",
+    encargado2: inicial.encargado2 || "",
+    numeroGuiaEmision: inicial.numeroGuiaEmision || "",
     numeroGuiaRemision: inicial.numeroGuiaRemision || "",
     fechaSalida: inicial.fechaSalida
       ? new Date(inicial.fechaSalida).toISOString().split("T")[0] : "",
-    protocolo:          inicial.protocolo          || "",
-    observaciones:      inicial.observaciones      || "",
-    estado:             inicial.estado             || "pendiente",
+    protocolo: inicial.protocolo || "",
+    observaciones: inicial.observaciones || "",
+    estado: inicial.estado || "pendiente",
     medioLlegadaEquipo: inicial.medioLlegadaEquipo || "",
   });
+  const navigate = useNavigate();
   const rolActual = getUsuario()?.rol;
   // Supervisor edita los campos de la OT y los Informes Técnicos, pero no
   // puede anularla (eso queda solo para admin/asistente). Igual que técnico,
   // supervisor no ve el resto de la cadena (Cotización/OC/Factura).
-  const puedeEditarCampos = ["admin", "asistente", "supervisor"].includes(rolActual);
+  const puedeEditarCampos = ["admin", "asistente", "supervisor", "planner"].includes(rolActual);
   const puedeAnular = ["admin", "asistente"].includes(rolActual);
   const esVistaLimitada = ["tecnico", "supervisor", "planner"].includes(rolActual);
   // Aprueba/desaprueba Informes Técnicos — una vez aprobado, solo estos tres
   // roles pueden seguir editándolo (ver onModificar más abajo).
   const puedeAprobarInforme = ["admin", "jefatura", "planner"].includes(rolActual);
-  const [usuarios, setUsuarios]   = useState([]);
-  const [empresas, setEmpresas]   = useState([]);
+  // Mismo set de roles que ya tiene acceso a /facturacion-electronica/guias —
+  // técnico (y cualquier otro rol sin acceso a esa ruta) no ve este card.
+  const puedeGenerarGRE = ["admin", "asistente", "facturacion", "almacenero", "jefatura"].includes(rolActual);
+  const [usuarios, setUsuarios] = useState([]);
+  const [empresas, setEmpresas] = useState([]);
   const [empresasOpen, setEmpresasOpen] = useState(false);
-  const [cot, setCot]             = useState(ot.cotizacion || null);
-  const [oc, setOc]               = useState(null);
-  const [factura, setFactura]     = useState(null);
-  const [informes, setInformes]   = useState([]);
-  const [subOTs, setSubOTs]       = useState([]);
+  const [cot, setCot] = useState(ot.cotizacion || null);
+  const [oc, setOc] = useState(null);
+  const [factura, setFactura] = useState(null);
+  const [informes, setInformes] = useState([]);
+  const [subOTs, setSubOTs] = useState([]);
+  const [greMap, setGreMap] = useState({});
   const [requerimientos, setRequerimientos] = useState([]);
   const [crearRequerimientoOpen, setCrearRequerimientoOpen] = useState(false);
   const [guardando, setGuardando] = useState(false);
-  const [error, setError]         = useState("");
+  const [error, setError] = useState("");
   const [crearOCOpen, setCrearOCOpen] = useState(false);
   const [crearSubOTOpen, setCrearSubOTOpen] = useState(false);
+  const [generarGREOpen, setGenerarGREOpen] = useState(false);
   const [seleccionarTipoOpen, setSeleccionarTipoOpen] = useState(false);
   const [tipoElegido, setTipoElegido] = useState(null);
   const [verInforme, setVerInforme] = useState(null);
@@ -115,7 +128,31 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
 
     fetchAuth(`/ordenes-trabajo?ordenPadre=${ot._id}`)
       .then(r => r.ok && r.json())
-      .then(subs => setSubOTs(subs || []));
+      .then(subs => {
+        setSubOTs(subs || []);
+        if (!puedeGenerarGRE) return;
+        // Qué sub-OTs (o la propia OT, si no tiene hijas) ya salieron en
+        // alguna GRE — para el badge en cada card. Solo cuentan las GRE
+        // ACEPTADAS por SUNAT: una rechazada/en error/anulada no significa
+        // que el equipo realmente salió, así que no debe marcar la sub-OT
+        // como "ya enviada". limit alto porque acá interesan todas las
+        // coincidencias, no una página.
+        const ids = [ot._id, ...(subs || []).map(s => s._id)];
+        return fetchAuth(`/guias?ordenesTrabajo=${ids.join(",")}&estado=ACEPTADO&limit=1000`)
+          .then(r => r.ok && r.json())
+          .then(data => {
+            if (!data?.ok) return;
+            const map = {};
+            data.data.forEach(g => {
+              const codigo = `${g.serie}-${String(g.correlativo).padStart(4, "0")}`;
+              (g.ordenesTrabajo || []).forEach(id => {
+                const key = id?._id || id;
+                map[key] = map[key] ? `${map[key]}, ${codigo}` : codigo;
+              });
+            });
+            setGreMap(map);
+          });
+      });
 
     fetchAuth(`/requerimientos?ordenTrabajoPadre=${ot._id}`)
       .then(r => r.ok && r.json())
@@ -155,6 +192,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
     if (!body.empresa) delete body.empresa;
     if (!body.fechaRecibida) delete body.fechaRecibida;
     if (!body.fechaSalida) delete body.fechaSalida;
+    if (!body.categorizacionTaller) delete body.categorizacionTaller;
 
     const res = await fetchAuth(`/ordenes-trabajo/${ot._id}`, {
       method: "PUT",
@@ -228,6 +266,24 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
     onNavegar?.({ tipo: "cotizacion", data: nueva });
   };
 
+  // Sin sub-OTs: un solo ítem (la OT misma) — directo al form prellenado, sin
+  // paso intermedio. Con sub-OTs: abre el selector para elegir cuáles van en
+  // esta GRE (permite envíos parciales, ver ModalGenerarGRE.jsx).
+  const abrirGenerarGRE = () => {
+    if (subOTs.length > 0) { setGenerarGREOpen(true); return; }
+    navigate("/facturacion-electronica/guias/emitir", {
+      state: {
+        prellenarGRE: {
+          items: [{ descripcion: ot.titulo, cantidad: 1, unidad: "NIU" }],
+          destinatario: ot.empresa
+            ? { schemeID: "6", numDoc: ot.empresa.ruc || "", nombre: ot.empresa.razonSocial || "" }
+            : undefined,
+          ordenesTrabajo: [ot._id],
+        },
+      },
+    });
+  };
+
   const toggleSeleccionInforme = (id) => {
     setInformesSeleccionados(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
@@ -254,18 +310,18 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
     setDescargando(false);
   };
 
-  const ie     = ot.ingresoEquipo;
+  const ie = ot.ingresoEquipo;
   const ultimo = informes[0];
   // El estado del padre pasa a ser calculado (backend, recalcularEstadoPadre) apenas tiene al
   // menos una sub-OT "sana" — las marcadas `irreparable` quedan excluidas del cálculo.
   const hayHijasSanas = subOTs.some(s => !s.irreparable);
 
   const pasos = [
-    { tipo: "cotizacion", activo: !!cot,              codigo: cot?.codigo },
-    { tipo: "ot",         activo: true,               codigo: ot.codigo },
-    { tipo: "informe",    activo: informes.length > 0, codigo: informes.length > 1 ? `${informes.length} informes` : informes[0]?.codigo },
-    { tipo: "oc",         activo: !!oc,               codigo: oc?.codigo },
-    { tipo: "factura",    activo: !!factura,          codigo: factura?.codigo },
+    { tipo: "cotizacion", activo: !!cot, codigo: cot?.codigo },
+    { tipo: "ot", activo: true, codigo: ot.codigo },
+    { tipo: "informe", activo: informes.length > 0, codigo: informes.length > 1 ? `${informes.length} informes` : informes[0]?.codigo },
+    { tipo: "oc", activo: !!oc, codigo: oc?.codigo },
+    { tipo: "factura", activo: !!factura, codigo: factura?.codigo },
   ];
 
   return (
@@ -350,16 +406,16 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
               </div>
             )}
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <div>
                 <label className="text-xs text-gray-500 block mb-1">N° OT</label>
                 <input name="numeroOT" value={form.numeroOT} onChange={handleChange} placeholder="—" className={INP} />
               </div>
-              <div>
+              <div hidden>
                 <label className="text-xs text-gray-500 block mb-1">Fecha de ingreso</label>
                 <input type="date" name="fechaRecibida" value={form.fechaRecibida} onChange={handleChange} className={INP} />
               </div>
-              <div>
+              <div hidden>
                 <label className="text-xs text-gray-500 block mb-1">Código SAP</label>
                 <input name="codigoSap" value={form.codigoSap} onChange={handleChange} placeholder="—" className={INP} />
               </div>
@@ -396,6 +452,12 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
                   <input name="planta" value={form.planta} onChange={handleChange} placeholder="Planta" className={INP} />
                 )}
               </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Persona de contacto</label>
+                <p className={`${INP} bg-gray-50 text-gray-500`}>
+                  {plantaSel ? `${plantaSel.contactoNombre} — ${plantaSel.contactoTelefono || "—"}` : "Selecciona una planta"}
+                </p>
+              </div>
             </div>
 
             <div>
@@ -403,11 +465,37 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
               <input name="titulo" value={form.titulo} onChange={handleChange} placeholder="Descripción del trabajo" className={INP} />
             </div>
 
-            <div className="grid grid-cols-4 gap-4">
+            <div hidden>
+              <label className="text-xs text-gray-500 block mb-1">Condición</label>
+              <input name="condicion" value={form.condicion} onChange={handleChange} className={INP} />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-xs text-gray-500 block mb-1">Condición</label>
-                <input name="condicion" value={form.condicion} onChange={handleChange} className={INP} />
+                <label className="text-xs text-gray-500 block mb-1">Categorización en taller</label>
+                <select name="categorizacionTaller" value={form.categorizacionTaller} onChange={handleChange} className={INP}>
+                  <option value="">Seleccionar categoría…</option>
+                  {CATEGORIAS_TALLER.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
               </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Entregado por</label>
+                <input name="entregadoPor" value={form.entregadoPor} onChange={handleChange} className={INP} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">MIC/Línea</label>
+                <input name="micLinea" value={form.micLinea} onChange={handleChange} className={INP} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Backup</label>
+                <input name="backup" value={form.backup} onChange={handleChange} className={INP} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-xs text-gray-500 block mb-1">Encargado</label>
                 <select name="encargado" value={form.encargado} onChange={handleChange} className={INP}>
@@ -426,20 +514,16 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Persona de contacto</label>
-                <p className={`${INP} bg-gray-50 text-gray-500`}>
-                  {plantaSel ? `${plantaSel.contactoNombre} — ${plantaSel.contactoTelefono || "—"}` : "Selecciona una planta"}
-                </p>
-              </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+
+
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-xs text-gray-500 block mb-1">Guía de llegada</label>
                 <input name="numeroGuiaEmision" value={form.numeroGuiaEmision} onChange={handleChange} placeholder="—" className={INP} />
               </div>
-              <div>
+              <div hidden>
                 <label className="text-xs text-gray-500 block mb-1">Guía de salida</label>
                 <input name="numeroGuiaRemision" value={form.numeroGuiaRemision} onChange={handleChange} placeholder="—" className={INP} />
               </div>
@@ -502,49 +586,51 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
 
             <TarjetaRelacion tipo="ot" codigo={ot.codigo} numero={ot.numeroOT} actual>
               {ot.estado && <Chip className={badgeOT(ot.estado)}>{ot.estado}</Chip>}
+              {greMap[ot._id] && <Chip className="bg-purple-100 text-purple-700">GRE {greMap[ot._id]}</Chip>}
             </TarjetaRelacion>
 
             <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    Sub-Órdenes ({subOTs.length})
-                  </p>
-                  {!ot.anulado && (
-                    <button type="button" onClick={() => setCrearSubOTOpen(true)}
-                      className="text-xs text-blue-600 hover:text-blue-800 underline">
-                      + Crear Sub-OT
-                    </button>
-                  )}
-                </div>
-                {subOTs.length === 0 ? (
-                  <p className="text-xs text-gray-400">Sin sub-órdenes</p>
-                ) : (
-                  <div className="space-y-2">
-                    {subOTs.map(s => {
-                      const informesSub = informes.filter(inf => (inf.ordenTrabajo?._id || inf.ordenTrabajo) === s._id);
-                      const totalInf = informesSub.length;
-                      const aprobadosInf = informesSub.filter(inf => inf.aprobado).length;
-                      return (
-                        <TarjetaRelacion key={s._id} tipo="ot" codigo={s.codigo} numero={s.numeroOT}
-                          onClick={() => onNavegar?.({ tipo: "ot", data: s })}>
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            {s.estado && <Chip className={badgeOT(s.estado)}>{s.estado}</Chip>}
-                            {s.irreparable && <Chip className="bg-red-100 text-red-700">Irreparable</Chip>}
-                            {totalInf === 0 ? (
-                              <Chip className="bg-red-100 text-red-700">Sin informe</Chip>
-                            ) : aprobadosInf === totalInf ? (
-                              <Chip className="bg-teal-100 text-teal-700">Informe aprobado</Chip>
-                            ) : (
-                              <Chip className="bg-amber-100 text-amber-700">{aprobadosInf}/{totalInf} informe(s) aprobado(s)</Chip>
-                            )}
-                          </div>
-                          <p className="text-sm text-gray-700 line-clamp-1">{s.titulo}</p>
-                        </TarjetaRelacion>
-                      );
-                    })}
-                  </div>
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  Sub-Órdenes ({subOTs.length})
+                </p>
+                {!ot.anulado && (
+                  <button type="button" onClick={() => setCrearSubOTOpen(true)}
+                    className="text-xs text-blue-600 hover:text-blue-800 underline">
+                    + Crear Sub-OT
+                  </button>
                 )}
               </div>
+              {subOTs.length === 0 ? (
+                <p className="text-xs text-gray-400">Sin sub-órdenes</p>
+              ) : (
+                <div className="space-y-2">
+                  {subOTs.map(s => {
+                    const informesSub = informes.filter(inf => (inf.ordenTrabajo?._id || inf.ordenTrabajo) === s._id);
+                    const totalInf = informesSub.length;
+                    const aprobadosInf = informesSub.filter(inf => inf.aprobado).length;
+                    return (
+                      <TarjetaRelacion key={s._id} tipo="ot" codigo={s.codigo} numero={s.numeroOT}
+                        onClick={() => onNavegar?.({ tipo: "ot", data: s })}>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {s.estado && <Chip className={badgeOT(s.estado)}>{s.estado}</Chip>}
+                          {s.irreparable && <Chip className="bg-red-100 text-red-700">Irreparable</Chip>}
+                          {totalInf === 0 ? (
+                            <Chip className="bg-red-100 text-red-700">Sin informe</Chip>
+                          ) : aprobadosInf === totalInf ? (
+                            <Chip className="bg-teal-100 text-teal-700">Informe aprobado</Chip>
+                          ) : (
+                            <Chip className="bg-amber-100 text-amber-700">{aprobadosInf}/{totalInf} informe(s) aprobado(s)</Chip>
+                          )}
+                          {greMap[s._id] && <Chip className="bg-purple-100 text-purple-700">GRE {greMap[s._id]}</Chip>}
+                        </div>
+                        <p className="text-sm text-gray-700 line-clamp-1">{s.titulo}</p>
+                      </TarjetaRelacion>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
             <TarjetaRelacion
               tipo="informe"
@@ -564,6 +650,11 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
                 )
               )}
             </TarjetaRelacion>
+
+            {puedeGenerarGRE && (
+              <TarjetaRelacion tipo="gre" vacio
+                onCrear={!ot.anulado ? abrirGenerarGRE : undefined} crearLabel="GRE" />
+            )}
 
             {!esVistaLimitada && (
               <>
@@ -595,11 +686,19 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
                     Informes Técnicos ({informes.length})
                   </h2>
                 </div>
+                <div className="flex items-center gap-2">
+                {!subOTs.length && !ot.anulado && (
+                  <button type="button" onClick={() => setSeleccionarTipoOpen(true)}
+                    className="text-sm border border-teal-600 text-teal-700 px-4 py-2 rounded-lg hover:bg-teal-50 transition font-medium">
+                    + Nuevo informe
+                  </button>
+                )}
                 <button type="button" disabled={informesSeleccionados.length === 0 || descargando}
                   onClick={descargarSeleccionados}
                   className="text-sm bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 disabled:opacity-50 transition font-medium">
                   {descargando ? "Descargando…" : `Descargar seleccionados (${informesSeleccionados.length})`}
                 </button>
+                </div>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -741,6 +840,14 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
           padre={ot}
           onClose={() => setCrearSubOTOpen(false)}
           onCreada={() => { setCrearSubOTOpen(false); cargarRelaciones(); }}
+        />
+      )}
+
+      {generarGREOpen && (
+        <ModalGenerarGRE
+          ot={ot}
+          subOTs={subOTs}
+          onClose={() => setGenerarGREOpen(false)}
         />
       )}
 

@@ -3,7 +3,7 @@ import { fetchAuth, uploadAuth, abrirArchivoProtegido } from "../utils/fetchAuth
 import DetalleDocumento from "../components/DetalleDocumento";
 import ModalCrearOrdenCompra   from "../components/ModalCrearOrdenCompra";
 import ModalImportarExcel, { COLS_OC, COLS_CADENA } from "../components/ModalImportarExcel";
-import { DotChip, badgeOT, dotOT } from "../components/detalleShared";
+import { DotChip, badgeOT, dotOT, badgeInformes, dotInformes } from "../components/detalleShared";
 import * as XLSX from "xlsx";
 
 const ESTADOS_OT = ["", "pendiente", "en progreso", "completado"];
@@ -36,7 +36,22 @@ const totalesDuales = (monto, tipoCambio) => {
   return { pen: m, usd: tc > 0 ? m / tc : null };
 };
 
-function TablaOC({ titulo, acento, ordenes, otMap, factMap, factByOCMap, tipoCambio, onSelect, subirDocumento, vacioMsg }) {
+function PillSiNo({ si }) {
+  return (
+    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full uppercase tracking-wide whitespace-nowrap ${si ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+      {si ? "SI" : "NO"}
+    </span>
+  );
+}
+
+function TablaOC({
+  titulo, acento, ordenes, otGroupMap, factMap, factByOCMap, greMap, tipoCambio, onSelect, subirDocumento,
+  mostrarFactura = true, mostrarTitulo = true, mostrarDocumento = true, mostrarHesActa = false,
+  vacioMsg,
+}) {
+  const totalColumnas = 10
+    + (mostrarFactura ? 1 : 0) + (mostrarTitulo ? 1 : 0)
+    + (mostrarHesActa ? 2 : 0) + (mostrarDocumento ? 1 : 0);
   return (
     <div className="mb-6">
       <div className="flex items-center gap-2 mb-3">
@@ -46,34 +61,43 @@ function TablaOC({ titulo, acento, ordenes, otMap, factMap, factByOCMap, tipoCam
       </div>
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-        <table className="w-full text-sm min-w-[600px]">
+        <table className="w-full text-sm" style={{ minWidth: `${totalColumnas * 85}px` }}>
           <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-200">
             <tr>
               <th className={`${TH} text-left`}>Cotización</th>
+              <th className={`${TH} text-left`}>N° OT</th>
               <th className={`${TH} text-left`}>N° Orden de Compra</th>
-              <th className={`${TH} text-left`}>N° Factura</th>
+              {mostrarFactura && <th className={`${TH} text-left`}>N° Factura</th>}
               <th className={`${TH} text-left`}>Empresa</th>
-              <th className={`${TH} text-left`}>Título</th>
+              {mostrarTitulo && <th className={`${TH} text-left`}>Título</th>}
               <th className={`${TH} text-right`}>Total (S/)</th>
               <th className={`${TH} text-right`}>Total (US$)</th>
               <th className={`${TH} text-center`}>Estado Cotización</th>
               <th className={`${TH} text-center`}>Estado OT</th>
-              <th className={`${TH} text-center`}>Documento</th>
+              <th className={`${TH} text-center`}>Estado Informes</th>
+              <th className={`${TH} text-center`}>GRE</th>
+              {mostrarHesActa && <th className={`${TH} text-center`}>HES</th>}
+              {mostrarHesActa && <th className={`${TH} text-center`}>Acta de Conformidad</th>}
+              {mostrarDocumento && <th className={`${TH} text-center`}>Documento</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {ordenes.length === 0 ? (
-              <tr><td colSpan={10} className="px-4 py-8 text-center text-gray-400">{vacioMsg}</td></tr>
-            ) : ordenes.map((o) => {
+              <tr><td colSpan={totalColumnas} className="px-4 py-8 text-center text-gray-400">{vacioMsg}</td></tr>
+            ) : ordenes.flatMap((o) => {
               const cotId = o.cotizacion?._id || o.cotizacion;
-              const estadoActual = otMap[cotId];
+              const grupoOT = otGroupMap[o.numeroDocumento];
+              const otPadre = grupoOT?.parent || null;
+              const subs = grupoOT?.subs || [];
               const factura = factByOCMap[o._id] || factMap[cotId];
               const { pen, usd } = totalesDuales(o.monto, tipoCambio);
-              return (
+
+              const filaPrincipal = (
                 <tr key={o._id}
                   className={`hover:bg-gray-50 cursor-pointer transition-colors ${o.anulado ? "opacity-50" : ""}`}
                   onClick={() => onSelect(o)}>
                   <td className="px-4 py-3.5 font-semibold text-gray-800 whitespace-nowrap">{o.cotizacion?.numeroCotizacion || <span className="text-gray-300">—</span>}</td>
+                  <td className="px-4 py-3.5 font-semibold text-gray-800 whitespace-nowrap">{otPadre?.numeroOT || <span className="text-gray-300 font-sans">Sin OT</span>}</td>
                   <td className="px-4 py-3.5 font-semibold text-gray-800 whitespace-nowrap">
                     <div className="flex items-center gap-1.5">
                       {o.numeroOrden || <span className="text-gray-300">—</span>}
@@ -84,9 +108,11 @@ function TablaOC({ titulo, acento, ordenes, otMap, factMap, factByOCMap, tipoCam
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-3.5 text-gray-600 whitespace-nowrap">{o.numeroFactura || factura?.numeroFactura || <span className="text-gray-300">—</span>}</td>
+                  {mostrarFactura && (
+                    <td className="px-4 py-3.5 text-gray-600 whitespace-nowrap">{o.numeroFactura || factura?.numeroFactura || <span className="text-gray-300">—</span>}</td>
+                  )}
                   <td className="px-4 py-3.5 text-gray-700">{o.empresa?.razonSocial || "—"}</td>
-                  <td className="px-4 py-3.5 text-gray-600">{o.titulo}</td>
+                  {mostrarTitulo && <td className="px-4 py-3.5 text-gray-600">{o.titulo}</td>}
                   <td className="px-4 py-3.5 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap">
                     {pen.toLocaleString("es-PE", { minimumFractionDigits: 2 })}
                   </td>
@@ -104,39 +130,95 @@ function TablaOC({ titulo, acento, ordenes, otMap, factMap, factByOCMap, tipoCam
                     </div>
                   </td>
                   <td className="px-4 py-3.5 text-center">
-                    {estadoActual ? (
-                      <DotChip chip={badgeOT(estadoActual)} dot={dotOT(estadoActual)}>{estadoActual}</DotChip>
+                    {otPadre ? (
+                      <DotChip chip={badgeOT(otPadre.estado)} dot={dotOT(otPadre.estado)}>{otPadre.estado}</DotChip>
                     ) : (
                       <span className="text-gray-300 text-xs">Sin OT</span>
                     )}
                   </td>
-                  <td className="px-4 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
-                    <label className="cursor-pointer inline-flex flex-col items-center gap-1">
-                      <input
-                        type="file"
-                        accept="application/pdf"
-                        className="hidden"
-                        onChange={(e) => { if (e.target.files[0]) subirDocumento(o._id, e.target.files[0]); e.target.value = ""; }}
-                      />
-                      {o.documento ? (
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); abrirArchivoProtegido(o.documento); }}
-                            className="text-blue-600 hover:text-blue-800 text-xs font-medium underline"
-                          >
-                            Ver PDF
-                          </button>
-                          <span className="text-gray-300">|</span>
-                          <span className="text-xs text-gray-400 hover:text-gray-600 underline">Reemplazar</span>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-blue-500 hover:text-blue-700 underline">Subir PDF</span>
-                      )}
-                    </label>
+                  <td className="px-4 py-3.5 text-center">
+                    {otPadre ? (
+                      <DotChip chip={badgeInformes(otPadre.estadoInformes)} dot={dotInformes(otPadre.estadoInformes)}>{otPadre.estadoInformes}</DotChip>
+                    ) : (
+                      <span className="text-gray-300 text-xs">—</span>
+                    )}
                   </td>
+                  <td className="px-4 py-3.5 text-center">
+                    {otPadre && greMap[otPadre._id] ? (
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 whitespace-nowrap">
+                        GRE {greMap[otPadre._id]}
+                      </span>
+                    ) : (
+                      <span className="text-gray-300 text-xs">Sin GRE</span>
+                    )}
+                  </td>
+                  {mostrarHesActa && <td className="px-4 py-3.5 text-center"><PillSiNo si={!!o.hesConfirmado} /></td>}
+                  {mostrarHesActa && <td className="px-4 py-3.5 text-center"><PillSiNo si={!!o.actaConformidadConfirmada} /></td>}
+                  {mostrarDocumento && (
+                    <td className="px-4 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
+                      <label className="cursor-pointer inline-flex flex-col items-center gap-1">
+                        <input
+                          type="file"
+                          accept="application/pdf"
+                          className="hidden"
+                          onChange={(e) => { if (e.target.files[0]) subirDocumento(o._id, e.target.files[0]); e.target.value = ""; }}
+                        />
+                        {o.documento ? (
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); abrirArchivoProtegido(o.documento); }}
+                              className="text-blue-600 hover:text-blue-800 text-xs font-medium underline"
+                            >
+                              Ver PDF
+                            </button>
+                            <span className="text-gray-300">|</span>
+                            <span className="text-xs text-gray-400 hover:text-gray-600 underline">Reemplazar</span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-blue-500 hover:text-blue-700 underline">Subir PDF</span>
+                        )}
+                      </label>
+                    </td>
+                  )}
                 </tr>
               );
+
+              const filasSub = subs.map((s) => (
+                <tr key={s._id}
+                  className={`hover:bg-gray-50 cursor-pointer transition-colors bg-indigo-50/30 ${s.anulado ? "opacity-50" : ""}`}
+                  onClick={() => onSelect(o)}>
+                  <td className="px-4 py-3" />
+                  <td className="px-4 py-3 font-semibold text-indigo-700 whitespace-nowrap pl-8">↳ {s.numeroOT}</td>
+                  <td className="px-4 py-3" />
+                  {mostrarFactura && <td className="px-4 py-3" />}
+                  <td className="px-4 py-3" />
+                  {mostrarTitulo && <td className="px-4 py-3" />}
+                  <td className="px-4 py-3" />
+                  <td className="px-4 py-3" />
+                  <td className="px-4 py-3" />
+                  <td className="px-4 py-3 text-center">
+                    <DotChip chip={badgeOT(s.estado)} dot={dotOT(s.estado)}>{s.estado}</DotChip>
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <DotChip chip={badgeInformes(s.estadoInformes)} dot={dotInformes(s.estadoInformes)}>{s.estadoInformes}</DotChip>
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    {greMap[s._id] ? (
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 whitespace-nowrap">
+                        GRE {greMap[s._id]}
+                      </span>
+                    ) : (
+                      <span className="text-gray-300 text-xs">Sin GRE</span>
+                    )}
+                  </td>
+                  {mostrarHesActa && <td className="px-4 py-3" />}
+                  {mostrarHesActa && <td className="px-4 py-3" />}
+                  {mostrarDocumento && <td className="px-4 py-3" />}
+                </tr>
+              ));
+
+              return [filaPrincipal, ...filasSub];
             })}
           </tbody>
         </table>
@@ -149,10 +231,10 @@ function TablaOC({ titulo, acento, ordenes, otMap, factMap, factByOCMap, tipoCam
 export default function ListaOrdenesCompra() {
   const hoy = new Date();
   const [ordenes, setOrdenes]       = useState([]);
-  const [otMap, setOtMap]           = useState({});
-  const [otNumeroMap, setOtNumeroMap] = useState({});
+  const [otGroupMap, setOtGroupMap] = useState({});
   const [factMap, setFactMap]       = useState({});
   const [factByOCMap, setFactByOCMap] = useState({});
+  const [greMap, setGreMap]         = useState({});
   const [tipoCambio, setTipoCambio] = useState(null);
   const [sortBy, setSortBy]         = useState("fecha");
   const [ordenSeleccionada, setOrdenSeleccionada] = useState(null);
@@ -175,15 +257,41 @@ export default function ListaOrdenesCompra() {
     ]).then(([ocs, ots, facts, tc]) => {
       setOrdenes(ocs);
       setTipoCambio(tc?.valor ?? null);
-      const otM = {};
-      const otNumM = {};
+      // Agrupa por numeroDocumento (compartido por toda la cadena): la OT
+      // padre + sus sub-OTs quedan bajo la misma OC/Cotización/Factura. Una
+      // sub-OT hereda el numeroDocumento de su padre al crearse, así que
+      // agrupar por este campo agarra padre + hijas sin necesitar `ordenPadre`.
+      const otG = {};
       ots.forEach((ot) => {
-        const cotId = ot.cotizacion?._id || ot.cotizacion;
-        if (cotId) otM[cotId] = ot.estado;
-        if (ot.numeroDocumento != null) otNumM[ot.numeroDocumento] = ot.numeroOT;
+        if (ot.numeroDocumento == null) return;
+        if (!otG[ot.numeroDocumento]) otG[ot.numeroDocumento] = { parent: null, subs: [] };
+        if (ot.ordenPadre) otG[ot.numeroDocumento].subs.push(ot);
+        else otG[ot.numeroDocumento].parent = ot;
       });
-      setOtMap(otM);
-      setOtNumeroMap(otNumM);
+      setOtGroupMap(otG);
+
+      // GRE generadas por OT/sub-OT (mismo mecanismo que el badge de
+      // DetalleOrdenTrabajo.jsx) — solo cuentan las ACEPTADAS por SUNAT.
+      const otIds = ots.map((ot) => ot._id);
+      if (otIds.length) {
+        fetchAuth(`/guias?ordenesTrabajo=${otIds.join(",")}&estado=ACEPTADO&limit=1000`)
+          .then((r) => r.ok && r.json())
+          .then((data) => {
+            if (!data?.ok) return;
+            const map = {};
+            data.data.forEach((g) => {
+              const codigo = `${g.serie}-${String(g.correlativo).padStart(4, "0")}`;
+              (g.ordenesTrabajo || []).forEach((id) => {
+                const key = id?._id || id;
+                map[key] = map[key] ? `${map[key]}, ${codigo}` : codigo;
+              });
+            });
+            setGreMap(map);
+          });
+      } else {
+        setGreMap({});
+      }
+
       const ocNumDoc = {};
       ocs.forEach((oc) => { ocNumDoc[oc._id] = oc.numeroDocumento; });
       const factM = {};
@@ -228,17 +336,18 @@ export default function ListaOrdenesCompra() {
     const matchMes   = fecha.getMonth() + 1 === mes;
     const txt = busqueda.toLowerCase();
     const factura = factByOCMap[o._id] || factMap[o.cotizacion?._id || o.cotizacion];
+    const grupoOT = otGroupMap[o.numeroDocumento];
+    const numerosOT = grupoOT ? [grupoOT.parent, ...grupoOT.subs].filter(Boolean).map((ot) => ot.numeroOT) : [];
     const matchBusq  = !txt
       || o.numeroOrden?.toLowerCase().includes(txt)
       || o.titulo?.toLowerCase().includes(txt)
       || o.numeroFactura?.toLowerCase().includes(txt)
       || factura?.numeroFactura?.toLowerCase().includes(txt)
-      || otNumeroMap[o.numeroDocumento]?.toLowerCase().includes(txt)
+      || numerosOT.some((n) => n?.toLowerCase().includes(txt))
       || o.cotizacion?.numeroCotizacion?.toLowerCase().includes(txt)
       || o.empresa?.razonSocial?.toLowerCase().includes(txt)
       || o.empresa?.ruc?.includes(txt);
-    const cotId      = o.cotizacion?._id || o.cotizacion;
-    const estadoActual = otMap[cotId];
+    const estadoActual = grupoOT?.parent?.estado;
     const matchEstado = !estadoOT || estadoActual === estadoOT;
     const matchEmpresa = !empresa || o.empresa?._id === empresa;
     const matchPlanta = !planta || o.planta === planta;
@@ -246,7 +355,7 @@ export default function ListaOrdenesCompra() {
   });
 
   filtradas.sort((a, b) => {
-    if (sortBy === "numeroOT") return compararTexto(otNumeroMap[a.numeroDocumento], otNumeroMap[b.numeroDocumento]);
+    if (sortBy === "numeroOT") return compararTexto(otGroupMap[a.numeroDocumento]?.parent?.numeroOT, otGroupMap[b.numeroDocumento]?.parent?.numeroOT);
     if (sortBy === "numeroCotizacion") return compararTexto(a.cotizacion?.numeroCotizacion, b.cotizacion?.numeroCotizacion);
     return new Date(b.fecha) - new Date(a.fecha);
   });
@@ -262,12 +371,14 @@ export default function ListaOrdenesCompra() {
   // Mismas columnas que TablaOC (sin "Documento", no aplica a una hoja de cálculo).
   const filaOC = (o) => {
     const cotId = o.cotizacion?._id || o.cotizacion;
-    const estadoActual = otMap[cotId];
+    const grupoOT = otGroupMap[o.numeroDocumento];
     const factura = factByOCMap[o._id] || factMap[cotId];
     const { pen, usd } = totalesDuales(o.monto, tipoCambio);
     return {
       "Cotización":         o.cotizacion?.numeroCotizacion || "—",
       "N° Orden de Compra": o.numeroOrden || "—",
+      "N° OT":              grupoOT?.parent?.numeroOT || "—",
+      "Sub-OTs":            grupoOT?.subs?.map((s) => s.numeroOT).join(", ") || "—",
       "N° Factura":         o.numeroFactura || factura?.numeroFactura || "—",
       "Empresa":            o.empresa?.razonSocial || "—",
       "Título":             o.titulo || "—",
@@ -275,7 +386,9 @@ export default function ListaOrdenesCompra() {
       "Total (US$)":        usd != null ? usd.toFixed(2) : "—",
       "Aprobado":           o.cotizacion?.aprobado ? "Aprobada" : "Pendiente",
       "Enviado":            o.cotizacion?.enviado ? "Enviada" : "No enviada",
-      "Estado OT":          estadoActual || "Sin OT",
+      "Estado":             grupoOT?.parent?.estado || "Sin OT",
+      "Estado Informes":    grupoOT?.parent?.estadoInformes || "—",
+      "GRE":                (grupoOT?.parent && greMap[grupoOT.parent._id]) || "Sin GRE",
     };
   };
 
@@ -408,9 +521,13 @@ export default function ListaOrdenesCompra() {
         titulo="Órdenes de Compra sin factura"
         acento="bg-amber-500"
         ordenes={sinFactura}
-        otMap={otMap} factMap={factMap} factByOCMap={factByOCMap} tipoCambio={tipoCambio}
+        otGroupMap={otGroupMap} factMap={factMap} factByOCMap={factByOCMap} greMap={greMap} tipoCambio={tipoCambio}
         onSelect={setOrdenSeleccionada}
         subirDocumento={subirDocumento}
+        mostrarFactura={false}
+        mostrarTitulo={false}
+        mostrarDocumento={false}
+        mostrarHesActa
         vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de compra sin factura"}
       />
 
@@ -418,7 +535,7 @@ export default function ListaOrdenesCompra() {
         titulo="Órdenes de Compra con factura"
         acento="bg-emerald-500"
         ordenes={conFactura}
-        otMap={otMap} factMap={factMap} factByOCMap={factByOCMap} tipoCambio={tipoCambio}
+        otGroupMap={otGroupMap} factMap={factMap} factByOCMap={factByOCMap} greMap={greMap} tipoCambio={tipoCambio}
         onSelect={setOrdenSeleccionada}
         subirDocumento={subirDocumento}
         vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de compra con factura"}
@@ -428,7 +545,7 @@ export default function ListaOrdenesCompra() {
         titulo="Órdenes de Compra cerradas"
         acento="bg-gray-500"
         ordenes={cerradas}
-        otMap={otMap} factMap={factMap} factByOCMap={factByOCMap} tipoCambio={tipoCambio}
+        otGroupMap={otGroupMap} factMap={factMap} factByOCMap={factByOCMap} greMap={greMap} tipoCambio={tipoCambio}
         onSelect={setOrdenSeleccionada}
         subirDocumento={subirDocumento}
         vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de compra cerradas"}

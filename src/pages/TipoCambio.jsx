@@ -83,6 +83,36 @@ export default function TipoCambio() {
           </div>
         )}
       </div>
+
+      {tc?.historial?.length > 0 && (
+        <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+          <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide mb-3">Historial de cambios</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-xs uppercase tracking-wide text-gray-400 border-b border-gray-100">
+                <tr>
+                  <th className="text-left py-2 pr-3">Valor anterior</th>
+                  <th className="text-left py-2 pr-3">Valor nuevo</th>
+                  <th className="text-left py-2 pr-3">Usuario</th>
+                  <th className="text-left py-2 pr-3">Rol</th>
+                  <th className="text-left py-2 pr-3">Fecha y hora</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {[...tc.historial].reverse().map((h, i) => (
+                  <tr key={i}>
+                    <td className="py-2 pr-3 text-gray-500">S/ {Number(h.valorAnterior).toFixed(3)}</td>
+                    <td className="py-2 pr-3 text-gray-800 font-medium">S/ {Number(h.valorNuevo).toFixed(3)}</td>
+                    <td className="py-2 pr-3 text-gray-600">{h.usuario || "—"}</td>
+                    <td className="py-2 pr-3 text-gray-500 capitalize">{h.rol || "—"}</td>
+                    <td className="py-2 pr-3 text-gray-500">{h.fecha ? new Date(h.fecha).toLocaleString("es-PE") : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

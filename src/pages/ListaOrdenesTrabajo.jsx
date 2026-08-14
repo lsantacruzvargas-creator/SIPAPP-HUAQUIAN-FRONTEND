@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { fetchAuth } from "../utils/fetchAuth";
 import DetalleDocumento from "../components/DetalleDocumento";
 import ModalNuevaOT from "../components/ModalNuevaOT";
-import { DotChip, badgeOT, dotOT } from "../components/detalleShared";
+import { DotChip, badgeOT, dotOT, badgeInformes, dotInformes } from "../components/detalleShared";
 import * as XLSX from "xlsx";
 
 const MESES = [
@@ -55,12 +55,13 @@ function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg }) {
                 <th className={`${TH} text-left`}>Encargado</th>
                 <th className={`${TH} text-left`}>Descripción</th>
                 <th className={`${TH} text-center`}>Estado</th>
+                <th className={`${TH} text-center`}>Estado Informes</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {ordenes.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-gray-400">{vacioMsg}</td>
+                  <td colSpan={9} className="px-4 py-8 text-center text-gray-400">{vacioMsg}</td>
                 </tr>
               ) : (
                 ordenes.flatMap((o) => [
@@ -94,6 +95,9 @@ function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg }) {
                     <td className="px-4 py-3.5 text-center">
                       <DotChip chip={badgeOT(o.estado)} dot={dotOT(o.estado)}>{o.estado}</DotChip>
                     </td>
+                    <td className="px-4 py-3.5 text-center">
+                      <DotChip chip={badgeInformes(o.estadoInformes)} dot={dotInformes(o.estadoInformes)}>{o.estadoInformes}</DotChip>
+                    </td>
                   </tr>,
                   ...(o.subOTs || []).map((s) => (
                     <tr
@@ -116,6 +120,9 @@ function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg }) {
                       <td className="px-4 py-3 text-gray-700">{s.titulo || <span className="text-gray-300">—</span>}</td>
                       <td className="px-4 py-3 text-center">
                         <DotChip chip={badgeOT(s.estado)} dot={dotOT(s.estado)}>{s.estado}</DotChip>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <DotChip chip={badgeInformes(s.estadoInformes)} dot={dotInformes(s.estadoInformes)}>{s.estadoInformes}</DotChip>
                       </td>
                     </tr>
                   )),
@@ -245,6 +252,7 @@ export default function ListaOrdenesTrabajo() {
     "Encargado":      o.encargado || "—",
     "Descripción":    o.titulo || "—",
     "Estado":         o.estado || "—",
+    "Estado Informes": o.estadoInformes || "—",
   });
 
   const exportarExcel = () => {

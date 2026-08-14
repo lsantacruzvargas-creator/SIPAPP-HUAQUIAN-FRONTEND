@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { fetchAuth } from "../utils/fetchAuth";
 import {
   TIPO_GUIA,
@@ -68,6 +69,13 @@ function Ayuda({ texto }) {
 }
 
 export default function EmitirGuia() {
+  // Llega desde el card "Generar GRE" del detalle de una OT padre — ver
+  // DetalleOrdenTrabajo.jsx:abrirGenerarGRE / ModalGenerarGRE.jsx. Los ítems
+  // vienen ya armados (títulos de la OT o sus sub-OTs elegidas); el resto del
+  // form (motivo, transporte, etc.) se sigue llenando a mano.
+  const location = useLocation();
+  const prellenado = location.state?.prellenarGRE || null;
+
   const [rucEmisor] = useState(RUC_EMISOR);
   const [tipoGuia, setTipoGuia]         = useState("REMITENTE");
   const [serie, setSerie]               = useState(SERIE_POR_TIPO_GUIA.REMITENTE);
@@ -83,7 +91,8 @@ export default function EmitirGuia() {
   const [comprobantes, setComprobantes] = useState([]);
   const [comprobanteId, setComprobanteId] = useState("");
 
-  const [destinatario, setDestinatario] = useState(PARTE_VACIA);
+  const [destinatario, setDestinatario] = useState(() =>
+    prellenado?.destinatario ? { ...PARTE_VACIA, ...prellenado.destinatario } : PARTE_VACIA);
   const [remitente, setRemitente]       = useState(PARTE_VACIA);
   const [proveedor, setProveedor]       = useState(PARTE_VACIA);
   const [comprador, setComprador]       = useState(PARTE_VACIA);
@@ -94,7 +103,9 @@ export default function EmitirGuia() {
   const [conductor, setConductor]         = useState(CONDUCTOR_VACIO);
   const [vehiculosSecundarios, setVehiculosSecundarios]   = useState([]);
   const [conductoresSecundarios, setConductoresSecundarios] = useState([]);
-  const [items, setItems]                 = useState([itemVacioGuia()]);
+  const [items, setItems]                 = useState(() =>
+    prellenado?.items?.length ? prellenado.items.map((i) => ({ ...itemVacioGuia(), ...i })) : [itemVacioGuia()]);
+  const [ordenesTrabajo]                  = useState(prellenado?.ordenesTrabajo || []);
 
   // Solo GRE Transportista.
   const [pagadorFlete, setPagadorFlete]                 = useState(PARTE_VACIA);
@@ -365,6 +376,7 @@ export default function EmitirGuia() {
           documentosRelacionados: documentosRelacionados.map((d) => ({ tipoDoc: d.tipoDoc, numero: d.numero.trim() })),
         } : {}),
         realizaTransbordo, retornoEnvasesVacios, retornoVehiculoVacio,
+        ...(ordenesTrabajo.length ? { ordenesTrabajo } : {}),
       };
       const res  = await fetchAuth("/guias", { method: "POST", body: JSON.stringify(body) });
       const data = await res.json();
@@ -421,6 +433,11 @@ export default function EmitirGuia() {
         {resultado?.ok && <span className="font-mono text-sm text-ink-muted">{resultado.nombre}</span>}
       </div>
 
+      {prellenado && !resultado && (
+        <div className="bg-sky-50 border border-sky-200 text-sky-700 text-sm rounded-lg px-4 py-3 mb-5">
+          Ítems y destinatario prellenados desde la Orden de Trabajo — revisa antes de emitir.
+        </div>
+      )}
       {resultado?.ok && (
         <div className="bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg px-4 py-3 mb-5">
           Guía <strong>{resultado.nombre}</strong> ACEPTADA por SUNAT.

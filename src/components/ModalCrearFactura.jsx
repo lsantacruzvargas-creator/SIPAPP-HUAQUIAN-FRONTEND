@@ -257,7 +257,14 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
       ordenCompra:        ocId,
       empresa:            form.empresa,
     };
-    if (form.fechaCancelacion) factPayload.fechaCancelacion = form.fechaCancelacion;
+    // Crédito con cuotas reemplaza a "Fecha cancelación": el vencimiento pasa
+    // a ser por cuota, no un solo dato suelto — ver Factura.js:cuotaSchema y
+    // la tabla de sub-filas en ListaFacturas.jsx.
+    if (formaPago === "Credito" && cuotas.length) {
+      factPayload.cuotas = cuotas.map((c) => ({ monto: Number(c.monto), fechaVencimiento: c.fechaVencimiento }));
+    } else if (form.fechaCancelacion) {
+      factPayload.fechaCancelacion = form.fechaCancelacion;
+    }
     if (ocVinculada) {
       factPayload.codigoSap   = ocVinculada.codigoSap;
       factPayload.fechaSalida = ocVinculada.fechaSalida;
@@ -343,7 +350,11 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
             </div>
             <div>
               <label className="text-xs text-gray-500 block mb-1">Fecha cancelación</label>
-              <input type="date" name="fechaCancelacion" value={form.fechaCancelacion} onChange={handleChange} className={INP} />
+              {formaPago === "Credito" ? (
+                <input value="Ver cuotas abajo" disabled className={INP_DIS} />
+              ) : (
+                <input type="date" name="fechaCancelacion" value={form.fechaCancelacion} onChange={handleChange} className={INP} />
+              )}
             </div>
             <div className="col-span-2">
               <label className="text-xs text-gray-500 block mb-1">Empresa (receptor SUNAT) *</label>

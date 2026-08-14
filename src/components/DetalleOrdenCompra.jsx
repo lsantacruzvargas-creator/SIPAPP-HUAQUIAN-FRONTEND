@@ -44,7 +44,37 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
   const [error, setError]         = useState("");
   const [cargandoFactura, setCargandoFactura] = useState(false);
   const [crearFacturaOpen, setCrearFacturaOpen] = useState(false);
-  const puedeEditar = ["admin", "asistente"].includes(getUsuario()?.rol);
+  const [ordenActual, setOrdenActual] = useState(orden);
+  const [guardandoConfirmacion, setGuardandoConfirmacion] = useState("");
+  const rolActual = getUsuario()?.rol;
+  const puedeEditar = ["admin", "asistente"].includes(rolActual);
+  const puedeConfirmarHesActa = ["admin", "asistente", "facturacion", "jefatura"].includes(rolActual);
+  // Crear Factura: solo Facturación, Jefatura y Admin — Asistente ya no
+  // puede (mismo gate que backend puedeEditar en routes/facturas.js).
+  const puedeCrearFacturaRol = ["admin", "facturacion", "jefatura"].includes(rolActual);
+  const exigeHes  = !!ordenActual.empresa?.requiereHes;
+  const exigeActa = !!ordenActual.empresa?.requiereActaConformidad;
+  const puedeCrearFactura =
+    (!exigeHes  || ordenActual.hesConfirmado) &&
+    (!exigeActa || ordenActual.actaConformidadConfirmada);
+
+  const confirmarHesActa = async (campo, valor) => {
+    setGuardandoConfirmacion(campo);
+    const res = await fetchAuth(`/ordenes-compra/${orden._id}/confirmaciones`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ [campo]: valor }),
+    });
+    if (res.ok) {
+      // No se usa `onGuardada` acá a propósito: ese callback cierra el modal
+      // (ver DetalleDocumento.jsx `cerrarGuardando`), y marcar un checkbox no
+      // debería sacar al usuario de la vista — solo se actualiza el estado
+      // local; la lista se refresca sola al cerrar (mismo patrón que ya usa
+      // el resto del detalle).
+      setOrdenActual(await res.json());
+    }
+    setGuardandoConfirmacion("");
+  };
 
   const abrirFactura = async () => {
     if (!facturaVinculada || cargandoFactura) return;
@@ -179,6 +209,48 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
               )}
             </div>
         </div>
+        {(exigeHes || exigeActa) && (
+          <div className="bg-blue-800/40 border-t border-white/10">
+            <div className="max-w-6xl mx-auto px-8 py-2.5 flex items-center gap-6">
+              <span className="text-xs text-white/70 uppercase tracking-wide font-semibold">Requisitos de facturación</span>
+              {exigeHes && (
+                <label className="flex items-center gap-2 text-sm text-white cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!!ordenActual.hesConfirmado}
+                    disabled={!puedeConfirmarHesActa || ordenActual.anulado || guardandoConfirmacion === "hesConfirmado"}
+                    onChange={(e) => confirmarHesActa("hesConfirmado", e.target.checked)}
+                    className="w-4 h-4"
+                  />
+                  HES confirmado
+                  {ordenActual.hesConfirmadoPor && (
+                    <span className="text-xs text-white/50">— {ordenActual.hesConfirmadoPor}</span>
+                  )}
+                </label>
+              )}
+              {exigeActa && (
+                <label className="flex items-center gap-2 text-sm text-white cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!!ordenActual.actaConformidadConfirmada}
+                    disabled={!puedeConfirmarHesActa || ordenActual.anulado || guardandoConfirmacion === "actaConformidadConfirmada"}
+                    onChange={(e) => confirmarHesActa("actaConformidadConfirmada", e.target.checked)}
+                    className="w-4 h-4"
+                  />
+                  Acta de Conformidad confirmada
+                  {ordenActual.actaConformidadConfirmadaPor && (
+                    <span className="text-xs text-white/50">— {ordenActual.actaConformidadConfirmadaPor}</span>
+                  )}
+                </label>
+              )}
+              {!puedeCrearFactura && (
+                <span className="text-xs text-amber-200 ml-auto">
+                  {exigeHes && exigeActa ? "Ambos requisitos deben marcarse" : "Este requisito debe marcarse"} antes de generar la factura.
+                </span>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Stepper de flujo */}
@@ -350,11 +422,14 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
 
             <TarjetaRelacion tipo="factura" codigo={factura?.codigo} numero={factura?.numeroFactura} vacio={!factura}
               onClick={factura ? abrirFactura : undefined} cargando={cargandoFactura}
-              onCrear={!factura && !orden.anulado ? () => setCrearFacturaOpen(true) : undefined} crearLabel="Factura">
+              onCrear={!factura && !orden.anulado && puedeCrearFactura && puedeCrearFacturaRol ? () => setCrearFacturaOpen(true) : undefined} crearLabel="Factura">
               {(factura?.totalAPagar || factura?.total) > 0 && (
                 <p className="text-xs text-gray-500">{money(factura.totalAPagar ?? factura.total)}</p>
               )}
               {factura?.estadoPago && <Chip className={badgePago(factura.estadoPago)}>{factura.estadoPago}</Chip>}
+              {!factura && !puedeCrearFactura && (
+                <p className="text-xs text-amber-600">Pendiente confirmar HES y Acta de Conformidad</p>
+              )}
             </TarjetaRelacion>
           </section>
         </div>

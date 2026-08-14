@@ -56,7 +56,7 @@ const compararTexto = (na, nb) => {
   return String(nb).localeCompare(String(na));
 };
 
-function TablaFacturas({ titulo, acento, facturas, onSelect, handlePagoCheck, vacioMsg }) {
+function TablaFacturas({ titulo, acento, facturas, onSelect, handlePagoCheck, handleCuotaPagoCheck, vacioMsg }) {
   const rolActual = getUsuario()?.rol;
   // Las anuladas siguen visibles en la tabla, pero no cuentan en los totales
   const noAnuladas = facturas.filter(f => !f.anulado);
@@ -102,74 +102,122 @@ function TablaFacturas({ titulo, acento, facturas, onSelect, handlePagoCheck, va
                 </tr>
               ) : (
                 <>
-                {facturas.map(f => (
-                  <tr key={f._id}
-                    className={`hover:bg-gray-50 cursor-pointer transition-colors ${f.anulado ? "opacity-50" : ""}`}
-                    onClick={() => onSelect(f)}>
-                    <td className="px-3 py-3.5 text-gray-600 whitespace-nowrap">
-                      {f._numeroOT || <span className="text-gray-300">—</span>}
-                    </td>
-                    <td className="px-3 py-3.5 font-semibold text-gray-800 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5">
-                        {f.numeroFactura || <span className="text-gray-300">—</span>}
-                        {f.anulado && (
-                          <span title={f.motivoAnulacion} className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 uppercase">
-                            Anulada
-                          </span>
+                {facturas.flatMap(f => {
+                  const tieneCuotas = f.cuotas?.length > 0;
+                  const filaPrincipal = (
+                    <tr key={f._id}
+                      className={`hover:bg-gray-50 cursor-pointer transition-colors ${f.anulado ? "opacity-50" : ""}`}
+                      onClick={() => onSelect(f)}>
+                      <td className="px-3 py-3.5 text-gray-600 whitespace-nowrap">
+                        {f._numeroOT || <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-3 py-3.5 font-semibold text-gray-800 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          {f.numeroFactura || <span className="text-gray-300">—</span>}
+                          {f.anulado && (
+                            <span title={f.motivoAnulacion} className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 uppercase">
+                              Anulada
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-3 py-3.5 text-center text-gray-500 whitespace-nowrap">
+                        {new Date(f.fechaEmision).toLocaleDateString("es-PE")}
+                      </td>
+                      <td className="px-3 py-3.5 text-center">
+                        {tieneCuotas ? (
+                          <span className="text-xs text-gray-400">{f.cuotas.length} cuota{f.cuotas.length !== 1 ? "s" : ""} (ver abajo)</span>
+                        ) : (
+                          <BadgeCancelacion fecha={f.fechaCancelacion} pagado={f.estadoPago === "pagado"} />
                         )}
-                      </div>
-                    </td>
-                    <td className="px-3 py-3.5 text-center text-gray-500 whitespace-nowrap">
-                      {new Date(f.fechaEmision).toLocaleDateString("es-PE")}
-                    </td>
-                    <td className="px-3 py-3.5 text-center">
-                      <BadgeCancelacion fecha={f.fechaCancelacion} pagado={f.estadoPago === "pagado"} />
-                    </td>
-                    <td className="px-3 py-3.5 text-gray-600 whitespace-nowrap">
-                      {f.ordenCompra?.numeroOrden || f.numeroOrdenCompra || <span className="text-gray-300">—</span>}
-                    </td>
-                    <td className="px-3 py-3.5 text-gray-700">
-                      {f.empresa?.razonSocial || <span className="text-gray-300">—</span>}
-                    </td>
-                    <td className={`${TD_NUM} text-gray-400`}>
-                      {Number(f.subtotal ?? f.monto ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className={`${TD_NUM} text-gray-400`}>
-                      {Number(f.igv ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className={`${TD_NUM} text-gray-600`}>
-                      {Number(f.total ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className={`${TD_NUM} text-gray-400`}>
-                      {Number(f.detraccion ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className={`${TD_NUM} font-bold text-gray-900`}>
-                      {Number(f.totalAPagar ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-3 py-2 text-center" onClick={e => e.stopPropagation()}>
-                      <div className="flex flex-col items-center gap-1.5 min-w-[110px]">
-                        <DotChip chip={badgePago(f.estadoPago)} dot={dotPago(f.estadoPago)}>
-                          {f.estadoPago}
-                        </DotChip>
-                        {(() => {
-                          const bloqueada = f.estadoPago === "pagado" && rolActual !== "admin";
-                          const disabled = f.anulado || !(Number(f.totalAPagar) > 0) || bloqueada;
-                          return (
-                            <label className={`flex items-center gap-1.5 text-xs text-gray-500 select-none ${disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
-                              title={f.anulado ? "Factura anulada" : !(Number(f.totalAPagar) > 0) ? "Sin monto a pagar" : bloqueada ? "Solo un administrador puede deshacer un pago" : undefined}>
-                              <input type="checkbox"
-                                checked={f.estadoPago === "pagado"}
-                                disabled={disabled}
-                                onChange={e => handlePagoCheck(f._id, e.target.checked)}
-                                className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-400" />
-                              Pagado
-                            </label>
-                          );
-                        })()}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-3 py-3.5 text-gray-600 whitespace-nowrap">
+                        {f.ordenCompra?.numeroOrden || f.numeroOrdenCompra || <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-3 py-3.5 text-gray-700">
+                        {f.empresa?.razonSocial || <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className={`${TD_NUM} text-gray-400`}>
+                        {Number(f.subtotal ?? f.monto ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className={`${TD_NUM} text-gray-400`}>
+                        {Number(f.igv ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className={`${TD_NUM} text-gray-600`}>
+                        {Number(f.total ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className={`${TD_NUM} text-gray-400`}>
+                        {Number(f.detraccion ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className={`${TD_NUM} font-bold text-gray-900`}>
+                        {Number(f.totalAPagar ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="px-3 py-2 text-center" onClick={e => e.stopPropagation()}>
+                        <div className="flex flex-col items-center gap-1.5 min-w-[110px]">
+                          <DotChip chip={badgePago(f.estadoPago)} dot={dotPago(f.estadoPago)}>
+                            {f.estadoPago}
+                          </DotChip>
+                          {tieneCuotas ? (
+                            <span className="text-[11px] text-gray-400">Marca cada cuota abajo</span>
+                          ) : (() => {
+                            const bloqueada = f.estadoPago === "pagado" && rolActual !== "admin";
+                            const disabled = f.anulado || !(Number(f.totalAPagar) > 0) || bloqueada;
+                            return (
+                              <label className={`flex items-center gap-1.5 text-xs text-gray-500 select-none ${disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
+                                title={f.anulado ? "Factura anulada" : !(Number(f.totalAPagar) > 0) ? "Sin monto a pagar" : bloqueada ? "Solo un administrador puede deshacer un pago" : undefined}>
+                                <input type="checkbox"
+                                  checked={f.estadoPago === "pagado"}
+                                  disabled={disabled}
+                                  onChange={e => handlePagoCheck(f._id, e.target.checked)}
+                                  className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-400" />
+                                Pagado
+                              </label>
+                            );
+                          })()}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+
+                  const filasCuotas = (f.cuotas || []).map((c, idx) => {
+                    const bloqueada = c.pagado && rolActual !== "admin";
+                    const disabled = f.anulado || bloqueada;
+                    return (
+                      <tr key={c._id} className="bg-indigo-50/20">
+                        <td className="px-3 py-2"></td>
+                        <td className="px-3 py-2 text-indigo-700 font-medium whitespace-nowrap pl-6">
+                          ↳ Cuota {String(idx + 1).padStart(3, "0")}
+                        </td>
+                        <td className="px-3 py-2"></td>
+                        <td className="px-3 py-2 text-center">
+                          <BadgeCancelacion fecha={c.fechaVencimiento} pagado={c.pagado} />
+                        </td>
+                        <td className="px-3 py-2"></td>
+                        <td className="px-3 py-2"></td>
+                        <td className={`${TD_NUM} text-gray-300`}></td>
+                        <td className={`${TD_NUM} text-gray-300`}></td>
+                        <td className={`${TD_NUM} text-gray-300`}></td>
+                        <td className={`${TD_NUM} text-gray-300`}></td>
+                        <td className={`${TD_NUM} font-semibold text-gray-700`}>
+                          {Number(c.monto).toLocaleString("es-PE", { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="px-3 py-2 text-center" onClick={e => e.stopPropagation()}>
+                          <label className={`flex items-center gap-1.5 text-xs text-gray-500 select-none justify-center ${disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
+                            title={f.anulado ? "Factura anulada" : bloqueada ? "Solo un administrador puede deshacer un pago" : undefined}>
+                            <input type="checkbox"
+                              checked={c.pagado}
+                              disabled={disabled}
+                              onChange={e => handleCuotaPagoCheck(f._id, c._id, e.target.checked)}
+                              className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-400" />
+                            Pagado
+                          </label>
+                        </td>
+                      </tr>
+                    );
+                  });
+
+                  return [filaPrincipal, ...filasCuotas];
+                })}
                 {/* Fila de totales */}
                 <tr className="bg-gray-50 border-t-2 border-gray-200 font-semibold text-sm">
                   <td colSpan={6} className="px-3 py-3.5 text-right text-xs uppercase tracking-wide text-gray-400">
@@ -312,6 +360,55 @@ export default function ListaFacturas() {
     }
   };
 
+  // Igual que handlePagoCheck pero por cuota — el agregado (montoPagado/
+  // estadoPago) se recalcula acá en espejo de lo que hace el backend
+  // (Backend/src/routes/facturas.js:/:id/cuotas/:cuotaId/pagar), no se
+  // reemplaza la factura completa con la respuesta del server para no perder
+  // los campos `_numeroOT`/`_numeroCotizacion` que solo viven en el frontend.
+  const handleCuotaPagoCheck = async (facturaId, cuotaId, pagada) => {
+    const factura = facturas.find(f => f._id === facturaId);
+    const cuota = factura?.cuotas?.find(c => c._id === cuotaId);
+    if (!factura || !cuota) return;
+
+    if (pagada) {
+      if (!window.confirm("¿Confirmas marcar esta cuota como pagada?")) return;
+    } else if (getUsuario()?.rol !== "admin") {
+      alert("Solo un administrador puede deshacer un pago.");
+      return;
+    }
+
+    const cuotasActualizadas = factura.cuotas.map(c =>
+      c._id === cuotaId ? { ...c, pagado: pagada, fechaPago: pagada ? new Date().toISOString() : null } : c
+    );
+    const total = cuotasActualizadas.length;
+    const pagadas = cuotasActualizadas.filter(c => c.pagado).length;
+    const montoPagado = cuotasActualizadas.filter(c => c.pagado).reduce((s, c) => s + c.monto, 0);
+    const estadoPago = pagadas === 0 ? "sin pago" : pagadas === total ? "pagado" : "pago parcial";
+    const estadoCadena = estadoPago === "pagado" ? "cerrado" : "abierto";
+
+    const previo = {
+      cuotas: factura.cuotas,
+      montoPagado: factura.montoPagado,
+      estadoPago: factura.estadoPago,
+      estadoCadena: factura.estadoCadena,
+    };
+    setFacturas(prev => prev.map(f =>
+      f._id === facturaId ? { ...f, cuotas: cuotasActualizadas, montoPagado, estadoPago, estadoCadena } : f
+    ));
+
+    try {
+      const res = await fetchAuth(`/facturas/${facturaId}/cuotas/${cuotaId}/pagar`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pagado: pagada }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    } catch {
+      setFacturas(prev => prev.map(f => f._id === facturaId ? { ...f, ...previo } : f));
+      alert("No se pudo guardar el estado de pago. Verifica que el servidor esté disponible e intenta de nuevo.");
+    }
+  };
+
   const cerradas = filtradas.filter(f => f.estadoCadena === "cerrado");
   const abiertas = filtradas.filter(f => f.estadoCadena !== "cerrado");
   const hayFiltro = Object.values(filtros).some(Boolean);
@@ -416,6 +513,7 @@ export default function ListaFacturas() {
         facturas={abiertas}
         onSelect={setSeleccionada}
         handlePagoCheck={handlePagoCheck}
+        handleCuotaPagoCheck={handleCuotaPagoCheck}
         vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin facturas registradas"}
       />
 
@@ -425,6 +523,7 @@ export default function ListaFacturas() {
         facturas={cerradas}
         onSelect={setSeleccionada}
         handlePagoCheck={handlePagoCheck}
+        handleCuotaPagoCheck={handleCuotaPagoCheck}
         vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin facturas cerradas"}
       />
     </div>

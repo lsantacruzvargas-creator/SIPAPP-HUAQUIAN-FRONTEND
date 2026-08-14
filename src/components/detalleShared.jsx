@@ -32,6 +32,11 @@ export const IconCheck = () => (
     <path d="M20 6 9 17l-5-5" />
   </svg>
 );
+export const IconGRE = () => (
+  <svg className={svg} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 16V6a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v10M3 16h11m0 0h2.5m-2.5 0V9h3.5L21 12.5V16h-2.5M7 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm11 0a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />
+  </svg>
+);
 
 /* ─── Paletas por entidad ───────────────────────────────────────── */
 export const TEMAS = {
@@ -40,6 +45,7 @@ export const TEMAS = {
   informe:    { icon: IconInforme,    ring: "ring-violet-200",  dot: "bg-violet-500",  soft: "bg-violet-50",  text: "text-violet-700",  border: "border-violet-100",  label: "Informe" },
   oc:         { icon: IconOC,         ring: "ring-blue-200",    dot: "bg-blue-500",    soft: "bg-blue-50",    text: "text-blue-700",    border: "border-blue-100",    label: "Orden de Compra" },
   factura:    { icon: IconFactura,    ring: "ring-emerald-200", dot: "bg-emerald-500", soft: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-100", label: "Factura" },
+  gre:        { icon: IconGRE,        ring: "ring-purple-200",  dot: "bg-purple-500",  soft: "bg-purple-50",  text: "text-purple-700",  border: "border-purple-100",  label: "Guía de Remisión" },
 };
 
 /* ─── Stepper del flujo de negocio ──────────────────────────────── */
@@ -208,6 +214,22 @@ export const dotOT = (e) => {
   if (e === "en progreso") return "bg-blue-500";
   if (e === "pendiente")   return "bg-amber-500";
   return "bg-gray-300";
+};
+
+// Estado agregado de Informes Técnicos de una OT (ver
+// Backend/src/utils/recalcularInformesAprobados.js) — independiente del
+// estado de la OT (`badgeOT`/`dotOT`).
+export const badgeInformes = (e) => {
+  if (e === "aprobado")                return "bg-teal-100 text-teal-700";
+  if (e === "en espera de aprobación") return "bg-amber-100 text-amber-700";
+  if (e === "en progreso")             return "bg-blue-100 text-blue-700";
+  return "bg-gray-100 text-gray-500"; // pendiente
+};
+export const dotInformes = (e) => {
+  if (e === "aprobado")                return "bg-teal-500";
+  if (e === "en espera de aprobación") return "bg-amber-500";
+  if (e === "en progreso")             return "bg-blue-500";
+  return "bg-gray-300"; // pendiente
 };
 
 export const money = (v, moneda = "PEN") =>

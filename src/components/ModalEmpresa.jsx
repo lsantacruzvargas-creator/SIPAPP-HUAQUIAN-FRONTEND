@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { fetchAuth } from "../utils/fetchAuth";
 
-const FORM_VACIO = { razonSocial: "", ruc: "", direccion: "", alias: "", plantas: [] };
+const FORM_VACIO = { razonSocial: "", ruc: "", direccion: "", alias: "", requiereHes: false, requiereActaConformidad: false, plantas: [] };
 const PLANTA_VACIA = { nombre: "", contactoNombre: "", contactoTelefono: "", contactoCorreo: "" };
 
 export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
@@ -12,6 +12,8 @@ export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
         ruc: empresa.ruc,
         direccion: empresa.direccion || "",
         alias: empresa.alias || "",
+        requiereHes: empresa.requiereHes || false,
+        requiereActaConformidad: empresa.requiereActaConformidad || false,
         plantas: empresa.plantas || [],
       }
       : FORM_VACIO
@@ -22,7 +24,10 @@ export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
   const [cargando, setCargando] = useState(false);
   const [buscandoRuc, setBuscandoRuc] = useState(false);
 
-  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setForm({ ...form, [name]: type === "checkbox" ? checked : value });
+  };
 
   const buscarDatosRuc = async (ruc) => {
     if (ruc.length !== 11) return;
@@ -144,6 +149,32 @@ export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 disabled:bg-gray-100 disabled:text-gray-500"
             />
           </div>
+          <div className="col-span-2 grid grid-cols-2 gap-3">
+            <label className="flex items-center gap-2 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                name="requiereHes"
+                checked={form.requiereHes}
+                onChange={handleChange}
+                className="w-4 h-4"
+              />
+              Exige confirmar HES antes de facturar
+            </label>
+            <label className="flex items-center gap-2 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                name="requiereActaConformidad"
+                checked={form.requiereActaConformidad}
+                onChange={handleChange}
+                className="w-4 h-4"
+              />
+              Exige confirmar Acta de Conformidad antes de facturar
+            </label>
+            <p className="col-span-2 text-xs text-gray-400">
+              Cada uno es independiente — si está activo, las Órdenes de Compra de esta empresa mostrarán ese checkbox y deberá marcarse antes de poder generar la factura.
+            </p>
+          </div>
+
           <div className="col-span-2">
             <label className="block text-xs font-medium text-gray-600 mb-1">Plantas</label>
             <p className="text-xs text-gray-400 mb-2">

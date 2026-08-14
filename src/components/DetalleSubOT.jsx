@@ -44,7 +44,7 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
     irreparable:            inicial.irreparable            || false,
   });
   const rolActual = getUsuario()?.rol;
-  const puedeEditarCampos = ["admin", "asistente", "supervisor"].includes(rolActual);
+  const puedeEditarCampos = ["admin", "asistente", "supervisor", "planner"].includes(rolActual);
   const puedeAnular = ["admin", "asistente"].includes(rolActual);
   const puedeAprobarInforme = ["admin", "jefatura", "planner"].includes(rolActual);
   const [usuarios, setUsuarios] = useState([]);

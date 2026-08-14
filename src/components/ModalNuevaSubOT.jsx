@@ -15,8 +15,11 @@ const colorEstado = (e, activo) => {
 
 export default function ModalNuevaSubOT({ padre, onClose, onCreada }) {
   const [form, setForm] = useState({
-    titulo: "", descripcion: "", micLinea: "", backup: "", categorizacionTaller: "",
-    personalAsignado: "", estado: "pendiente", observaciones: "", entregadoPor: "",
+    titulo: "", descripcion: "",
+    // MIC/Línea, Backup y Entregado por se heredan del padre por defecto —
+    // el técnico puede sobrescribirlos antes de crear si esta sub-OT difiere.
+    micLinea: padre.micLinea || "", backup: padre.backup || "", categorizacionTaller: "",
+    personalAsignado: "", estado: "pendiente", observaciones: "", entregadoPor: padre.entregadoPor || "",
     fechaEntrega: "", numeroGuiaRemision: "",
   });
   const [usuarios, setUsuarios] = useState([]);
