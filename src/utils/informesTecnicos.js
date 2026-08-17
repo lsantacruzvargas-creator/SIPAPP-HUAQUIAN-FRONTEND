@@ -75,6 +75,11 @@ const checklistSimple = (titulo, items) => ({
   items: items.map((label, i) => ({ clave: `item${i + 1}`, label })),
 });
 
+// Variante de `checklistSimple` con selector OK/NOK en vez de texto libre —
+// mismo shape, solo agrega `opciones` (el renderer genérico la usa para
+// decidir <select> vs <input>, ver SeccionChecklist en FormInformeTecnico.jsx).
+const checklistOkNok = (titulo, items) => ({ ...checklistSimple(titulo, items), opciones: ["OK", "NOK"] });
+
 // Checklist "de doble columna" (# | Descripción | OK/NOK Inicial | OK/NOK
 // Final) — usa el tipo "tabla" del renderer genérico (grilla filas x
 // columnas) porque "checklist" solo soporta un input por ítem.
@@ -84,9 +89,32 @@ const checklistDoble = (titulo, clave, items) => ({
   filas: items.map((label, i) => ({ clave: `item${i + 1}`, label })),
 });
 
+// Variante de `checklistDoble` con selector OK/NOK en ambas columnas en vez
+// de texto libre — mismo shape, solo agrega `opciones` (el renderer
+// genérico la usa para decidir <select> vs <input>, ver SeccionTabla en
+// FormInformeTecnico.jsx).
+const checklistDobleOkNok = (titulo, clave, items) => ({ ...checklistDoble(titulo, clave, items), opciones: ["OK", "NOK"] });
+
 const EVIDENCIAS_ESTANDAR = { tipo: "evidencias", titulo: "Evidencias fotográficas", clave: "evidencias" };
 
+// `slotsFijos` — recuadros de foto fijos e impresos en la plantilla (no se
+// pueden agregar/quitar, a diferencia de EVIDENCIAS_ESTANDAR en modo libre).
+// Cada slot es { clave, label }: `clave` identifica el grupo (se guarda como
+// su `titulo` interno y es la llave que usa SLOTS_FOTOS en
+// informeTecnicoExcel.js para ubicar la foto en su celda exacta), `label` es
+// el texto que ve el técnico en el formulario.
+const SLOTS_FIJOS_LETRAS = ["A", "B", "C", "D"].map((letra) => ({ clave: letra, label: `Foto ${letra}` }));
+
 const PIEZAS_A_REEMPLAZAR = BULLETS_ESTANDAR("piezasAReemplazar", "Piezas a reemplazar", "🔩");
+
+// Variante de "Piezas a reemplazar" en filas de 2 columnas (Cantidad /
+// Descripción) en vez de una sola línea de texto libre — usa el tipo
+// "filas" del renderer genérico (lista dinámica de objetos, "+ agregar
+// fila" como en bullets, pero cada fila tiene 2 campos en vez de 1).
+const PIEZAS_A_REEMPLAZAR_TABLA = {
+  tipo: "filas", titulo: "Piezas a reemplazar", clave: "piezasAReemplazar",
+  columnas: [{ clave: "cantidad", label: "Cantidad" }, { clave: "descripcion", label: "Descripción" }],
+};
 
 export const TIPOS_INFORME = [
   {
@@ -103,7 +131,7 @@ export const TIPOS_INFORME = [
         ],
       },
       EVIDENCIAS_ESTANDAR,
-      checklistSimple("Checklist de verificación técnica", [
+      checklistOkNok("Checklist de verificación técnica", [
         "Estado visual del componente",
         "Verificación visual de tarjetas y conectores",
         "Estado de la comunicación o encendido del componente del equipo",
@@ -130,7 +158,10 @@ export const TIPOS_INFORME = [
           { clave: "entrada", label: "Entrada" }, { clave: "salida", label: "Salida" },
         ],
       },
-      { ...EVIDENCIAS_ESTANDAR, titulo: "Fotos del soporte" },
+      // 4 recuadros fijos impresos en la plantilla (A/B/C/D) — ver
+      // SLOTS_FOTOS.soporte en informeTecnicoExcel.js, que ubica cada foto
+      // por la clave del slot (la letra), no por orden de subida.
+      { ...EVIDENCIAS_ESTANDAR, titulo: "Fotos del soporte", slotsFijos: SLOTS_FIJOS_LETRAS },
       BULLETS_ESTANDAR("observacion", "Observación"),
       BULLETS_ESTANDAR("conclusion", "Conclusión"),
       BULLETS_ESTANDAR("recomendacion", "Recomendación"),
@@ -143,10 +174,16 @@ export const TIPOS_INFORME = [
     secciones: [
       { tipo: "campos", titulo: "Datos generales", campos: CAMPOS_HEADER_SERVICIO },
       { tipo: "campos", titulo: "Datos del equipo", campos: [...CAMPOS_EQUIPO_ESTANDAR, ...CAMPOS_OPERARIO] },
-      EVIDENCIAS_ESTANDAR,
+      // 8 recuadros fijos impresos en la plantilla — ver SLOTS_FOTOS.diagnostico_equipo
+      // en informeTecnicoExcel.js, que ubica cada foto por la clave del slot,
+      // no por orden de subida.
       {
-        tipo: "campos", titulo: "Estado general",
-        campos: [
+        ...EVIDENCIAS_ESTANDAR, titulo: "Fotos del diagnóstico",
+        slotsFijos: [
+          { clave: "vistaFrontal", label: "Vista frontal del equipo" },
+          { clave: "placa", label: "Placa" },
+          { clave: "estadoInterno1", label: "Estado interno del equipo (1)" },
+          { clave: "estadoInterno2", label: "Estado interno del equipo (2)" },
           { clave: "estadoCarcasa", label: "Estado de la carcasa del equipo" },
           { clave: "estadoTarjeta", label: "Estado de la tarjeta electrónica" },
           { clave: "componentesMalEstado", label: "Componentes en mal estado" },
@@ -163,7 +200,7 @@ export const TIPOS_INFORME = [
       },
       BULLETS_ESTANDAR("observacionesIgbt", "Observaciones de la medición"),
       PIEZAS_A_REEMPLAZAR,
-      checklistSimple("Checklist de verificación técnica", [
+      checklistOkNok("Checklist de verificación técnica", [
         "Estado general del gabinete y carcasa",
         "Estado visual de tarjetas y conectores",
         "Estado conexiones de potencia y control",
@@ -196,18 +233,24 @@ export const TIPOS_INFORME = [
           ...CAMPOS_OPERARIO,
         ],
       },
-      EVIDENCIAS_ESTANDAR,
+      // 8 recuadros fijos impresos en la plantilla — ver
+      // SLOTS_FOTOS.diagnostico_servomotor en informeTecnicoExcel.js, que
+      // ubica cada foto por la clave del slot, no por orden de subida.
       {
-        tipo: "campos", titulo: "Estado general",
-        campos: [
+        ...EVIDENCIAS_ESTANDAR, titulo: "Fotos del diagnóstico",
+        slotsFijos: [
+          { clave: "vistaFrontal", label: "Vista frontal del equipo" },
+          { clave: "placa", label: "Placa" },
           { clave: "estadoCarcasa", label: "Estado de la carcasa del equipo" },
+          { clave: "estadoEncoder", label: "Estado del encoder" },
+          { clave: "estadoInterno", label: "Estado interno del equipo" },
           { clave: "conectores", label: "Conectores" },
           { clave: "estadoRodamientos", label: "Estado de los rodamientos" },
           { clave: "pruebaEquipo", label: "Prueba del equipo" },
         ],
       },
       PIEZAS_A_REEMPLAZAR,
-      checklistSimple("Checklist de verificación técnica", [
+      checklistOkNok("Checklist de verificación técnica", [
         "Revisión de estado general del gabinete y carcasa",
         "Verificación visual de conectores",
         "Revisión de conexiones de potencia",
@@ -241,9 +284,19 @@ export const TIPOS_INFORME = [
           ...CAMPOS_OPERARIO,
         ],
       },
-      EVIDENCIAS_ESTANDAR,
-      PIEZAS_A_REEMPLAZAR,
-      checklistDoble("Checklist de verificación técnica", "checklistTecnico", [
+      // 3 recuadros fijos impresos en la plantilla — ver
+      // SLOTS_FOTOS.tarjetas en informeTecnicoExcel.js, que ubica cada foto
+      // por la clave del slot, no por orden de subida.
+      {
+        ...EVIDENCIAS_ESTANDAR, titulo: "Imágenes",
+        slotsFijos: [
+          { clave: "imagenA", label: "Imagen A" },
+          { clave: "imagenB", label: "Imagen B" },
+          { clave: "imagenC", label: "Imagen C" },
+        ],
+      },
+      PIEZAS_A_REEMPLAZAR_TABLA,
+      checklistDobleOkNok("Checklist de verificación técnica", "checklistTecnico", [
         "Estado de conectores",
         "Estado conexiones de potencia y control",
         "Estado de tierra y posibles cortocircuitos",
@@ -264,9 +317,23 @@ export const TIPOS_INFORME = [
     secciones: [
       { tipo: "campos", titulo: "Datos generales", campos: CAMPOS_HEADER_SERVICIO },
       { tipo: "campos", titulo: "Datos del equipo", campos: [...CAMPOS_EQUIPO_ESTANDAR, ...CAMPOS_OPERARIO] },
-      EVIDENCIAS_ESTANDAR,
-      PIEZAS_A_REEMPLAZAR,
-      checklistDoble("Checklist de verificación técnica", "checklistTecnico", [
+      // 7 recuadros fijos impresos en la plantilla — ver SLOTS_FOTOS.pc en
+      // informeTecnicoExcel.js, que ubica cada foto por la clave del slot,
+      // no por orden de subida.
+      {
+        ...EVIDENCIAS_ESTANDAR, titulo: "Fotos del mantenimiento",
+        slotsFijos: [
+          { clave: "vistaFrontal", label: "Vista frontal del equipo" },
+          { clave: "placaEquipo", label: "Placa Equipo" },
+          { clave: "carcasaContaminada", label: "Carcasa contaminada" },
+          { clave: "carcasaDescontaminada", label: "Carcasa descontaminada" },
+          { clave: "limpiezaTarjetaInicial", label: "Limpieza de tarjeta inicial" },
+          { clave: "limpiezaTarjetaFinal", label: "Limpieza de tarjeta final" },
+          { clave: "cambioVentilador", label: "Cambio de ventilador" },
+        ],
+      },
+      PIEZAS_A_REEMPLAZAR_TABLA,
+      checklistDobleOkNok("Checklist de verificación técnica", "checklistTecnico", [
         "Estado de conectores",
         "Estado conexiones de potencia y control",
         "Estado de fuente de alimentación",

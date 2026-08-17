@@ -49,6 +49,30 @@ function BloqueSeccion({ seccion, campos }) {
       </ul>
     ) : <span className="text-sm text-gray-300">Sin registros</span>;
   }
+  if (seccion.tipo === "filas") {
+    const filas = (campos[seccion.clave] || []).filter((f) => f.cantidad || f.descripcion);
+    const [colUno, colDos] = seccion.columnas;
+    return filas.length ? (
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr>
+              <th className="text-left px-2 py-1 text-xs text-gray-400 font-medium w-20">{colUno.label}</th>
+              <th className="text-left px-2 py-1 text-xs text-gray-400 font-medium">{colDos.label}</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {filas.map((f, i) => (
+              <tr key={i}>
+                <td className="px-2 py-1.5 text-gray-700">{f[colUno.clave] || "—"}</td>
+                <td className="px-2 py-1.5 text-gray-700">{f[colDos.clave] || "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    ) : <span className="text-sm text-gray-300">Sin registros</span>;
+  }
   if (seccion.tipo === "tabla") {
     const valores = campos[seccion.clave] || {};
     const claveHechoPor = `${claveChecklist(seccion.titulo)}__hechoPor`;
@@ -88,11 +112,15 @@ function BloqueSeccion({ seccion, campos }) {
   }
   if (seccion.tipo === "evidencias") {
     const grupos = campos[seccion.clave] || [];
+    // Con slotsFijos, `titulo` es la clave interna del slot (ej.
+    // "vistaFrontal"), no el texto para mostrar — se resuelve contra la
+    // definición de la sección (ver slotsFijos en informesTecnicos.js).
+    const etiqueta = (g) => seccion.slotsFijos?.find((s) => s.clave === g.titulo)?.label ?? g.titulo;
     return grupos.length ? (
       <div className="space-y-3">
         {grupos.map((g, i) => (
           <div key={i} className="bg-gray-50 rounded-xl p-3 space-y-2">
-            {g.titulo && <p className="text-sm font-semibold text-gray-700">{g.titulo}</p>}
+            {g.titulo && <p className="text-sm font-semibold text-gray-700">{etiqueta(g)}</p>}
             <div className="flex flex-wrap gap-2">
               {(g.imagenes || []).map((img, j) => (
                 <ImagenProtegida key={j} src={img} onClick={() => abrirArchivoProtegido(img)}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { fetchAuth, uploadAuth, getUsuario } from "../utils/fetchAuth";
 import { tipoInformePorValor, claveChecklist } from "../utils/informesTecnicos";
 import ImagenProtegida from "./ImagenProtegida";
@@ -50,8 +50,18 @@ function SeccionChecklist({ seccion, campos, onCampo }) {
         {seccion.items.map((it) => (
           <div key={it.clave} className="flex items-center gap-2">
             <label className="text-xs text-gray-500 w-1/2 shrink-0">{it.label}</label>
-            <input value={campos[it.clave] ?? ""} onChange={(e) => onCampo(it.clave, e.target.value)}
-              className={`${INP} py-1.5`} />
+            {seccion.opciones ? (
+              <select value={campos[it.clave] ?? ""} onChange={(e) => onCampo(it.clave, e.target.value)}
+                className={`${INP} py-1.5 font-medium ${
+                  campos[it.clave] === "OK" ? "text-green-600" : campos[it.clave] === "NOK" ? "text-red-600" : "text-gray-500"
+                }`}>
+                <option value="">—</option>
+                {seccion.opciones.map((op) => <option key={op} value={op}>{op}</option>)}
+              </select>
+            ) : (
+              <input value={campos[it.clave] ?? ""} onChange={(e) => onCampo(it.clave, e.target.value)}
+                className={`${INP} py-1.5`} />
+            )}
           </div>
         ))}
       </div>
@@ -76,6 +86,34 @@ function SeccionBullets({ seccion, campos, onCampos }) {
         ))}
         <button type="button" onClick={() => set([...lineas, ""])}
           className="text-xs text-gray-400 hover:text-amber-600 transition">+ agregar línea</button>
+      </div>
+    </Seccion>
+  );
+}
+
+// Lista dinámica de filas con 2 campos cada una (ej. Cantidad/Descripción)
+// — mismo patrón "+ agregar" de SeccionBullets, pero cada línea guarda un
+// objeto en vez de un string.
+function SeccionFilas({ seccion, campos, onCampos }) {
+  const filas = campos[seccion.clave] || [];
+  const set = (nuevas) => onCampos(seccion.clave, nuevas);
+  const [colUno, colDos] = seccion.columnas;
+  const actualizar = (i, clave, valor) => set(filas.map((f, j) => (j === i ? { ...f, [clave]: valor } : f)));
+  return (
+    <Seccion titulo={seccion.titulo}>
+      <div className="space-y-2">
+        {filas.map((f, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <input value={f[colUno.clave] ?? ""} onChange={(e) => actualizar(i, colUno.clave, e.target.value)}
+              placeholder={colUno.label} className={`${INP} !w-24 shrink-0`} />
+            <input value={f[colDos.clave] ?? ""} onChange={(e) => actualizar(i, colDos.clave, e.target.value)}
+              placeholder={colDos.label} className={`${INP} flex-1 min-w-0`} />
+            <button type="button" onClick={() => set(filas.filter((_, j) => j !== i))}
+              className="text-red-300 hover:text-red-500 shrink-0">✕</button>
+          </div>
+        ))}
+        <button type="button" onClick={() => set([...filas, { [colUno.clave]: "", [colDos.clave]: "" }])}
+          className="text-xs text-gray-400 hover:text-amber-600 transition">+ agregar fila</button>
       </div>
     </Seccion>
   );
@@ -117,9 +155,21 @@ function SeccionTabla({ seccion, campos, onCampo, onCampos }) {
                 <td className="px-2 py-1 text-xs text-gray-600 whitespace-nowrap">{f.label}</td>
                 {seccion.columnas.map((c) => (
                   <td key={c.clave} className="px-1 py-1">
-                    <input value={valores[`${f.clave}__${c.clave}`] ?? ""}
-                      onChange={(e) => set(f.clave, c.clave, e.target.value)}
-                      className={`${INP} text-center py-1`} />
+                    {seccion.opciones ? (
+                      <select value={valores[`${f.clave}__${c.clave}`] ?? ""}
+                        onChange={(e) => set(f.clave, c.clave, e.target.value)}
+                        className={`${INP} text-center py-1 font-medium ${
+                          valores[`${f.clave}__${c.clave}`] === "OK" ? "text-green-600"
+                            : valores[`${f.clave}__${c.clave}`] === "NOK" ? "text-red-600" : "text-gray-500"
+                        }`}>
+                        <option value="">—</option>
+                        {seccion.opciones.map((op) => <option key={op} value={op}>{op}</option>)}
+                      </select>
+                    ) : (
+                      <input value={valores[`${f.clave}__${c.clave}`] ?? ""}
+                        onChange={(e) => set(f.clave, c.clave, e.target.value)}
+                        className={`${INP} text-center py-1`} />
+                    )}
                   </td>
                 ))}
               </tr>
@@ -136,9 +186,33 @@ function SeccionEvidencias({ seccion, campos, onCampos }) {
   const [subiendo, setSubiendo] = useState(null);
   const set = (nuevos) => onCampos(seccion.clave, nuevos);
 
+  // Slots fijos (ej. Servicio de Soporte: A/B/C/D, Diagnóstico de Equipo: 8
+  // recuadros con nombre propio — uno por recuadro impreso en la plantilla,
+  // ver SLOTS_FOTOS en informeTecnicoExcel.js, que ubica cada foto por la
+  // `clave` del slot, no por orden de subida) — se crean una sola vez si
+  // todavía no existen; a diferencia del modo genérico, acá no se pueden
+  // agregar/quitar grupos, solo llenar los ya definidos. Cada slot es
+  // { clave, label }: `clave` se guarda como `titulo` del grupo (identidad
+  // para el matching en la exportación), `label` es el texto visible.
+  useEffect(() => {
+    if (!seccion.slotsFijos) return;
+    const faltantes = seccion.slotsFijos.filter((slot) => !grupos.some((g) => g.titulo === slot.clave));
+    if (faltantes.length) set([...grupos, ...faltantes.map((slot) => ({ _key: slot.clave, titulo: slot.clave, imagenes: [] }))]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seccion.slotsFijos]);
+
+  const gruposAMostrar = seccion.slotsFijos
+    ? seccion.slotsFijos.map((slot) => {
+        const g = grupos.find((gr) => gr.titulo === slot.clave);
+        return g ? { ...g, _label: slot.label } : null;
+      }).filter(Boolean)
+    : grupos;
+
   const agregarGrupo = () => set([...grupos, { _key: Date.now() + Math.random(), titulo: "", imagenes: [] }]);
   const actualizarTitulo = (key, titulo) => set(grupos.map((g) => (g._key === key ? { ...g, titulo } : g)));
   const eliminarGrupo = (key) => set(grupos.filter((g) => g._key !== key));
+  const eliminarImagen = (key, indice) =>
+    set(grupos.map((g) => (g._key === key ? { ...g, imagenes: g.imagenes.filter((_, i) => i !== indice) } : g)));
 
   const subir = async (key, files) => {
     setSubiendo(key);
@@ -156,16 +230,29 @@ function SeccionEvidencias({ seccion, campos, onCampos }) {
   return (
     <Seccion titulo={seccion.titulo}>
       <div className="space-y-3">
-        {grupos.map((g) => (
+        {gruposAMostrar.map((g) => (
           <div key={g._key} className="border border-gray-100 rounded-xl p-3 space-y-2 bg-gray-50/50">
             <div className="flex items-center gap-2">
-              <input value={g.titulo} onChange={(e) => actualizarTitulo(g._key, e.target.value)}
-                placeholder="Leyenda (ej. Ingreso de equipo)" className={`${INP} flex-1`} />
-              <button type="button" onClick={() => eliminarGrupo(g._key)} className="text-red-300 hover:text-red-500 shrink-0">✕</button>
+              {seccion.slotsFijos ? (
+                <span className="flex-1 text-sm font-semibold text-gray-700">{g._label}</span>
+              ) : (
+                <>
+                  <input value={g.titulo} onChange={(e) => actualizarTitulo(g._key, e.target.value)}
+                    placeholder="Leyenda (ej. Ingreso de equipo)" className={`${INP} flex-1`} />
+                  <button type="button" onClick={() => eliminarGrupo(g._key)} className="text-red-300 hover:text-red-500 shrink-0">✕</button>
+                </>
+              )}
             </div>
             <div className="flex flex-wrap gap-2">
               {g.imagenes.map((img, i) => (
-                <ImagenProtegida key={i} src={img} className="w-16 h-16 object-cover rounded-lg border border-gray-200" />
+                <div key={i} className="relative group/foto shrink-0">
+                  <ImagenProtegida src={img} className="w-16 h-16 object-cover rounded-lg border border-gray-200" />
+                  <button type="button" onClick={() => eliminarImagen(g._key, i)}
+                    title="Eliminar foto"
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white text-xs leading-none flex items-center justify-center opacity-0 group-hover/foto:opacity-100 hover:bg-red-600 transition shadow">
+                    ✕
+                  </button>
+                </div>
               ))}
               {["environment", null].map((capture) => (
                 <label key={capture || "galeria"}
@@ -182,10 +269,12 @@ function SeccionEvidencias({ seccion, campos, onCampos }) {
             </div>
           </div>
         ))}
-        <button type="button" onClick={agregarGrupo}
-          className="w-full text-sm border-2 border-dashed border-gray-200 text-gray-400 py-2.5 rounded-xl hover:border-amber-300 hover:text-amber-600 transition">
-          + Agregar grupo de fotos
-        </button>
+        {!seccion.slotsFijos && (
+          <button type="button" onClick={agregarGrupo}
+            className="w-full text-sm border-2 border-dashed border-gray-200 text-gray-400 py-2.5 rounded-xl hover:border-amber-300 hover:text-amber-600 transition">
+            + Agregar grupo de fotos
+          </button>
+        )}
       </div>
     </Seccion>
   );
@@ -194,13 +283,21 @@ function SeccionEvidencias({ seccion, campos, onCampos }) {
 export default function FormInformeTecnico({ ordenTrabajo, tipo, informeExistente, onClose, onGuardado }) {
   const def = tipoInformePorValor(tipo);
   const esEdicion = !!informeExistente;
+  // Cabecera "Datos generales" (CAMPOS_HEADER_SERVICIO/CAMPOS_HEADER_SOPORTE
+  // en informesTecnicos.js) se repite igual en las 13 plantillas — se
+  // autocompleta desde la OT para no volver a escribirla en cada informe.
+  // Sigue siendo editable por si el informe puntual necesita un valor
+  // distinto (ej. otro contacto para ese servicio específico).
+  const hoy = new Date().toLocaleDateString("es-PE");
   const [campos, setCampos] = useState(() => informeExistente?.campos ?? {
-    cliente: ordenTrabajo.empresa?.razonSocial || "",
-    equipo: ordenTrabajo.titulo || "",
-    ot: ordenTrabajo.numeroOT || "",
-    planta: ordenTrabajo.planta || "",
-    nGuia: ordenTrabajo.numeroGuiaEmision || "",
-    tecnico: ordenTrabajo.encargado || "",
+    empresa: ordenTrabajo.empresa?.razonSocial || "",
+    contacto: [ordenTrabajo.contactoNombre, ordenTrabajo.contactoTelefono].filter(Boolean).join(" — "),
+    lineaArea: ordenTrabajo.micLinea || "",
+    descripcion: ordenTrabajo.descripcion || "",
+    categoria: ordenTrabajo.categorizacionTaller || "",
+    fecha: hoy,
+    fechaInicio: hoy,
+    fechaTermino: hoy,
   });
   const [hechoPor, setHechoPor] = useState(informeExistente?.hechoPor ?? getUsuario()?.nombre ?? "");
   const [vB, setVB] = useState(informeExistente?.vB ?? "");
@@ -253,6 +350,7 @@ export default function FormInformeTecnico({ ordenTrabajo, tipo, informeExistent
             if (seccion.tipo === "campos") return <SeccionCampos key={i} seccion={seccion} campos={campos} onCampo={handleCampo} />;
             if (seccion.tipo === "checklist") return <SeccionChecklist key={i} seccion={seccion} campos={campos} onCampo={handleCampo} />;
             if (seccion.tipo === "bullets") return <SeccionBullets key={i} seccion={seccion} campos={campos} onCampos={handleCampo} />;
+            if (seccion.tipo === "filas") return <SeccionFilas key={i} seccion={seccion} campos={campos} onCampos={handleCampo} />;
             if (seccion.tipo === "tabla") return <SeccionTabla key={i} seccion={seccion} campos={campos} onCampo={handleCampo} onCampos={handleCampo} />;
             if (seccion.tipo === "evidencias") return <SeccionEvidencias key={i} seccion={seccion} campos={campos} onCampos={handleCampo} />;
             return null;

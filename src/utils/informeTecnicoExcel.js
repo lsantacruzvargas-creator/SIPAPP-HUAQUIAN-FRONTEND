@@ -147,6 +147,16 @@ async function restaurarMetadatosDePagina(bufferPlantillaOriginal, bufferExporta
   return zipSalida.generateAsync({ type: "arraybuffer" });
 }
 
+// Se intentó restaurar el logo de "INFORME SUMINISTRO.xlsx" (vive como
+// "imagen dentro de la celda" / Rich Value Data Types en A3 — celda t="e"
+// vm="N" que exceljs descarta al regrabar el archivo, ver investigación en
+// [[huaquian-phases-progress]] Fase 21) copiando xl/metadata.xml +
+// xl/richData/ de vuelta y reinyectando `vm` en la celda. El archivo
+// resultante disparaba el diálogo de reparación de Excel — corrupción real,
+// peor que el logo faltante — así que se revirtió. Pendiente de retomar con
+// más cuidado (o de decidir que no vale la pena, dado el riesgo de
+// corromper el archivo para algo puramente decorativo).
+
 // Direcciones de celda de las 13 plantillas nuevas de
 // Frontend/public/informes-templates/ (reemplazo completo del set anterior
 // de 5 tipos — ver Backend/src/models/InformeTecnico.js). Mapeadas leyendo
@@ -263,6 +273,9 @@ const MAPEOS = {
 
   tarjetas: {
     campos: { ...CAMPOS_ENCABEZADO_SERVICIO, ...CAMPOS_EQUIPO_9COL },
+    filas: {
+      piezasAReemplazar: { colCantidad: "A", colDescripcion: "B", filaInicial: 43, max: 4 },
+    },
     tabla: {
       checklistTecnico: Object.fromEntries(
         Array.from({ length: 8 }, (_, i) => [i, 49 + i]).flatMap(([i, fila]) => [
@@ -278,6 +291,9 @@ const MAPEOS = {
 
   pc: {
     campos: { ...CAMPOS_ENCABEZADO_SERVICIO, ...CAMPOS_EQUIPO_9COL },
+    filas: {
+      piezasAReemplazar: { colCantidad: "A", colDescripcion: "B", filaInicial: 64, max: 4 },
+    },
     tabla: {
       checklistTecnico: Object.fromEntries(
         Array.from({ length: 9 }, (_, i) => [i, 70 + i]).flatMap(([i, fila]) => [
@@ -435,11 +451,73 @@ const MAPEOS = {
 // mapeada) — no hace falta la excepción.
 const SIN_TEXTO_ANEXO_EVIDENCIAS_FIRMA = new Set([]);
 
+// Plantillas donde ya se conoce la posición exacta del recuadro de foto
+// impreso (pedido explícito del usuario, citando la celda directamente) —
+// la(s) primera(s) foto(s) del informe se anclan ahí con ancla de DOS puntos
+// (llena el rango exacto y se ajusta sola si cambian anchos/altos de fila o
+// columna), en vez de la posición genérica "4 columnas a la derecha" de más
+// abajo. Si el informe trae más fotos que slots definidos acá, las que
+// sobran caen igual al área genérica de siempre — nunca se pierden.
+// Dos formas de definir slots:
+// - Array de rangos: posicional, la foto N (contando TODAS las fotos del
+//   informe en orden) va al rango N.
+// - Objeto { LETRA: rango }: por identidad de grupo — cada grupo de
+//   evidencias con ese título fijo (ver `slotsFijos` en informesTecnicos.js
+//   y SeccionEvidencias en FormInformeTecnico.jsx) siempre va a ese rango,
+//   sin importar el orden de subida. Solo la PRIMERA foto de cada grupo
+//   nombrado ocupa su slot — si el técnico sube más de una foto al mismo
+//   recuadro, las de más caen al área genérica, igual que un tipo sin slots.
+const SLOTS_FOTOS = {
+  suministro: ["B23:E34"],
+  soporte: { A: "A23:B37", B: "C23:D37", C: "E23:F37", D: "G23:H37" },
+  diagnostico_equipo: {
+    vistaFrontal: "A18:B29", placa: "C18:D29", estadoInterno1: "E18:F29", estadoInterno2: "G18:H29",
+    estadoCarcasa: "A31:B42", estadoTarjeta: "C31:D42", componentesMalEstado: "E31:F42", estadoVentiladores: "G31:H42",
+  },
+  diagnostico_servomotor: {
+    vistaFrontal: "A18:B29", placa: "C18:D29", estadoCarcasa: "E18:F29", estadoEncoder: "G18:H29",
+    estadoInterno: "A31:B42", conectores: "C31:D42", estadoRodamientos: "E31:F42", pruebaEquipo: "G31:H42",
+  },
+  tarjetas: { imagenA: "A19:C38", imagenB: "D19:F38", imagenC: "G19:I38" },
+  pc: {
+    vistaFrontal: "A19:C38", placaEquipo: "D19:F38", carcasaContaminada: "G19:I38",
+    carcasaDescontaminada: "A40:C59", limpiezaTarjetaInicial: "D40:F49", limpiezaTarjetaFinal: "D50:F59",
+    cambioVentilador: "G40:I59",
+  },
+};
+
+// "B23" -> 2 (1-based, B es la 2da columna).
+const columnaANumero = (letras) => {
+  let n = 0;
+  for (const ch of letras) n = n * 26 + (ch.charCodeAt(0) - 64);
+  return n;
+};
+
+// "B23:E34" -> anchor de dos puntos para ws.addImage. `br` apunta a la
+// esquina superior-izquierda de la celda SIGUIENTE a la final (col+1 sin
+// -1, row sin -1) para que el rectángulo incluya la celda final completa,
+// no se detenga en su propia esquina superior-izquierda.
+const rangoAAnchor = (rango) => {
+  const [ini, fin] = rango.split(":");
+  const [, colIni, filaIni] = ini.match(/^([A-Z]+)(\d+)$/);
+  const [, colFin, filaFin] = fin.match(/^([A-Z]+)(\d+)$/);
+  return {
+    tl: { col: columnaANumero(colIni) - 1, row: Number(filaIni) - 1 },
+    br: { col: columnaANumero(colFin), row: Number(filaFin) },
+  };
+};
+
 // Para campos/checklist/tabla, una sección puede tener SOLO ALGUNOS de sus
 // elementos mapeados (ej. un ítem de checklist sin celda propia en la
 // plantilla real) — esta función devuelve nada más los pares [label, valor]
 // de lo que efectivamente NO tiene celda, para no duplicar en el bloque
 // anexo lo que ya se escribió con precisión.
+// Con slotsFijos, `g.titulo` guarda la clave interna del slot (ej.
+// "vistaFrontal"), no el texto legible — se resuelve contra la definición
+// de la sección (mismo criterio que VistaInformeTecnico.jsx) para no
+// filtrar claves en camelCase al Excel (celdas de texto o bloque anexo).
+const tituloGrupo = (seccion, g) => seccion.slotsFijos?.find((s) => s.clave === g.titulo)?.label ?? g.titulo;
+
 const elementosSinMapear = (seccion, mapa, campos) => {
   if (seccion.tipo === "campos") {
     return seccion.campos
@@ -545,11 +623,20 @@ export async function exportarInformeTecnicoExcel(informe, ot) {
       if (!m) return;
       const lineas = (campos[seccion.clave] || []).filter(Boolean);
       lineas.slice(0, m.max).forEach((linea, i) => escribir(`${m.col}${m.fila + i}`, linea));
+    } else if (seccion.tipo === "filas") {
+      const m = mapa.filas?.[seccion.clave];
+      if (!m) return;
+      const [colUno, colDos] = seccion.columnas;
+      const filas = (campos[seccion.clave] || []).filter((f) => f[colUno.clave] || f[colDos.clave]);
+      filas.slice(0, m.max).forEach((f, i) => {
+        escribir(`${m.colCantidad}${m.filaInicial + i}`, f[colUno.clave]);
+        escribir(`${m.colDescripcion}${m.filaInicial + i}`, f[colDos.clave]);
+      });
     } else if (seccion.tipo === "evidencias") {
       const slots = mapa.evidencias?.[seccion.clave];
       if (!slots) return;
       const grupos = campos[seccion.clave] || [];
-      grupos.slice(0, slots.length).forEach((g, i) => escribir(slots[i], g.titulo));
+      grupos.slice(0, slots.length).forEach((g, i) => escribir(slots[i], tituloGrupo(seccion, g)));
     }
   });
 
@@ -596,15 +683,25 @@ export async function exportarInformeTecnicoExcel(informe, ot) {
       } else if (lineas.length > m.max) {
         bloques.push([`${seccion.titulo} (líneas adicionales)`, lineas.slice(m.max).map((l) => ["", l])]);
       }
+    } else if (seccion.tipo === "filas") {
+      const m = mapa.filas?.[seccion.clave];
+      const [colUno, colDos] = seccion.columnas;
+      const filas = (campos[seccion.clave] || []).filter((f) => f[colUno.clave] || f[colDos.clave]);
+      const par = (f) => [f[colUno.clave] || "—", f[colDos.clave] || ""];
+      if (!m) {
+        bloques.push([seccion.titulo, filas.length ? filas.map(par) : [["(sin filas)", ""]]]);
+      } else if (filas.length > m.max) {
+        bloques.push([`${seccion.titulo} (filas adicionales)`, filas.slice(m.max).map(par)]);
+      }
     } else if (seccion.tipo === "evidencias") {
       const slots = mapa.evidencias?.[seccion.clave];
       const grupos = campos[seccion.clave] || [];
       if (!slots) {
         if (!SIN_TEXTO_ANEXO_EVIDENCIAS_FIRMA.has(informe.tipo)) {
-          bloques.push([seccion.titulo, grupos.map((g) => [g.titulo || "(sin título)", `${g.imagenes?.length || 0} foto(s)`])]);
+          bloques.push([seccion.titulo, grupos.map((g) => [tituloGrupo(seccion, g) || "(sin título)", `${g.imagenes?.length || 0} foto(s)`])]);
         }
       } else if (grupos.length > slots.length) {
-        bloques.push([`${seccion.titulo} (grupos adicionales)`, grupos.slice(slots.length).map((g) => [g.titulo || "(sin título)", `${g.imagenes?.length || 0} foto(s)`])]);
+        bloques.push([`${seccion.titulo} (grupos adicionales)`, grupos.slice(slots.length).map((g) => [tituloGrupo(seccion, g) || "(sin título)", `${g.imagenes?.length || 0} foto(s)`])]);
       }
     }
   });
@@ -662,15 +759,19 @@ export async function exportarInformeTecnicoExcel(informe, ot) {
     ws.getCell(`${COL_FOTOS}${r}`).value = String(valor);
   };
 
-  const gruposConFotos = [];
+  const fotosAInsertar = [];
   def.secciones.forEach((seccion) => {
     if (seccion.tipo !== "evidencias") return;
     (campos[seccion.clave] || []).forEach((g) => {
-      if (g.imagenes?.length) gruposConFotos.push({ titulo: g.titulo || seccion.titulo, imagenes: g.imagenes });
+      (g.imagenes || []).forEach((ruta) => fotosAInsertar.push({ titulo: g.titulo || seccion.titulo, ruta }));
     });
   });
 
-  if (gruposConFotos.length) {
+  if (fotosAInsertar.length) {
+    const slotsConfig = SLOTS_FOTOS[informe.tipo];
+    const slotsPorNombre = slotsConfig && !Array.isArray(slotsConfig);
+    const slotsPosicionales = Array.isArray(slotsConfig) ? slotsConfig.map(rangoAAnchor) : [];
+    const nombresUsados = new Set();
     // Arranca en una fila fija (6), independiente de dónde haya terminado
     // el bloque de texto "DATOS ADICIONALES" — antes las fotos seguían
     // acumulándose después de ese bloque y terminaban muy abajo ("al final
@@ -679,25 +780,43 @@ export async function exportarInformeTecnicoExcel(informe, ot) {
     // COL_FOTOS arriba), la fila 6 siempre está libre ahí sin importar el
     // tipo de informe.
     let filaFotos = 6;
-    escribirFilaDerecha(filaFotos, "FOTOS ADJUNTAS (arrastrar a la posición final)");
-    filaFotos += 2;
-    for (const grupo of gruposConFotos) {
-      for (const ruta of grupo.imagenes) {
-        const extension = EXTENSION_SOPORTADA(ruta);
-        if (!extension) { console.warn("Formato de imagen no soportado para Excel:", ruta); continue; }
-        try {
-          const resImg = await fetchUpload(ruta);
-          const bufferImg = await resImg.arrayBuffer();
-          const imageId = wb.addImage({ buffer: bufferImg, extension });
-          escribirFilaDerecha(filaFotos, grupo.titulo);
+    let encabezadoGenericoEscrito = false;
+    for (let i = 0; i < fotosAInsertar.length; i++) {
+      const { titulo, ruta } = fotosAInsertar[i];
+      const extension = EXTENSION_SOPORTADA(ruta);
+      if (!extension) { console.warn("Formato de imagen no soportado para Excel:", ruta); continue; }
+      try {
+        const resImg = await fetchUpload(ruta);
+        const bufferImg = await resImg.arrayBuffer();
+        const imageId = wb.addImage({ buffer: bufferImg, extension });
+        let slot = null;
+        if (slotsPorNombre) {
+          if (slotsConfig[titulo] && !nombresUsados.has(titulo)) {
+            slot = rangoAAnchor(slotsConfig[titulo]);
+            nombresUsados.add(titulo);
+          }
+        } else {
+          slot = slotsPosicionales[i];
+        }
+        if (slot) {
+          // Posición conocida de la plantilla — ancla de dos puntos, llena
+          // el recuadro impreso exacto en vez de quedar fuera del área.
+          ws.addImage(imageId, slot);
+        } else {
+          if (!encabezadoGenericoEscrito) {
+            escribirFilaDerecha(filaFotos, "FOTOS ADJUNTAS (arrastrar a la posición final)");
+            filaFotos += 2;
+            encabezadoGenericoEscrito = true;
+          }
+          escribirFilaDerecha(filaFotos, titulo);
           ws.addImage(imageId, {
             tl: { col: COL_FOTOS_IDX0, row: filaFotos }, // filaFotos es 1-indexado pero el anchor espera 0-indexado
             ext: { width: 260, height: 195 },
           });
           filaFotos += 11;
-        } catch (err) {
-          console.warn("No se pudo insertar la imagen en el Excel:", ruta, err.message);
         }
+      } catch (err) {
+        console.warn("No se pudo insertar la imagen en el Excel:", ruta, err.message);
       }
     }
   }
