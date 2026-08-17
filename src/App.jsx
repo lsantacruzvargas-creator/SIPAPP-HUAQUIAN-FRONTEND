@@ -9,6 +9,7 @@ import ListaCotizaciones from "./pages/ListaCotizaciones";
 import Cotizaciones from "./pages/Cotizaciones";
 import ListaOrdenesTrabajo from "./pages/ListaOrdenesTrabajo";
 import ListaFacturas from "./pages/ListaFacturas";
+import Reportes from "./pages/Reportes";
 import ListaOrdenesCompra from "./pages/ListaOrdenesCompra";
 import IngresoEquipos from "./pages/IngresoEquipos";
 import Usuarios from "./pages/Usuarios";
@@ -111,6 +112,15 @@ export default function App() {
         element={
           <ProtectedRoute roles={["admin", "facturacion", "jefatura"]}>
             <Layout><ListaFacturas /></Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/reportes"
+        element={
+          <ProtectedRoute roles={["admin", "facturacion", "jefatura"]}>
+            <Layout><Reportes /></Layout>
           </ProtectedRoute>
         }
       />

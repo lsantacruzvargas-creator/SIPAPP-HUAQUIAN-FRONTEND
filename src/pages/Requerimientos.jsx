@@ -58,34 +58,46 @@ function PanelSalida({ requerimientoId, item, onClose, onListo }) {
     <div className="bg-blue-50/60 rounded-xl p-3 mt-2 space-y-2">
       {error && <p className="text-xs text-red-500 bg-red-50 px-2 py-1 rounded">{error}</p>}
       {lotes.length === 0 ? (
-        <p className="text-xs text-gray-400">Sin lotes disponibles para este material.</p>
+        // Sin stock, no hay nada que seleccionar — mostrar cantidad/confirmar
+        // acá sería un callejón sin salida (el botón nunca se habilita porque
+        // nunca hay un lote que elegir). Se avisa y se corta el flujo acá.
+        <>
+          <p className="text-xs text-gray-500">
+            Sin lotes disponibles para este material — registra un ingreso en Almacén antes de poder atenderlo.
+          </p>
+          <div className="flex justify-end">
+            <button onClick={onClose} className="text-xs text-gray-400 hover:text-gray-700">Cancelar</button>
+          </div>
+        </>
       ) : (
-        <div className="space-y-1.5">
-          {lotes.map((l) => (
-            <button key={l.lote} type="button" onClick={() => seleccionarLote(l)}
-              className={`w-full text-left px-3 py-2 rounded-lg border text-xs transition ${
-                lote === l.lote ? "border-blue-400 bg-blue-50" : "border-gray-200 bg-white hover:border-gray-300"
-              }`}>
-              <div className="flex justify-between">
-                <span className="font-mono font-semibold text-gray-700">{l.lote}</span>
-                <span className="font-semibold text-gray-800">S/ {Number(l.precioUnitario).toFixed(2)}</span>
-              </div>
-              <div className="flex gap-3 text-gray-400 mt-0.5">
-                <span>Disponible: <strong>{l.cantidadDisponible}</strong></span>
-              </div>
+        <>
+          <div className="space-y-1.5">
+            {lotes.map((l) => (
+              <button key={l.lote} type="button" onClick={() => seleccionarLote(l)}
+                className={`w-full text-left px-3 py-2 rounded-lg border text-xs transition ${
+                  lote === l.lote ? "border-blue-400 bg-blue-50" : "border-gray-200 bg-white hover:border-gray-300"
+                }`}>
+                <div className="flex justify-between">
+                  <span className="font-mono font-semibold text-gray-700">{l.lote}</span>
+                  <span className="font-semibold text-gray-800">S/ {Number(l.precioUnitario).toFixed(2)}</span>
+                </div>
+                <div className="flex gap-3 text-gray-400 mt-0.5">
+                  <span>Disponible: <strong>{l.cantidadDisponible}</strong></span>
+                </div>
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <input type="number" min={0.01} step="any" value={cantidad} onChange={(e) => setCantidad(e.target.value)}
+              className="w-24 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-right bg-white" />
+            <button onClick={confirmar} disabled={guardando || !lote}
+              className="text-xs bg-emerald-600 text-white px-3 py-1.5 rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition font-medium">
+              {guardando ? "Guardando…" : "Confirmar salida"}
             </button>
-          ))}
-        </div>
+            <button onClick={onClose} className="text-xs text-gray-400 hover:text-gray-700">Cancelar</button>
+          </div>
+        </>
       )}
-      <div className="flex items-center gap-2">
-        <input type="number" min={0.01} step="any" value={cantidad} onChange={(e) => setCantidad(e.target.value)}
-          className="w-24 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-right bg-white" />
-        <button onClick={confirmar} disabled={guardando || !lote}
-          className="text-xs bg-emerald-600 text-white px-3 py-1.5 rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition font-medium">
-          {guardando ? "Guardando…" : "Confirmar salida"}
-        </button>
-        <button onClick={onClose} className="text-xs text-gray-400 hover:text-gray-700">Cancelar</button>
-      </div>
     </div>
   );
 }

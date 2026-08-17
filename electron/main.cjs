@@ -1,5 +1,6 @@
 const { app, BrowserWindow, dialog } = require("electron");
 const { autoUpdater } = require("electron-updater");
+const path = require("path");
 
 autoUpdater.autoDownload = false;
 
@@ -19,11 +20,22 @@ function createWindow() {
   });
 
   const isDev = !app.isPackaged;
-  if (isDev) {
-    mainWindow.loadURL("http://localhost:5173");
-  } else {
-    mainWindow.loadURL(LOGIN_URL);
-  }
+  const startUrl = isDev ? "http://localhost:5173" : LOGIN_URL;
+
+  // offline.html existía en el proyecto pero nunca se cargaba desde acá — si
+  // el servidor no respondía (o, en producción, si LOGIN_URL todavía no
+  // resuelve — ver el TODO de arriba) Electron mostraba su página de error
+  // de red por defecto en vez de esta pantalla. -3 = ERR_ABORTED: se dispara
+  // en navegaciones canceladas normales (cerrar la ventana, un redirect
+  // intencional), no es un fallo real de conexión — se ignora.
+  mainWindow.webContents.on("did-fail-load", (event, errorCode, errorDescription, validatedURL) => {
+    if (errorCode === -3) return;
+    mainWindow.loadFile(path.join(__dirname, "offline.html"), {
+      query: { retry: validatedURL || startUrl },
+    });
+  });
+
+  mainWindow.loadURL(startUrl);
 
   // Cerrar sesión al cerrar la ventana. El JWT/usuario ya viven en
   // sessionStorage (se borra solo al destruirse el proceso), pero esto queda

@@ -61,6 +61,9 @@ const IconBoxes = (p) => (
 const IconClipboardList = (p) => (
   <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2M9 12h6M9 16h6" /></svg>
 );
+const IconChartBar = (p) => (
+  <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3v18h18M8 17V11m5 6V7m5 10v-4" /></svg>
+);
 const IconPanelClose = (p) => (
   <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="16" rx="2" strokeWidth={2} /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 4v16m4-8l-2 2 2 2" /></svg>
 );
@@ -152,6 +155,7 @@ export default function Sidebar() {
     { to: "/cotizaciones", label: "Cotizaciones", Icon: IconDocument, show: esComercial || esPlanner || esJefatura },
     { to: "/ordenes-compra", label: "Órdenes de Compra", Icon: IconCart, show: esAdmin || esFacturacion || esJefatura },
     { to: "/facturas", label: "Facturas", Icon: IconReceipt, show: esAdmin || esFacturacion || esJefatura },
+    { to: "/reportes", label: "Reportes", Icon: IconChartBar, show: esAdmin || esFacturacion || esJefatura },
     { to: "/facturacion-electronica", label: "Fact. Electrónica", Icon: IconBolt, show: esComercial || esFacturacion || esJefatura },
     { to: "/facturacion-electronica/guias", label: "Guías", Icon: IconTruck, show: esAdmin || esFacturacion || esAlmacenero || esJefatura },
     { to: "/tipo-cambio", label: "Tipo de Cambio", Icon: IconExchange, show: esAdmin || esFacturacion || esAlmacenero || esJefatura },
