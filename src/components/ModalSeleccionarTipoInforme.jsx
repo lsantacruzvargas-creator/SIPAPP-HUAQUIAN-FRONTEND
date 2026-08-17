@@ -21,24 +21,26 @@ const ICONOS = {
 export default function ModalSeleccionarTipoInforme({ onSeleccionar, onClose }) {
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
           <h3 className="font-semibold text-gray-800">Nuevo Informe Técnico</h3>
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl leading-none">✕</button>
         </div>
-        <div className="p-6 space-y-2">
+        <div className="p-6 overflow-y-auto">
           <p className="text-xs text-gray-500 mb-3">Selecciona el tipo de informe a generar:</p>
-          {TIPOS_INFORME.map((t) => (
-            <button
-              key={t.valor}
-              type="button"
-              onClick={() => onSeleccionar(t.valor)}
-              className="w-full flex items-center gap-3 text-left px-4 py-3 rounded-xl border border-gray-200 hover:border-amber-300 hover:bg-amber-50/50 transition"
-            >
-              <span className="text-2xl shrink-0">{ICONOS[t.valor] || "📄"}</span>
-              <span className="text-sm font-medium text-gray-800">{t.label}</span>
-            </button>
-          ))}
+          <div className="grid grid-cols-2 gap-2">
+            {TIPOS_INFORME.map((t) => (
+              <button
+                key={t.valor}
+                type="button"
+                onClick={() => onSeleccionar(t.valor)}
+                className="w-full flex items-center gap-3 text-left px-4 py-3 rounded-xl border border-gray-200 hover:border-amber-300 hover:bg-amber-50/50 transition"
+              >
+                <span className="text-2xl shrink-0">{ICONOS[t.valor] || "📄"}</span>
+                <span className="text-sm font-medium text-gray-800">{t.label}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>
