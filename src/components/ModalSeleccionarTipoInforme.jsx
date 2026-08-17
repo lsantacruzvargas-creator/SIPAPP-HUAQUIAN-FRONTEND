@@ -1,14 +1,22 @@
 import { TIPOS_INFORME } from "../utils/informesTecnicos";
 
 const ICONOS = {
-  bombas: "🔧",
-  protocolo_jaula_ardilla: "⚙️",
-  bobina_estator_mtto: "🧵",
-  bobina_estator_rebo: "🧵",
-  tecnico_mantenimiento: "📋",
+  suministro: "📦",
+  soporte: "🛠️",
+  diagnostico_equipo: "🔍",
+  diagnostico_servomotor: "⚙️",
+  tarjetas: "🔌",
+  pc: "🖥️",
+  panel: "🖲️",
+  adicional: "📎",
+  plc: "🧠",
+  arrancador: "🚀",
+  variador_reparacion: "🔧",
+  ups: "🔋",
+  servomotor: "⚡",
 };
 
-// Primer paso del flujo "+ Crear informe": elegir uno de los 5 tipos antes
+// Primer paso del flujo "+ Crear informe": elegir uno de los tipos antes
 // de abrir FormInformeTecnico con las secciones correspondientes.
 export default function ModalSeleccionarTipoInforme({ onSeleccionar, onClose }) {
   return (

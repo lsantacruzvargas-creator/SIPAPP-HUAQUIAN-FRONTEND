@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { fetchAuth } from "../utils/fetchAuth";
+import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import { calcSubtotal, itemInvalido } from "../utils/cotizacionItems";
 import TablaItemsCotizacion from "./TablaItemsCotizacion";
 import { FlujoNegocio, TarjetaRelacion, money } from "./detalleShared";
@@ -44,6 +44,9 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
   const [guardando, setGuardando] = useState(false);
   const [intentoGuardar, setIntentoGuardar] = useState(false);
   const [error, setError] = useState("");
+  // Precios: información sensible, solo Admin/Facturación/Jefatura los ven —
+  // ni Asistente ni Planner, aunque puedan crear la cotización.
+  const puedeVerPrecios = ["admin", "facturacion", "jefatura"].includes(getUsuario()?.rol);
 
   useEffect(() => {
     fetchAuth("/empresas").then(r => r.ok && r.json()).then(d => setEmpresas(d || []));
@@ -140,10 +143,12 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className="text-[10px] text-white/60 uppercase tracking-widest leading-none">Total</p>
-              <p className="text-lg font-bold leading-tight">{money(totalesMostrados.total, form.moneda)}</p>
-            </div>
+            {puedeVerPrecios && (
+              <div className="text-right">
+                <p className="text-[10px] text-white/60 uppercase tracking-widest leading-none">Total</p>
+                <p className="text-lg font-bold leading-tight">{money(totalesMostrados.total, form.moneda)}</p>
+              </div>
+            )}
             <button onClick={guardar} disabled={guardando}
               className="bg-white text-sky-700 text-sm px-5 py-2 rounded-lg hover:bg-sky-50 disabled:opacity-60 transition font-semibold shadow-sm shrink-0">
               {guardando ? "Creando…" : "Crear Cotización"}
@@ -307,7 +312,8 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
               </div>
             </div>
 
-            {/* Cálculos */}
+            {/* Cálculos — precios, información sensible: oculto sin privilegio */}
+            {puedeVerPrecios && (
             <div className="rounded-xl bg-gradient-to-br from-gray-50 to-sky-50/40 border border-gray-100 p-4 space-y-4">
               <div>
                 <label className="text-xs text-gray-500 block mb-1">
@@ -334,6 +340,7 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
                 </div>
               </div>
             </div>
+            )}
 
             {error && <p className="text-xs text-red-500">{error}</p>}
           </div>
@@ -366,6 +373,7 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
             intentoGuardar={intentoGuardar}
             totalesMostrados={totalesMostrados}
             seleccionables={false}
+            puedeVerPrecios={puedeVerPrecios}
           />
         </div>
       </div>

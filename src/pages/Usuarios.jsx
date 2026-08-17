@@ -2,6 +2,10 @@ import { useState, useEffect } from "react";
 import { fetchAuth } from "../utils/fetchAuth";
 
 const ROLES = ["admin", "tecnico", "almacenero", "asistente", "supervisor", "jefatura", "facturacion", "planner"];
+// "asistente" es el valor de rol real (DB/JWT/permisos) — solo se renombra
+// la etiqueta visible a "Administración", nunca el valor almacenado.
+const ROL_LABEL = { asistente: "Administración" };
+const labelRol = (rol) => ROL_LABEL[rol] ?? rol;
 
 const badgeRol = (rol) => {
   if (rol === "admin")       return "bg-red-50 text-red-700";
@@ -97,7 +101,7 @@ function ModalUsuario({ usuario, onClose, onGuardado }) {
             <div>
               <label className="text-xs text-gray-500 block mb-1">Rol</label>
               <select name="rol" value={form.rol} onChange={handleChange} className={INP}>
-                {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+                {ROLES.map((r) => <option key={r} value={r}>{labelRol(r)}</option>)}
               </select>
             </div>
             {esEdicion && (
@@ -272,7 +276,7 @@ export default function Usuarios() {
                   <td className="px-4 py-3 text-gray-500 font-mono text-xs">{u.username}</td>
                   <td className="px-4 py-3 text-center">
                     <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${badgeRol(u.rol)}`}>
-                      {u.rol}
+                      {labelRol(u.rol)}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-center">

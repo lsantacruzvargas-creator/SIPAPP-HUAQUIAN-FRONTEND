@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { fetchAuth } from "../utils/fetchAuth";
+import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import DetalleDocumento from "../components/DetalleDocumento";
 import ModalImportarExcel, { COLS_COT_OT } from "../components/ModalImportarExcel";
 import ModalNuevaOT from "../components/ModalNuevaOT";
@@ -57,7 +57,12 @@ const totalesDuales = (c, tipoCambio) => {
   return { pen: total, usd: tc > 0 ? total / tc : null };
 };
 
-function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, tipoCambio }) {
+// Días transcurridos desde que se marcó "informe enviado" — null si nunca
+// se marcó (no hay `fechaInformeEnviado`).
+const diasDesdeInforme = (c) =>
+  c.fechaInformeEnviado ? Math.floor((Date.now() - new Date(c.fechaInformeEnviado).getTime()) / 86400000) : null;
+
+function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, tipoCambio, mostrarDiasInforme, puedeVerPrecios }) {
   return (
     <div className="mb-6">
       <div className="flex items-center gap-2 mb-3">
@@ -76,16 +81,18 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
               <th className={`${TH} text-left`}>Planta</th>
               <th className={`${TH} text-left`}>Encargado</th>
               <th className={`${TH} text-left`}>Descripción</th>
-              <th className={`${TH} text-right`}>Total sin IGV (S/)</th>
-              <th className={`${TH} text-right`}>Total sin IGV (US$)</th>
+              {puedeVerPrecios && <th className={`${TH} text-right`}>Total sin IGV (S/)</th>}
+              {puedeVerPrecios && <th className={`${TH} text-right`}>Total sin IGV (US$)</th>}
               <th className={`${TH} text-center`}>Aprobado</th>
               <th className={`${TH} text-center`}>Enviado</th>
+              <th className={`${TH} text-center`}>Informe enviado</th>
+              {mostrarDiasInforme && <th className={`${TH} text-center`}>Días desde informe enviado</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {cotizaciones.length === 0 ? (
               <tr>
-                <td colSpan={10} className="px-4 py-8 text-center text-gray-400">{vacioMsg}</td>
+                <td colSpan={(mostrarDiasInforme ? 12 : 11) - (puedeVerPrecios ? 0 : 2)} className="px-4 py-8 text-center text-gray-400">{vacioMsg}</td>
               </tr>
             ) : (
               cotizaciones.map((c) => {
@@ -121,12 +128,16 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
                   <td className="px-4 py-3.5 text-gray-600">{c.planta || <span className="text-gray-300">—</span>}</td>
                   <td className="px-4 py-3.5 text-gray-600">{c.encargado || <span className="text-gray-300">—</span>}</td>
                   <td className="px-4 py-3.5 text-gray-700">{c.titulo}</td>
-                  <td className="px-4 py-3.5 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap">
-                    {pen != null ? pen.toLocaleString("es-PE", { minimumFractionDigits: 2 }) : "—"}
-                  </td>
-                  <td className="px-4 py-3.5 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap">
-                    {usd != null ? usd.toLocaleString("es-PE", { minimumFractionDigits: 2 }) : "—"}
-                  </td>
+                  {puedeVerPrecios && (
+                    <td className="px-4 py-3.5 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap">
+                      {pen != null ? pen.toLocaleString("es-PE", { minimumFractionDigits: 2 }) : "—"}
+                    </td>
+                  )}
+                  {puedeVerPrecios && (
+                    <td className="px-4 py-3.5 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap">
+                      {usd != null ? usd.toLocaleString("es-PE", { minimumFractionDigits: 2 }) : "—"}
+                    </td>
+                  )}
                   <td className="px-4 py-3.5 text-center">
                     {c._esOT ? <span className="text-gray-300">—</span> : (
                       <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full uppercase tracking-wide whitespace-nowrap ${c.aprobado ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
@@ -141,6 +152,21 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
                       </span>
                     )}
                   </td>
+                  <td className="px-4 py-3.5 text-center">
+                    {c._esOT ? <span className="text-gray-300">—</span> : (
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full uppercase tracking-wide whitespace-nowrap ${c.informeEnviado ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                        {c.informeEnviado ? "Enviado" : "No enviado"}
+                      </span>
+                    )}
+                  </td>
+                  {mostrarDiasInforme && (
+                    <td className="px-4 py-3.5 text-center text-gray-600 tabular-nums">
+                      {(() => {
+                        const dias = c._esOT ? null : diasDesdeInforme(c);
+                        return dias != null ? `${dias} día${dias !== 1 ? "s" : ""}` : <span className="text-gray-300">—</span>;
+                      })()}
+                    </td>
+                  )}
                 </tr>
                 );
               })
@@ -171,8 +197,11 @@ export default function ListaCotizaciones() {
   const [ocPorNumDoc, setOcPorNumDoc] = useState(new Map());
   const [facturaPorNumDoc, setFacturaPorNumDoc] = useState(new Map());
   const [sortBy, setSortBy] = useState("numeroOT");
-  const [vista, setVista] = useState("pendientes");
+  const [vista, setVista] = useState("todas");
   const [tipoCambio, setTipoCambio] = useState(null);
+  // Precios: información sensible, solo Admin/Facturación/Jefatura los ven —
+  // esta lista es compartida también con Planner y Asistente (Administración).
+  const puedeVerPrecios = ["admin", "facturacion", "jefatura"].includes(getUsuario()?.rol);
 
   const buildOtsMap = (ots) => {
     const m = new Map();
@@ -304,7 +333,10 @@ export default function ListaCotizaciones() {
 
   const esCerrada = (c) => c.estadoCadena === "cerrado";
   const cerradas = filtradas.filter((c) => esCerrada(c));
-  const pendientes = filtradas.filter((c) => !esCerrada(c) && !tieneOC(c));
+  // Pendientes de OC: solo cotizaciones reales — las filas pseudo de OT sin
+  // cotización (_esOT) no tienen cotización que esperar OC, así que no
+  // cuentan como "pendientes" acá aunque tampoco tengan OC.
+  const pendientes = filtradas.filter((c) => !c._esOT && !esCerrada(c) && !tieneOC(c));
   const conOC = filtradas.filter((c) => !esCerrada(c) && tieneOC(c));
   // Cotizaciones (no pseudo-filas de OT) sin ninguna OT relacionada.
   const sinOT = filtradas.filter((c) => !c._esOT && !otsPorCot.get(c._id)?.length);
@@ -327,10 +359,14 @@ export default function ListaCotizaciones() {
       "Planta":                 c.planta || "—",
       "Encargado":              c.encargado || "—",
       "Descripción":            c.titulo,
-      "Total sin IGV (S/)":     pen != null ? pen.toFixed(2) : "—",
-      "Total sin IGV (US$)":    usd != null ? usd.toFixed(2) : "—",
+      ...(puedeVerPrecios ? {
+        "Total sin IGV (S/)":   pen != null ? pen.toFixed(2) : "—",
+        "Total sin IGV (US$)":  usd != null ? usd.toFixed(2) : "—",
+      } : {}),
       "Aprobado":               c._esOT ? "—" : (c.aprobado ? "Aprobada" : "Pendiente"),
       "Enviado":                c._esOT ? "—" : (c.enviado ? "Enviada" : "No enviada"),
+      "Informe enviado":        c._esOT ? "—" : (c.informeEnviado ? "Enviado" : "No enviado"),
+      "Días desde informe enviado": c._esOT ? "—" : (diasDesdeInforme(c) ?? "—"),
     };
   };
 
@@ -451,6 +487,7 @@ export default function ListaCotizaciones() {
           onSelect={seleccionarFila}
           vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Todas las cotizaciones ya tienen OT"}
           tipoCambio={tipoCambio}
+          puedeVerPrecios={puedeVerPrecios}
         />
       )}
 
@@ -462,6 +499,8 @@ export default function ListaCotizaciones() {
           onSelect={seleccionarFila}
           vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin cotizaciones pendientes"}
           tipoCambio={tipoCambio}
+          puedeVerPrecios={puedeVerPrecios}
+          mostrarDiasInforme
         />
       )}
 
@@ -473,6 +512,7 @@ export default function ListaCotizaciones() {
           onSelect={seleccionarFila}
           vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin cotizaciones con OC"}
           tipoCambio={tipoCambio}
+          puedeVerPrecios={puedeVerPrecios}
         />
       )}
 
@@ -484,6 +524,7 @@ export default function ListaCotizaciones() {
           onSelect={seleccionarFila}
           vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin cotizaciones cerradas"}
           tipoCambio={tipoCambio}
+          puedeVerPrecios={puedeVerPrecios}
         />
       )}
     </div>

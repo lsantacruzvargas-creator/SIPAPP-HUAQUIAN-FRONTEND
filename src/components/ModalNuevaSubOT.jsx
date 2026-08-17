@@ -18,16 +18,25 @@ export default function ModalNuevaSubOT({ padre, onClose, onCreada }) {
     titulo: "", descripcion: "",
     // MIC/Línea, Backup y Entregado por se heredan del padre por defecto —
     // el técnico puede sobrescribirlos antes de crear si esta sub-OT difiere.
-    micLinea: padre.micLinea || "", backup: padre.backup || "", categorizacionTaller: "",
+    micLinea: padre.micLinea || "", backup: padre.backup || "", categorizacionTaller: "MANTENIMIENTO PREVENTIVO",
     personalAsignado: "", estado: "pendiente", observaciones: "", entregadoPor: padre.entregadoPor || "",
     fechaEntrega: "", numeroGuiaRemision: "",
+    // Encargado Prueba / Encargado Intervención heredan del padre por
+    // defecto — cada sub-OT puede tener su propio par de técnicos si la
+    // sub-tarea lo requiere.
+    encargado: padre.encargado || "", encargado2: padre.encargado2 || "",
   });
   const [usuarios, setUsuarios] = useState([]);
+  const [tecnicos, setTecnicos] = useState([]);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     fetchAuth("/personal/lista").then((r) => r.ok && r.json().then(setUsuarios));
+    // Encargado Prueba / Encargado Intervención se eligen entre los
+    // usuarios con login y rol "tecnico" (distinto de "Personal asignado",
+    // que sigue siendo del catálogo de Personal) — ver Fase 13.
+    fetchAuth("/usuarios/lista").then((r) => r.ok && r.json()).then((u) => setTecnicos((u || []).filter((x) => x.rol === "tecnico")));
   }, []);
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
@@ -100,11 +109,28 @@ export default function ModalNuevaSubOT({ padre, onClose, onCreada }) {
                 {CATEGORIAS_TALLER.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
-            <div>
+            <div hidden>
               <label className="text-xs text-gray-500 block mb-1">Personal asignado</label>
               <select name="personalAsignado" value={form.personalAsignado} onChange={handleChange} className={`w-full ${INP}`}>
                 <option value="">Sin asignar</option>
                 {usuarios.map((u) => <option key={u._id} value={u._id}>{u.nombre}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Encargado Prueba</label>
+              <select name="encargado" value={form.encargado} onChange={handleChange} className={`w-full ${INP}`}>
+                <option value="">Sin asignar</option>
+                {tecnicos.map((t) => <option key={t._id} value={t.nombre}>{t.nombre}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Encargado Intervención</label>
+              <select name="encargado2" value={form.encargado2} onChange={handleChange} className={`w-full ${INP}`}>
+                <option value="">Sin asignar</option>
+                {tecnicos.map((t) => <option key={t._id} value={t.nombre}>{t.nombre}</option>)}
               </select>
             </div>
           </div>

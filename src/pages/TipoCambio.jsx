@@ -16,6 +16,11 @@ export default function TipoCambio() {
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
   const [ok, setOk] = useState(false);
+  const [tcSunat, setTcSunat] = useState(null);
+  // Arranca en `true` cuando corresponde consultarlo (se dispara desde el
+  // primer render vía useEffect) — evita tener que llamar setState de forma
+  // síncrona dentro del efecto solo para marcar "cargando".
+  const [cargandoSunat, setCargandoSunat] = useState(puedeEditar);
 
   const cargar = () => {
     fetchAuth("/tipo-cambio").then((r) => r.ok && r.json()).then((d) => {
@@ -23,7 +28,14 @@ export default function TipoCambio() {
     });
   };
 
-  useEffect(() => { cargar(); }, []);
+  const cargarSunat = () => {
+    fetchAuth("/sunat/tipo-cambio").then((r) => r.ok && r.json()).then((d) => {
+      if (d) setTcSunat(d);
+    }).finally(() => setCargandoSunat(false));
+  };
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { cargar(); if (puedeEditar) cargarSunat(); }, []);
 
   const guardar = async () => {
     const num = Number(valor);
@@ -68,6 +80,32 @@ export default function TipoCambio() {
 
         {puedeEditar && (
           <div className="border-t border-gray-100 pt-4 space-y-3">
+            {/* Valor sugerido por SUNAT (vía Decolecta) — solo referencia,
+                no actualiza nada por sí sola. Confirmar siempre requiere
+                presionar "Actualizar" abajo, que es lo que guarda el
+                historial (quién, cuándo, valor anterior/nuevo). */}
+            <div className="bg-sky-50 border border-sky-100 rounded-lg px-3 py-2.5 text-sm">
+              {cargandoSunat ? (
+                <p className="text-sky-600">Consultando tipo de cambio SUNAT…</p>
+              ) : tcSunat ? (
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <span className="text-sky-700">
+                    SUNAT hoy — Compra S/ {Number(tcSunat.compra).toFixed(3)} · Venta S/ {Number(tcSunat.venta).toFixed(3)}
+                  </span>
+                  <button type="button"
+                    onClick={() => { setValor(String(tcSunat.venta)); setOk(false); }}
+                    className="text-xs text-sky-700 border border-sky-300 px-2.5 py-1 rounded-lg hover:bg-sky-100 transition font-medium">
+                    Usar valor SUNAT (venta)
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-400">No se pudo consultar el tipo de cambio SUNAT.</span>
+                  <button type="button" onClick={() => { setCargandoSunat(true); cargarSunat(); }} className="text-xs text-sky-700 underline">Reintentar</button>
+                </div>
+              )}
+            </div>
+
             {error && <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
             {ok && <p className="text-sm text-green-600 bg-green-50 px-3 py-2 rounded-lg">Tipo de cambio actualizado.</p>}
             <label className="text-xs text-gray-500 block mb-1">Nuevo valor (S/ por 1 US$)</label>

@@ -3,7 +3,7 @@ import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import ModalCrearFactura from "./ModalCrearFactura";
 import {
   FlujoNegocio, TarjetaRelacion, Chip,
-  badgePago, badgeOT, money, BotonAnular, BannerAnulado,
+  badgePago, badgeOT, money, BotonAnular, BannerAnulado, bloqueadoPorCadenaCerrada,
 } from "./detalleShared";
 
 const INP = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 w-full transition";
@@ -47,16 +47,17 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
   const [ordenActual, setOrdenActual] = useState(orden);
   const [guardandoConfirmacion, setGuardandoConfirmacion] = useState("");
   const rolActual = getUsuario()?.rol;
-  const puedeEditar = ["admin", "asistente"].includes(rolActual);
+  const puedeEditar = ["admin", "asistente", "facturacion", "jefatura"].includes(rolActual);
+  // Anular un documento queda reservado a Admin, Facturación y Jefatura.
+  const puedeAnular = ["admin", "facturacion", "jefatura"].includes(rolActual);
+  const cadenaCerrada = bloqueadoPorCadenaCerrada(orden.estadoCadena, rolActual);
   const puedeConfirmarHesActa = ["admin", "asistente", "facturacion", "jefatura"].includes(rolActual);
-  // Crear Factura: solo Facturación, Jefatura y Admin — Asistente ya no
-  // puede (mismo gate que backend puedeEditar en routes/facturas.js).
-  const puedeCrearFacturaRol = ["admin", "facturacion", "jefatura"].includes(rolActual);
+  // Generar factura es libre (ya no exige confirmar HES/Acta antes) y queda
+  // exclusivo para Facturación y Jefatura — Admin ya no puede (mismo gate en
+  // el backend, POST /facturas puedeCrear en routes/facturas.js).
+  const puedeCrearFacturaRol = ["facturacion", "jefatura"].includes(rolActual);
   const exigeHes  = !!ordenActual.empresa?.requiereHes;
   const exigeActa = !!ordenActual.empresa?.requiereActaConformidad;
-  const puedeCrearFactura =
-    (!exigeHes  || ordenActual.hesConfirmado) &&
-    (!exigeActa || ordenActual.actaConformidadConfirmada);
 
   const confirmarHesActa = async (campo, valor) => {
     setGuardandoConfirmacion(campo);
@@ -200,8 +201,8 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
                   <Chip className="mt-0.5 bg-white/20 text-white">{factura.estadoPago}</Chip>
                 )}
               </div>
-              {!orden.anulado && puedeEditar && <BotonAnular onAnular={anular} />}
-              {!orden.anulado && puedeEditar && (
+              {!orden.anulado && !cadenaCerrada && puedeAnular && <BotonAnular onAnular={anular} />}
+              {!orden.anulado && !cadenaCerrada && puedeEditar && (
                 <button onClick={guardar} disabled={guardando}
                   className="bg-white text-blue-700 text-sm px-5 py-2 rounded-lg hover:bg-blue-50 disabled:opacity-60 transition font-semibold shadow-sm shrink-0">
                   {guardando ? "Guardando…" : "Guardar cambios"}
@@ -243,11 +244,6 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
                   )}
                 </label>
               )}
-              {!puedeCrearFactura && (
-                <span className="text-xs text-amber-200 ml-auto">
-                  {exigeHes && exigeActa ? "Ambos requisitos deben marcarse" : "Este requisito debe marcarse"} antes de generar la factura.
-                </span>
-              )}
             </div>
           </div>
         )}
@@ -265,7 +261,7 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
         <div className="max-w-6xl mx-auto px-8 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
 
           {/* Datos editables */}
-          <fieldset disabled={orden.anulado || !puedeEditar} className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5 self-start">
+          <fieldset disabled={orden.anulado || cadenaCerrada || !puedeEditar} className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5 self-start">
             <div className="flex items-center gap-2">
               <span className="w-1.5 h-5 rounded-full bg-blue-500" />
               <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Datos de la orden</h2>
@@ -273,6 +269,12 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
 
             {orden.anulado && (
               <BannerAnulado motivo={orden.motivoAnulacion} por={orden.anuladoPor} fecha={orden.fechaAnulacion} />
+            )}
+
+            {!orden.anulado && cadenaCerrada && (
+              <p className="text-xs text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                La cadena de este documento está cerrada (factura pagada) — de solo lectura. Solo Jefatura puede editarlo.
+              </p>
             )}
 
             <div className="grid grid-cols-2 gap-4">
@@ -422,14 +424,11 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
 
             <TarjetaRelacion tipo="factura" codigo={factura?.codigo} numero={factura?.numeroFactura} vacio={!factura}
               onClick={factura ? abrirFactura : undefined} cargando={cargandoFactura}
-              onCrear={!factura && !orden.anulado && puedeCrearFactura && puedeCrearFacturaRol ? () => setCrearFacturaOpen(true) : undefined} crearLabel="Factura">
+              onCrear={!factura && !orden.anulado && puedeCrearFacturaRol ? () => setCrearFacturaOpen(true) : undefined} crearLabel="Factura">
               {(factura?.totalAPagar || factura?.total) > 0 && (
                 <p className="text-xs text-gray-500">{money(factura.totalAPagar ?? factura.total)}</p>
               )}
               {factura?.estadoPago && <Chip className={badgePago(factura.estadoPago)}>{factura.estadoPago}</Chip>}
-              {!factura && !puedeCrearFactura && (
-                <p className="text-xs text-amber-600">Pendiente confirmar HES y Acta de Conformidad</p>
-              )}
             </TarjetaRelacion>
           </section>
         </div>

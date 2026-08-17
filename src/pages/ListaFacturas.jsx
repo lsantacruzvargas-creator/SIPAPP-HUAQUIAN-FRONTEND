@@ -56,7 +56,48 @@ const compararTexto = (na, nb) => {
   return String(nb).localeCompare(String(na));
 };
 
-function TablaFacturas({ titulo, acento, facturas, onSelect, handlePagoCheck, handleCuotaPagoCheck, vacioMsg }) {
+// Campo numérico (reemplaza el checkbox "Pagado") — permite anotar un pago
+// parcial, no solo todo-o-nada. Se confirma con el botón ✓ (no dispara el
+// PATCH en cada tecla); el estado agregado (badge de arriba) se deriva del
+// monto en `handlePagoMonto`.
+function CeldaMontoPagado({ factura, rolActual, handlePagoMonto }) {
+  const [monto, setMonto] = useState(String(factura.montoPagado ?? 0));
+  const [guardando, setGuardando] = useState(false);
+  // Re-sincroniza el input si `montoPagado` cambia por fuera (guardado
+  // exitoso o reversión tras error) — ajuste durante el render en vez de un
+  // efecto, patrón recomendado por React para "adjusting state on prop change".
+  const [montoPrevio, setMontoPrevio] = useState(factura.montoPagado);
+  if (factura.montoPagado !== montoPrevio) {
+    setMontoPrevio(factura.montoPagado);
+    setMonto(String(factura.montoPagado ?? 0));
+  }
+
+  const bloqueada = factura.estadoPago === "pagado" && rolActual !== "admin";
+  const disabled = factura.anulado || !(Number(factura.totalAPagar) > 0) || bloqueada;
+  const cambiado = Number(monto) !== Number(factura.montoPagado ?? 0);
+
+  const confirmar = async () => {
+    setGuardando(true);
+    await handlePagoMonto(factura._id, monto);
+    setGuardando(false);
+  };
+
+  return (
+    <div className="flex items-center gap-1"
+      title={factura.anulado ? "Factura anulada" : !(Number(factura.totalAPagar) > 0) ? "Sin monto a pagar" : bloqueada ? "Solo un administrador puede deshacer un pago" : undefined}>
+      <input type="number" min="0" step="0.01" value={monto} disabled={disabled}
+        onChange={e => setMonto(e.target.value)}
+        onKeyDown={e => { if (e.key === "Enter" && cambiado) confirmar(); }}
+        className="w-20 border border-gray-200 rounded-lg px-1.5 py-1 text-xs text-right disabled:opacity-40 disabled:cursor-not-allowed" />
+      <button type="button" onClick={confirmar} disabled={disabled || guardando || !cambiado}
+        className="text-xs text-emerald-600 hover:text-emerald-800 disabled:opacity-30 disabled:cursor-not-allowed font-semibold px-1">
+        {guardando ? "…" : "✓"}
+      </button>
+    </div>
+  );
+}
+
+function TablaFacturas({ titulo, acento, facturas, onSelect, handlePagoMonto, handleCuotaPagoCheck, vacioMsg }) {
   const rolActual = getUsuario()?.rol;
   // Las anuladas siguen visibles en la tabla, pero no cuentan en los totales
   const noAnuladas = facturas.filter(f => !f.anulado);
@@ -159,21 +200,9 @@ function TablaFacturas({ titulo, acento, facturas, onSelect, handlePagoCheck, ha
                           </DotChip>
                           {tieneCuotas ? (
                             <span className="text-[11px] text-gray-400">Marca cada cuota abajo</span>
-                          ) : (() => {
-                            const bloqueada = f.estadoPago === "pagado" && rolActual !== "admin";
-                            const disabled = f.anulado || !(Number(f.totalAPagar) > 0) || bloqueada;
-                            return (
-                              <label className={`flex items-center gap-1.5 text-xs text-gray-500 select-none ${disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
-                                title={f.anulado ? "Factura anulada" : !(Number(f.totalAPagar) > 0) ? "Sin monto a pagar" : bloqueada ? "Solo un administrador puede deshacer un pago" : undefined}>
-                                <input type="checkbox"
-                                  checked={f.estadoPago === "pagado"}
-                                  disabled={disabled}
-                                  onChange={e => handlePagoCheck(f._id, e.target.checked)}
-                                  className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-400" />
-                                Pagado
-                              </label>
-                            );
-                          })()}
+                          ) : (
+                            <CeldaMontoPagado factura={f} rolActual={rolActual} handlePagoMonto={handlePagoMonto} />
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -321,23 +350,32 @@ export default function ListaFacturas() {
     return new Date(b.fechaEmision) - new Date(a.fechaEmision);
   });
 
-  const handlePagoCheck = async (id, pagada) => {
+  // Campo numérico (no checkbox): el usuario anota cuánto se pagó hasta
+  // ahora — puede ser parcial. `estadoPago` se deriva del monto igual que en
+  // el backend (routes/facturas.js /estado-pago): 0 = sin pago, entre 0 y el
+  // total = pago parcial, >= total = pagado.
+  const handlePagoMonto = async (id, montoIngresado) => {
     const factura = facturas.find(f => f._id === id);
     if (!factura) return;
 
-    if (pagada) {
-      if (!window.confirm("¿Confirmas marcar esta factura como pagada?")) return;
-    } else if (getUsuario()?.rol !== "admin") {
-      alert("Solo un administrador puede deshacer un pago.");
+    const totalAPagar = Number(factura.totalAPagar) || 0;
+    const pago = Math.max(0, Number(montoIngresado) || 0);
+    const estadoPagoAnterior = factura.estadoPago;
+    let estadoPago = "sin pago";
+    if (pago > 0 && pago < totalAPagar) estadoPago = "pago parcial";
+    if (totalAPagar > 0 && pago >= totalAPagar) estadoPago = "pagado";
+
+    if (estadoPagoAnterior === "pagado" && estadoPago !== "pagado" && getUsuario()?.rol !== "admin") {
+      alert("Solo un administrador puede deshacer un pago ya confirmado.");
       return;
     }
+    if (estadoPago === "pagado" && estadoPagoAnterior !== "pagado") {
+      if (!window.confirm("¿Confirmas marcar esta factura como pagada?")) return;
+    }
 
-    const totalAPagar = Number(factura.totalAPagar) || 0;
-    const pago = pagada ? totalAPagar : 0;
-    const estadoPago = pagada ? "pagado" : "sin pago";
     // Al pagar se cierra toda la cadena (Cotización/OT/Informe/OC/Factura); se
     // refleja de inmediato en memoria, el backend hace lo mismo en la BD.
-    const estadoCadena = pagada ? "cerrado" : "abierto";
+    const estadoCadena = estadoPago === "pagado" ? "cerrado" : "abierto";
     const previo = {
       montoPagado: factura.montoPagado,
       estadoPago: factura.estadoPago,
@@ -360,7 +398,7 @@ export default function ListaFacturas() {
     }
   };
 
-  // Igual que handlePagoCheck pero por cuota — el agregado (montoPagado/
+  // Igual que handlePagoMonto pero por cuota — el agregado (montoPagado/
   // estadoPago) se recalcula acá en espejo de lo que hace el backend
   // (Backend/src/routes/facturas.js:/:id/cuotas/:cuotaId/pagar), no se
   // reemplaza la factura completa con la respuesta del server para no perder
@@ -512,7 +550,7 @@ export default function ListaFacturas() {
         acento="bg-emerald-500"
         facturas={abiertas}
         onSelect={setSeleccionada}
-        handlePagoCheck={handlePagoCheck}
+        handlePagoMonto={handlePagoMonto}
         handleCuotaPagoCheck={handleCuotaPagoCheck}
         vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin facturas registradas"}
       />
@@ -522,7 +560,7 @@ export default function ListaFacturas() {
         acento="bg-gray-500"
         facturas={cerradas}
         onSelect={setSeleccionada}
-        handlePagoCheck={handlePagoCheck}
+        handlePagoMonto={handlePagoMonto}
         handleCuotaPagoCheck={handleCuotaPagoCheck}
         vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin facturas cerradas"}
       />

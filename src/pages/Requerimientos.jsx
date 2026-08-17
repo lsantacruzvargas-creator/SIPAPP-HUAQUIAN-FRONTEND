@@ -23,11 +23,17 @@ function PanelSalida({ requerimientoId, item, onClose, onListo }) {
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
 
+  // Ítem de stock existente: usa `item.material`. Ítem de compra ya vinculado
+  // a un SKU: usa `item.materialAsociado` — mismo flujo de Atender para ambos.
+  const materialId = item.esSolicitudCompra
+    ? (item.materialAsociado?._id || item.materialAsociado)
+    : item.material._id;
+
   useEffect(() => {
-    fetchAuth(`/movimientos-almacen/lotes/${item.material._id}`)
+    fetchAuth(`/movimientos-almacen/lotes/${materialId}`)
       .then((r) => r.ok ? r.json() : [])
       .then(setLotes);
-  }, [item.material._id]);
+  }, [materialId]);
 
   const seleccionarLote = (l) => { setLote(l.lote); setPrecioAuto(l.precioUnitario); };
 
@@ -87,6 +93,7 @@ function PanelSalida({ requerimientoId, item, onClose, onListo }) {
 // ─── Devolución de un ítem ya atendido: registra un INGRESO en Movimientos ──
 
 function PanelDevolucion({ requerimientoId, item, onClose, onListo }) {
+  const unidad = item.esSolicitudCompra ? item.materialAsociado?.unidad : item.material?.unidad;
   const maxDevolvible = item.cantidad - (item.cantidadDevuelta || 0);
   const [cantidad, setCantidad] = useState(maxDevolvible);
   const [guardando, setGuardando] = useState(false);
@@ -112,7 +119,7 @@ function PanelDevolucion({ requerimientoId, item, onClose, onListo }) {
   return (
     <div className="bg-red-50/60 rounded-xl p-3 mt-2 space-y-2">
       {error && <p className="text-xs text-red-500 bg-red-50 px-2 py-1 rounded">{error}</p>}
-      <p className="text-xs text-gray-500">Disponible para devolver: <strong>{maxDevolvible}</strong> {item.material?.unidad}</p>
+      <p className="text-xs text-gray-500">Disponible para devolver: <strong>{maxDevolvible}</strong> {unidad}</p>
       <div className="flex items-center gap-2">
         <input type="number" min={0.01} max={maxDevolvible} step="any" value={cantidad} onChange={(e) => setCantidad(e.target.value)}
           className="w-24 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-right bg-white" />
@@ -132,6 +139,7 @@ function FilaItem({ requerimiento, item, puedeAtender, onActualizado }) {
   const [panelSalida, setPanelSalida] = useState(false);
   const [panelDevolucion, setPanelDevolucion] = useState(false);
   const [buscadorAbierto, setBuscadorAbierto] = useState(false);
+  const unidad = item.esSolicitudCompra ? item.materialAsociado?.unidad : item.material?.unidad;
 
   const accion = async (endpoint, body) => {
     const r = await fetchAuth(`/requerimientos/${requerimiento._id}/items/${item._id}/${endpoint}`, {
@@ -178,10 +186,10 @@ function FilaItem({ requerimiento, item, puedeAtender, onActualizado }) {
         <span className={`px-2 py-0.5 rounded-full text-xs font-semibold shrink-0 ${ESTADO_ITEM[item.estado]}`}>
           {item.estado}
         </span>
-        {puedeAtender && item.estado === "pendiente" && !item.esSolicitudCompra && (
+        {puedeAtender && item.estado === "pendiente" && (!item.esSolicitudCompra || item.materialAsociado) && (
           <button onClick={() => setPanelSalida((v) => !v)}
             className="text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-lg hover:bg-emerald-100 transition font-medium shrink-0">
-            Salida
+            Atender
           </button>
         )}
         {puedeAtender && item.estado === "pendiente" && item.esSolicitudCompra && !item.materialAsociado && (
@@ -190,18 +198,12 @@ function FilaItem({ requerimiento, item, puedeAtender, onActualizado }) {
             Vincular SKU
           </button>
         )}
-        {puedeAtender && item.estado === "pendiente" && item.esSolicitudCompra && item.materialAsociado && (
-          <button onClick={() => accion("cerrar")}
-            className="text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-lg hover:bg-emerald-100 transition font-medium shrink-0">
-            Cerrar
-          </button>
-        )}
         {puedeAtender && item.estado === "pendiente" && (
           <button onClick={rechazar} className="text-xs text-gray-400 hover:text-red-500 transition shrink-0">
             Rechazar
           </button>
         )}
-        {puedeAtender && item.estado === "atendido" && !item.esSolicitudCompra && item.movimientoAlmacen && (
+        {puedeAtender && item.estado === "atendido" && item.movimientoAlmacen && (
           <button onClick={() => setPanelDevolucion((v) => !v)}
             disabled={item.cantidad - (item.cantidadDevuelta || 0) <= 0}
             className="text-xs bg-red-50 text-red-700 px-2.5 py-1 rounded-lg hover:bg-red-100 disabled:opacity-40 disabled:cursor-not-allowed transition font-medium shrink-0">
@@ -210,7 +212,7 @@ function FilaItem({ requerimiento, item, puedeAtender, onActualizado }) {
         )}
       </div>
       {item.cantidadDevuelta > 0 && (
-        <p className="text-xs text-red-500 mt-1">Devuelto: {item.cantidadDevuelta} {item.material?.unidad}</p>
+        <p className="text-xs text-red-500 mt-1">Devuelto: {item.cantidadDevuelta} {unidad}</p>
       )}
 
       {panelSalida && (

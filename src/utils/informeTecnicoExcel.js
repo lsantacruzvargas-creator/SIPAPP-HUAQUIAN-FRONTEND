@@ -147,258 +147,279 @@ async function restaurarMetadatosDePagina(bufferPlantillaOriginal, bufferExporta
   return zipSalida.generateAsync({ type: "arraybuffer" });
 }
 
-// Direcciones de celda mapeadas celda-por-celda contra las plantillas reales
-// (dumps exhaustivos con la librería xlsx sobre los archivos de
-// Frontend/informes/, cruzando la versión rellenada de ejemplo con la
-// versión en blanco para separar etiqueta de valor). "bombas" y
-// "protocolo_jaula_ardilla" están verificados contra un caso real relleno
-// (alta confianza). "bobina_estator_mtto"/"bobina_estator_rebo" se derivan
-// de los merges de la plantilla en blanco (alta confianza en encabezado y
-// tablas; los 6 valores de "megadoBobina" son mejor esfuerzo porque esa
-// zona es un gráfico de megado, no una celda simple). "tecnico_mantenimiento"
-// usa la plantilla construida desde cero en esta sesión, así que es exacta
-// por diseño. Un campo/ítem/celda que no aparece acá simplemente no tiene
-// posición conocida en la plantilla — su valor igual se garantiza en el
-// bloque "DATOS CAPTURADOS" que se anexa más abajo.
+// Direcciones de celda de las 13 plantillas nuevas de
+// Frontend/public/informes-templates/ (reemplazo completo del set anterior
+// de 5 tipos — ver Backend/src/models/InformeTecnico.js). Mapeadas leyendo
+// cada plantilla real con exceljs (celdas + merges) y verificadas de forma
+// programática contra los archivos reales: un script cargó cada .xlsx y
+// confirmó que cada celda mapeada cae dentro de la sección correcta (no
+// sobre un rótulo/encabezado impreso). El bloque "Datos generales"
+// (encabezado), "Datos del equipo" y el checklist principal de cada tipo
+// tienen alta confianza. Quedan sin mapear a propósito — y por lo tanto
+// caen al bloque "DATOS CAPTURADOS" anexado más abajo, nunca se pierden —
+// los campos secundarios que no se pudieron ubicar con certeza sin abrir
+// el archivo en Excel (algunas tablas de medición y el protocolo de
+// prueba de arrancador/variador/ups), y prácticamente todo el checklist de
+// "servomotor" (la plantilla más grande, ~90 ítems — solo se mapeó el
+// encabezado y los datos del equipo).
+// Un campo/ítem/celda que no aparece acá simplemente no tiene posición
+// conocida en la plantilla — su valor igual se garantiza en el bloque
+// "DATOS CAPTURADOS" que se anexa más abajo.
+// Encabezado "INFORME DE SERVICIO" (D3..D11) — idéntico en las 9 columnas
+// D..I de las 13 plantillas nuevas (Frontend/public/informes-templates/),
+// solo cambia el ancho de página (algunas llegan a F, otras a I) pero la
+// celda de INICIO de cada campo es siempre la misma. `categoria` (celda
+// C9/D9) en varias plantillas trae impreso un valor fijo ("VARIADORES",
+// "PANEL"...) — si el técnico no lo toca, `escribir()` no sobrescribe la
+// celda (ignora valores vacíos) y ese texto impreso queda tal cual.
+const CAMPOS_ENCABEZADO_SERVICIO = {
+  empresa: "D3", contacto: "D4", ordenCompra: "D5", cot: "D6",
+  lineaArea: "D7", descripcion: "D8", categoria: "D9", cantidad: "D10", fecha: "D11",
+};
+const CAMPOS_ENCABEZADO_SOPORTE = { ...CAMPOS_ENCABEZADO_SERVICIO, fechaInicio: "D11", fechaTermino: "D12" };
+delete CAMPOS_ENCABEZADO_SOPORTE.fecha;
+
+// "DATOS DEL EQUIPO" — layout de 9 columnas (C..I) que se repite igual en
+// tarjetas/pc/panel/adicional/plc/arrancador/variador_reparacion/ups. La
+// fila 14 trae los RÓTULOS (EQUIPO/MARCA, MODELO, CODIGO, TAG, POTENCIA,
+// S/N) — el dato en sí va en la fila 15, justo debajo (confirmado
+// programáticamente: la primera versión de este mapeo apuntaba a la fila
+// 14 por error y el script de verificación encontró el texto del rótulo
+// en vez de una celda vacía).
+const CAMPOS_EQUIPO_9COL = {
+  equipoMarca: "C15", modelo: "D15", codigo: "E15", tag: "G15", potencia: "H15", serie: "I15",
+  observacionIngreso: "E16",
+};
+
 const MAPEOS = {
-  bombas: {
-    // Remapeado el 2026-07-22 (segunda vez): la plantilla recibió otro
-    // ajuste de encabezado/pie que eliminó la columna decorativa de
-    // numeración (antes B) — todo el contenido real corrió 1 columna a la
-    // izquierda, MISMA fila (verificado celda por celda contra los merges
-    // actuales). La sección de evidencias además corrió +1 fila.
+  suministro: {
     campos: {
-      cliente: "F12", equipo: "F13", referencia: "AH12", ot: "AW12", nGuia: "AG13",
-      oc: "AS13", indicacionesCliente: "L14", recepcion: "AT14",
-      marca: "G18", modelo: "G19", hp: "G20", nSerie: "G21", rpm: "G22", peso: "G23",
+      ...CAMPOS_ENCABEZADO_SERVICIO,
+      equipoMarca: "A15", modelo: "C15", potenciaComponente: "E15", cantidadComponente: "F15",
     },
     checklist: {
-      "2. Revisión mecánica": {
-        hechoPor: "I26", fecha: "X26",
+      "Checklist de verificación técnica": {
         items: {
-          tapasLT: "G30", tapasLOT: "O30", guarda: "G31", impulsor: "G32", acople: "G33",
-          contratapaLT: "I34", contratapaLOT: "P34", selloMecanico: "I35",
-          rodamientosLT: "I36", rodamientosLOT: "R36",
-          soportesEjeLT: "J37", soportesEjeLOT: "R37",
-          anilloLT: "H38", anilloLOT: "M38",
-          vRingLT: "G39", vRingLOT: "M39",
-          retenLT: "G40", retenLOT: "M40",
+          item1: "F47", item2: "F48", item3: "F49", item4: "F50", item5: "F51", item6: "F52", item7: "F53",
         },
       },
     },
-    bullets: {
-      observaciones: { col: "E", fila: 43, max: 20 },
-      resumenTrabajo: { col: "E", fila: 65, max: 10 },
-      recomendaciones: { col: "E", fila: 76, max: 3 },
-    },
-    evidencias: {
-      evidencias: ["D94", "U94", "AL94", "D115", "U115", "AL115", "D136", "U136", "AL136"],
-    },
-    footer: { hechoPor: "G79", vB: "AB79", fecha: "AY79" },
+    bullets: { recomendaciones: { col: "A", fila: 55, max: 2 } },
   },
 
-  protocolo_jaula_ardilla: {
-    // Los encabezados de las páginas de evidencias (G77/G150, AI77/AI150,
-    // etc.) son fórmulas ="=G4" etc. en la propia plantilla — se actualizan
-    // solas al escribir la celda principal, no hace falta repetirlas acá.
-    //
-    // Remapeado el 2026-07-21: la plantilla real recibió un encabezado
-    // nuevo que corrió +8 filas la mayor parte del bloque de datos/
-    // checklist/tablas/bullets/footer (verificado celda por celda contra
-    // los merges reales de Frontend/public/informes-templates/).
-    //
-    // Actualizado el 2026-07-22: el resto de la plantilla no volvió a
-    // moverse (mismas celdas que el remapeo anterior), pero el usuario
-    // reemplazó en la plantilla real el bloque "Datos de bobina
-    // (recepción)" por "Evaluación de núcleo magnético" (mismo lugar,
-    // filas 31-35, columnas E-AB) — el formulario en informesTecnicos.js
-    // se actualizó para reflejar los campos nuevos. Las evidencias también
-    // se reacomodaron: recepción +1 fila, salida +2 filas respecto al
-    // remapeo anterior.
+  soporte: {
     campos: {
-      cliente: "G12", equipo: "G13",
-      referencia: "AI12", ot: "AX12",
-      nGuia: "AH13", oc: "AT13",
-      indicacionesCliente: "M18", recepcion: "AU18",
-      marca: "G14", nSerie: "G15", codigo: "G16",
-      ip: "AA14", potenciaKw: "AD15", tensionV: "AC16", corrienteA: "AO14", cosphi: "AX14",
-      frecuenciaHz: "AP15", nSalidas: "AZ15", rpm: "AL16", conexion: "AZ16",
-      bornera: "AH17", cajaBornes: "W17", conexIngreso: "AX17",
-      tiempoPrueba: "K32", comentarios: "R33", voltajeInducido: "K33",
-      areaCalentamiento: "L34", kGauss: "H35",
-      conclusionRecepcion: "J29", conclusionVibracionRecepcion: "J42",
-      vNom: "G54", iNom: "Q54", conexionSal: "Z54",
-      rpmSalida: "G59", ivIn: "Y59",
+      ...CAMPOS_ENCABEZADO_SOPORTE,
+      tablero: "C14", marca: "C15", modelo: "C16", serie: "C17", codigo: "C18",
+      potencia: "C19", entrada: "C20", salida: "C21",
+    },
+    bullets: {
+      observacion: { col: "A", fila: 40, max: 4 },
+      conclusion: { col: "A", fila: 45, max: 4 },
+      recomendacion: { col: "A", fila: 50, max: 4 },
+    },
+  },
+
+  diagnostico_equipo: {
+    campos: {
+      ...CAMPOS_ENCABEZADO_SERVICIO,
+      equipoMarca: "C15", modelo: "D15", codigo: "E15", tag: "F15", potencia: "G15", serie: "H15",
+      observacionIngreso: "G16",
     },
     checklist: {
-      "4. Revisión mecánica": {
-        hechoPor: "AJ21", fecha: "AY21",
-        items: {
-          canalizacionMediante: "AM23",
-          posicionTrabajo: "AK25",
-          tapasLT: "AH26", tapasLOT: "AP26", fundaLOT: "AH27",
-          contratapaLT: "AS27", contratapaLOT: "AY27",
-          soportesEjeLT: "AJ28", soportesEjeLOT: "AP28",
-          ventiladorLOT: "AJ29", chaveta1: "AQ29",
-          cargaLT: "AH30", chaveta2: "AT30",
-          rodamientosLT: "AJ31", rodamientosLOT: "AS31",
-          anilloLanLT: "AH32", anilloLanLOT: "AN32",
-          vRingLT: "AH33", vRingLOT: "AN33",
-          retenLT: "AH34", retenLOT: "AN34",
-        },
-      },
-    },
-    tabla: {
-      aislamientoRecepcion: {
-        hechoPor: "J21", fecha: "Y21",
-        bornes1m__aMasa: "K25", bornes1m__entreFases: "T25",
-        bornes2m__aMasa: "N25", bornes2m__entreFases: "W25",
-        bornes3m__aMasa: "Q25", bornes3m__entreFases: "Z25",
-      },
-      resistenciaRecepcion: {
-        resistencia__c14: "K28", resistencia__c25: "Q28", resistencia__c36: "W28",
-      },
-      vibracionRecepcion: {
-        horizontal__lt: "L39", horizontal__lot: "R39",
-        vertical__lt: "L40", vertical__lot: "R40",
-        axial__lt: "L41", axial__lot: "R41",
-      },
-      aislamientoSalida: {
-        hechoPor: "J45", fecha: "Y45",
-        bornes1m__aMasa: "K49", bornes1m__entreFases: "T49",
-        bornes2m__aMasa: "N49", bornes2m__entreFases: "W49",
-        bornes3m__aMasa: "Q49", bornes3m__entreFases: "Z49",
-      },
-      resistenciaSalida: {
-        resistencia__c14: "K52", resistencia__c25: "Q52", resistencia__c36: "W52",
-      },
-      pruebaMotorTabla: {
-        tension__c12: "K57", tension__c23: "Q57", tension__c31: "W57",
-        amperaje__c12: "K58", amperaje__c23: "Q58", amperaje__c31: "W58",
+      "Checklist de verificación técnica": {
+        items: Object.fromEntries(Array.from({ length: 12 }, (_, i) => [`item${i + 1}`, `H${58 + i}`])),
       },
     },
     bullets: {
-      resumenTrabajo: { col: "F", fila: 63, max: 11 },
-      recomendaciones: { col: "F", fila: 76, max: 3 },
+      observacionFallas: { col: "A", fila: 71, max: 3 },
+      recomendacion: { col: "A", fila: 75, max: 4 },
     },
-    evidencias: {
-      evidenciasRecepcion: ["E94", "V94", "AM94", "E115", "V115", "AM115", "E136", "V136", "AM136"],
-      evidenciasSalida: ["E172", "V172", "AM172", "E193", "V193", "AM193", "E214", "V214", "AM214"],
-    },
-    footer: { hechoPor: "H79", vB: "AC79", fecha: "AZ79" },
+    // "Estado general" (carcasa/tarjeta/componentes/ventiladores), la
+    // medición de diodos IGBT, piezas a reemplazar y sus observaciones no
+    // quedaron con posición de celda confirmada sin abrir el archivo en
+    // Excel — caen al bloque anexo (no se pierde el dato, solo no queda en
+    // su celda "de papel").
   },
 
-  bobina_estator_mtto: {
-    // Remapeado el 2026-07-22: la plantilla real recibió un encabezado que
-    // corrió +1 fila (y en varios casos +2 columnas, ej. E→G) todo el
-    // bloque de datos/tabla/bullets (verificado celda por celda contra los
-    // merges reales de Frontend/public/informes-templates/).
+  diagnostico_servomotor: {
     campos: {
-      cliente: ["G12", "G76"], equipo: ["G11", "G75"], planta: ["V11", "V75"],
-      tecnico: ["V12", "V76"], ot: ["AI12", "AI76"],
-      marca: "G18", potencia: "G19", rpm: "G20", modelo: "G21", nEquipo: "G22",
-    },
-    tabla: {
-      // Zona de gráfico de megado en la plantilla real (no una grilla de
-      // celdas simple) — se ubica el valor capturado justo debajo de cada
-      // rótulo de fase como mejor esfuerzo. Remapeado el 2026-07-22: los
-      // rótulos de fase se corrieron +8 filas (95→103, 111→119, 127→135),
-      // así que estas posiciones "debajo del rótulo" también +8.
-      megadoBobina: {
-        fase1Tierra__valor: "B105", fase2Tierra__valor: "S105",
-        fase3Tierra__valor: "B121", fase12__valor: "S121",
-        fase23__valor: "B137", fase13__valor: "S137",
-      },
-    },
-    bullets: {
-      resumen: { col: "C", fila: 49, max: 7 },
-      recomendaciones: { col: "C", fila: 62, max: 3 },
-    },
-    // Esta plantilla no tiene ningún bloque "Hecho por/V.B./Fecha" impreso
-    // (confirmado revisando las 199 filas de la hoja) — la firma queda en
-    // el bloque anexo en vez de escribirse sobre celdas sin etiqueta.
-  },
-
-  bobina_estator_rebo: {
-    // Remapeado el 2026-07-22: mismo tipo de ajuste que en
-    // bobina_estator_mtto (encabezado nuevo, +1 fila en la mayoría de
-    // campos, columnas ligeramente distintas por cambios de ancho de
-    // etiqueta) — verificado celda por celda contra los merges reales.
-    //
-    // cliente/equipo/planta/tecnico/ot: solo la posición de la 1ra página
-    // (antes también escribía en una 2da posición, pensada como el
-    // encabezado repetido de la página 2 — pero esa zona quedó pegada al
-    // banner "MEGADO DE BOBINA" en la plantilla real y el dato se veía
-    // metido ahí; pedido explícito del usuario para que el encabezado solo
-    // aparezca en la primera hoja).
-    campos: {
-      cliente: "G12", equipo: "G11", planta: "V11",
-      tecnico: "V12", ot: "AI12",
-      marca: "H18", potencia: "H19", rpm: "H20", modelo: "H21", nEquipo: "H22",
-      pase: "F43", nSalidas: "P43", alambre: "G44", kgAlambre: "Q44",
-      vueltas: "G45", papelNomex: "Q45", conexion: "H46",
-      gruposBobinas: "K47", bobinasGrupo: "K48",
-    },
-    tabla: {
-      pruebasResistencia: { l14__valor: "I29", l36__valor: "O29", l25__valor: "I30", tierra__valor: "O30" },
-      aislamientoIngreso: {
-        fase12__valor: "I33", f1Tierra__valor: "O33",
-        fase23__valor: "I34", f2Tierra__valor: "O34",
-        fase31__valor: "I35", f3Tierra__valor: "O35",
-      },
-      aislamientoSalida: {
-        fase12__valor: "I38", f1Tierra__valor: "O38",
-        fase23__valor: "I39", f2Tierra__valor: "O39",
-        fase31__valor: "I40", f3Tierra__valor: "O40",
-      },
-    },
-    bullets: {
-      diagnostico: { col: "U", fila: 37, max: 5 },
-      conclusiones: { col: "U", fila: 43, max: 5 },
-    },
-    // Igual que en bobina_estator_mtto: no existe bloque de firma impreso
-    // en esta plantilla — queda en el bloque anexo.
-  },
-
-  // Plantilla real "CAJA REDUCTORA EN MTTO.xlsx" (encontrada por el usuario
-  // en Frontend/informes/) — reemplaza la plantilla que se había armado
-  // desde cero a partir del PDF. Mapeada celda por celda contra el XML
-  // crudo (estilo de cada celda), no contra un ejemplo relleno.
-  //
-  // Remapeado el 2026-07-21: igual que "bombas", esta plantilla recibió un
-  // encabezado nuevo que corrió +6 filas todo el bloque de datos/checklist/
-  // bullets/footer (verificado celda por celda, incluyendo merges, contra
-  // el dump de la plantilla actual en Frontend/public/informes-templates/).
-  tecnico_mantenimiento: {
-    campos: {
-      cliente: "G11", equipo: "G12", referencia: "AE11", ot: "AY11",
-      nGuia: "AE12", oc: "AU12", indicacionesCliente: "O15",
-      placa: "I18", marca: "I19", nSerie: "I20", tipoEquipo: "I21",
+      ...CAMPOS_ENCABEZADO_SERVICIO,
+      equipoMarca: "C15", modelo: "D15", codigo: "E15", tag: "F15", potencia: "G15", serie: "H15",
+      observacionIngreso: "G16",
     },
     checklist: {
-      "Revisión mecánica": {
-        hechoPor: "I24", fecha: "X24",
-        items: {
-          engranaje: "K25", ejeSinFin: "K26", tapasRodajes: "K27", rodamientos: "K28",
-          canalChavetero: "K29", chaveta: "K30", retenes: "K31", tapaCiega: "K32",
-        },
+      "Checklist de verificación técnica": {
+        items: Object.fromEntries(Array.from({ length: 13 }, (_, i) => [`item${i + 1}`, `H${52 + i}`])),
       },
     },
     bullets: {
-      observaciones: { col: "F", fila: 35, max: 3 },
-      procesoTrabajo: { col: "F", fila: 72, max: 3 },
-      recomendaciones: { col: "F", fila: 77, max: 1 },
+      observacionFallas: { col: "A", fila: 66, max: 3 },
+      actividadesARealizar: { col: "A", fila: 70, max: 4 },
     },
-    // El bloque "HECHO POR / V.B. / FECHA" se repite idéntico al final de
-    // cada una de las 4 páginas de la plantilla (80/160/240/320), pero acá
-    // NO son fórmulas que copian la fila 80 (a diferencia de "bombas" y
-    // "protocolo_jaula_ardilla", que sí usan "=H79") — son celdas sueltas e
-    // independientes, hay que escribir el mismo valor en las 4.
-    footer: {
-      hechoPor: ["I80", "I160", "I240", "I320"],
-      vB: ["AD80", "AD160", "AD240", "AD320"],
-      fecha: ["AZ80", "AZ160", "AZ240", "AZ320"],
+    // "Estado general" y piezas a reemplazar: mismo caso que en
+    // diagnostico_equipo, caen al anexo.
+  },
+
+  tarjetas: {
+    campos: { ...CAMPOS_ENCABEZADO_SERVICIO, ...CAMPOS_EQUIPO_9COL },
+    tabla: {
+      checklistTecnico: Object.fromEntries(
+        Array.from({ length: 8 }, (_, i) => [i, 49 + i]).flatMap(([i, fila]) => [
+          [`item${i + 1}__inicial`, `H${fila}`], [`item${i + 1}__final`, `I${fila}`],
+        ])
+      ),
     },
+    bullets: {
+      conclusiones: { col: "A", fila: 58, max: 2 },
+      recomendaciones: { col: "A", fila: 61, max: 2 },
+    },
+  },
+
+  pc: {
+    campos: { ...CAMPOS_ENCABEZADO_SERVICIO, ...CAMPOS_EQUIPO_9COL },
+    tabla: {
+      checklistTecnico: Object.fromEntries(
+        Array.from({ length: 9 }, (_, i) => [i, 70 + i]).flatMap(([i, fila]) => [
+          [`item${i + 1}__inicial`, `H${fila}`], [`item${i + 1}__final`, `I${fila}`],
+        ])
+      ),
+    },
+    bullets: {
+      conclusiones: { col: "A", fila: 80, max: 2 },
+      recomendaciones: { col: "A", fila: 83, max: 2 },
+    },
+  },
+
+  panel: {
+    campos: { ...CAMPOS_ENCABEZADO_SERVICIO, ...CAMPOS_EQUIPO_9COL },
+    tabla: {
+      checklistTecnico: Object.fromEntries(
+        Array.from({ length: 8 }, (_, i) => [i, 70 + i]).flatMap(([i, fila]) => [
+          [`item${i + 1}__inicial`, `H${fila}`], [`item${i + 1}__final`, `I${fila}`],
+        ])
+      ),
+    },
+    bullets: {
+      observaciones: { col: "A", fila: 79, max: 1 },
+      conclusiones: { col: "A", fila: 81, max: 2 },
+      recomendaciones: { col: "A", fila: 84, max: 2 },
+    },
+  },
+
+  adicional: {
+    campos: {
+      ...CAMPOS_ENCABEZADO_SERVICIO,
+      componenteMarca: "A15", componenteModelo: "B15", componentePotencia: "C15", componenteCantidad: "D15",
+      equipoMarca: "E15", equipoModelo: "F15", equipoPotencia: "G15", equipoCantidad: "H15",
+    },
+    checklist: {
+      "Checklist de verificación técnica": {
+        items: Object.fromEntries(Array.from({ length: 7 }, (_, i) => [`item${i + 1}`, `H${32 + i}`])),
+      },
+    },
+    bullets: { recomendaciones: { col: "A", fila: 40, max: 4 } },
+  },
+
+  plc: {
+    campos: { ...CAMPOS_ENCABEZADO_SERVICIO, ...CAMPOS_EQUIPO_9COL },
+    tabla: {
+      checklistTecnico: Object.fromEntries(
+        Array.from({ length: 8 }, (_, i) => [i, 70 + i]).flatMap(([i, fila]) => [
+          [`item${i + 1}__inicial`, `H${fila}`], [`item${i + 1}__final`, `I${fila}`],
+        ])
+      ),
+    },
+    bullets: {
+      observaciones: { col: "A", fila: 79, max: 1 },
+      conclusiones: { col: "A", fila: 81, max: 2 },
+      recomendaciones: { col: "A", fila: 84, max: 2 },
+    },
+  },
+
+  arrancador: {
+    campos: { ...CAMPOS_ENCABEZADO_SERVICIO, ...CAMPOS_EQUIPO_9COL },
+    tabla: {
+      medicionScr: {
+        scr1__gateAnode: "B101", scr1__gateCathode: "C101",
+        scr2__gateAnode: "B102", scr2__gateCathode: "C102",
+        scr3__gateAnode: "B103", scr3__gateCathode: "C103",
+      },
+      checklistTecnico: Object.fromEntries(
+        Array.from({ length: 13 }, (_, i) => [i, 108 + i]).flatMap(([i, fila]) => [
+          [`item${i + 1}__inicial`, `H${fila}`], [`item${i + 1}__final`, `I${fila}`],
+        ])
+      ),
+    },
+    bullets: {
+      observacionesScr: { col: "A", fila: 105, max: 1 },
+      observaciones: { col: "A", fila: 122, max: 1 },
+      conclusiones: { col: "A", fila: 124, max: 3 },
+      recomendaciones: { col: "A", fila: 128, max: 2 },
+    },
+    // Protocolo de prueba inicial/final y piezas a reemplazar: la zona de
+    // celdas (filas 19-33) corresponde a un bloque combinado más complejo
+    // que un input por fila — no se pudo confirmar la celda exacta de cada
+    // valor sin abrir el archivo en Excel. Caen al anexo.
+  },
+
+  variador_reparacion: {
+    campos: { ...CAMPOS_ENCABEZADO_SERVICIO, ...CAMPOS_EQUIPO_9COL },
+    tabla: {
+      medicionIgbtIngreso: { l1__dcMenos: "B101", l1__dcMas: "C101", l2__dcMenos: "B102", l2__dcMas: "C102", l3__dcMenos: "B103", l3__dcMas: "C103" },
+      medicionIgbtSalida: { u__dcMenos: "B105", u__dcMas: "C105", v__dcMenos: "B106", v__dcMas: "C106", w__dcMenos: "B107", w__dcMas: "C107" },
+      checklistTecnico: Object.fromEntries(
+        Array.from({ length: 12 }, (_, i) => [i, 112 + i]).flatMap(([i, fila]) => [
+          [`item${i + 1}__inicial`, `H${fila}`], [`item${i + 1}__final`, `I${fila}`],
+        ])
+      ),
+    },
+    bullets: {
+      observacionesIgbt: { col: "A", fila: 109, max: 1 },
+      observaciones: { col: "A", fila: 125, max: 1 },
+      conclusiones: { col: "A", fila: 127, max: 3 },
+      recomendaciones: { col: "A", fila: 131, max: 2 },
+    },
+  },
+
+  ups: {
+    campos: { ...CAMPOS_ENCABEZADO_SERVICIO, ...CAMPOS_EQUIPO_9COL },
+    tabla: {
+      medicionBaterias: Object.fromEntries(
+        Array.from({ length: 10 }, (_, i) => [i, 101 + i]).flatMap(([i, fila]) => [
+          [`bateria${i + 1}__nominal`, `B${fila}`], [`bateria${i + 1}__real`, `C${fila}`],
+        ])
+      ),
+      checklistTecnico: Object.fromEntries(
+        Array.from({ length: 12 }, (_, i) => [i, 114 + i]).flatMap(([i, fila]) => [
+          [`item${i + 1}__inicial`, `H${fila}`], [`item${i + 1}__final`, `I${fila}`],
+        ])
+      ),
+    },
+    bullets: {
+      observaciones: { col: "A", fila: 127, max: 1 },
+      conclusiones: { col: "A", fila: 129, max: 3 },
+      recomendaciones: { col: "A", fila: 133, max: 2 },
+    },
+  },
+
+  // La plantilla más grande y compleja del set (489 filas, ~90 ítems de
+  // checklist repartidos en 4 sub-checklists + tablas de mediciones
+  // eléctricas/mecánicas + tolerancias EASA AR100). Solo se mapeó con
+  // confianza el bloque superior (encabezado + datos del equipo); el resto
+  // de las ~90 celdas de checklist y las tablas de medición necesitan
+  // verificación visual contra el Excel real antes de mapearse — todos esos
+  // campos SÍ existen en el formulario de la app, solo caen al bloque anexo
+  // al exportar en vez de quedar en su celda exacta de la plantilla.
+  servomotor: {
+    campos: {
+      ...CAMPOS_ENCABEZADO_SERVICIO,
+      equipoMarca: "C15", modelo: "D15", tag: "E15", potencia: "F15", voltaje: "G15", rpm: "H15", serie: "I15",
+    },
+    // "Operario"/"Observación de ingreso" (fila 16) no tienen una celda de
+    // input distinguible del rótulo en esta plantilla (D16:I16 es todo el
+    // rótulo "OBSERVACION" fusionado, sin una celda en blanco aparte) —
+    // caen al anexo, igual que el resto del formulario de este tipo.
   },
 };
 
@@ -407,7 +428,12 @@ const MAPEOS = {
 // — pedido explícito del usuario para que en el Excel de bobina de estator
 // solo queden las imágenes, sin texto sobrante debajo. Las fotos en sí se
 // siguen insertando igual (esa inserción no depende de este bloque).
-const SIN_TEXTO_ANEXO_EVIDENCIAS_FIRMA = new Set(["bobina_estator_mtto", "bobina_estator_rebo"]);
+//
+// Ninguno de los 13 tipos nuevos lo necesita: ninguna de sus plantillas
+// trae impreso un bloque "HECHO POR / V.B. / FECHA", así que la firma cae
+// al anexo por diseño (mismo comportamiento que cualquier campo sin celda
+// mapeada) — no hace falta la excepción.
+const SIN_TEXTO_ANEXO_EVIDENCIAS_FIRMA = new Set([]);
 
 // Para campos/checklist/tabla, una sección puede tener SOLO ALGUNOS de sus
 // elementos mapeados (ej. un ítem de checklist sin celda propia en la
@@ -584,10 +610,10 @@ export async function exportarInformeTecnicoExcel(informe, ot) {
   });
 
   // Firma: si la plantilla de este tipo no tiene un bloque de "Hecho por /
-  // V.B. / Fecha" (ej. bobina_estator_mtto/rebo no lo traen), no se pierde
-  // el dato — cae acá igual que cualquier otro campo sin celda mapeada.
-  // Excepción: bobina_estator_mtto/rebo la omiten a propósito (ver
-  // SIN_TEXTO_ANEXO_EVIDENCIAS_FIRMA).
+  // V.B. / Fecha" impreso (ninguna de las 13 plantillas nuevas lo trae), no
+  // se pierde el dato — cae acá igual que cualquier otro campo sin celda
+  // mapeada. SIN_TEXTO_ANEXO_EVIDENCIAS_FIRMA permite excluir un tipo de
+  // este texto anexo puntualmente si algún tipo lo pidiera más adelante.
   if (!SIN_TEXTO_ANEXO_EVIDENCIAS_FIRMA.has(informe.tipo)) {
     const faltanFirma = [];
     if (!mapa.footer?.hechoPor) faltanFirma.push(["Hecho por", informe.hechoPor || ""]);
@@ -612,8 +638,7 @@ export async function exportarInformeTecnicoExcel(informe, ot) {
   }
 
   // Fotos: se insertan apiladas verticalmente 4 columnas a la derecha de la
-  // última columna real de la plantilla (ej. en "bombas" la última es BC,
-  // así que las fotos anclan en BG), fuera del área impresa, en vez de en
+  // última columna real de la plantilla, fuera del área impresa, en vez de en
   // la columna B como antes — el usuario las arrastra a su lugar final en
   // Excel. Se calcula en base a ws.dimensions.right (última columna con
   // contenido real) en vez de hardcodear "BC" porque cada plantilla tiene

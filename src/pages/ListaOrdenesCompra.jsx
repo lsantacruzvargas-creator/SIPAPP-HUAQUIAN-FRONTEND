@@ -127,6 +127,9 @@ function TablaOC({
                       <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full uppercase tracking-wide whitespace-nowrap ${o.cotizacion?.enviado ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
                         {o.cotizacion?.enviado ? "Enviada" : "No enviada"}
                       </span>
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full uppercase tracking-wide whitespace-nowrap ${o.cotizacion?.informeEnviado ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                        {o.cotizacion?.informeEnviado ? "Informe enviado" : "Informe no enviado"}
+                      </span>
                     </div>
                   </td>
                   <td className="px-4 py-3.5 text-center">
@@ -386,6 +389,7 @@ export default function ListaOrdenesCompra() {
       "Total (US$)":        usd != null ? usd.toFixed(2) : "—",
       "Aprobado":           o.cotizacion?.aprobado ? "Aprobada" : "Pendiente",
       "Enviado":            o.cotizacion?.enviado ? "Enviada" : "No enviada",
+      "Informe enviado":    o.cotizacion?.informeEnviado ? "Enviado" : "No enviado",
       "Estado":             grupoOT?.parent?.estado || "Sin OT",
       "Estado Informes":    grupoOT?.parent?.estadoInformes || "—",
       "GRE":                (grupoOT?.parent && greMap[grupoOT.parent._id]) || "Sin GRE",

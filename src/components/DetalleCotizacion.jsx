@@ -8,7 +8,7 @@ import BuscadorOrdenTrabajo from "./BuscadorOrdenTrabajo";
 import TablaItemsCotizacion from "./TablaItemsCotizacion";
 import {
   FlujoNegocio, TarjetaRelacion, Chip,
-  badgePago, badgeOT, money, BotonAnular, BannerAnulado,
+  badgePago, badgeOT, money, BotonAnular, BannerAnulado, bloqueadoPorCadenaCerrada,
 } from "./detalleShared";
 
 const INP = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 w-full transition";
@@ -59,13 +59,24 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   const [seleccionados, setSeleccionados] = useState(() => new Set());
   const [generandoOT, setGenerandoOT] = useState(false);
   const rolActual = getUsuario()?.rol;
-  const puedeEditar = ["admin", "asistente"].includes(rolActual);
+  const puedeEditar = ["admin", "asistente", "facturacion", "jefatura"].includes(rolActual);
+  // Anular un documento queda reservado a Admin, Facturación y Jefatura.
+  const puedeAnular = ["admin", "facturacion", "jefatura"].includes(rolActual);
+  // Precios: información sensible, solo Admin/Facturación/Jefatura los ven —
+  // ni Asistente ni Planner, aunque puedan editar/ver el resto de la cotización.
+  const puedeVerPrecios = ["admin", "facturacion", "jefatura"].includes(rolActual);
   const puedeAprobar = ["admin", "jefatura"].includes(rolActual);
   const puedeEnviar = ["admin", "asistente"].includes(rolActual);
+  const puedeConfirmarInformeEnviado = ["admin", "asistente", "facturacion", "jefatura"].includes(rolActual);
   // Asistente solo puede enviar cotizaciones ya aprobadas — Admin conserva
   // la potestad de enviar sin esperar la aprobación (ver mismo criterio en
   // el backend, PATCH /cotizaciones/:id/enviar).
   const bloqueadoPorAprobacion = rolActual === "asistente" && !cot.aprobado;
+  // A diferencia de la aprobación, aquí SÍ se bloquea a todos los roles
+  // (incluido Admin): el informe no puede confirmarse como enviado antes
+  // de que la cotización misma se haya enviado.
+  const bloqueadoPorInforme = !cot.enviado;
+  const cadenaCerrada = bloqueadoPorCadenaCerrada(cot.estadoCadena, rolActual);
 
   const cargarRelaciones = () => {
     Promise.all([
@@ -307,6 +318,19 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
     }
   };
 
+  const toggleInformeEnviado = async () => {
+    const res = await fetchAuth(`/cotizaciones/${cot._id}/informe-enviado`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ informeEnviado: !cot.informeEnviado }),
+    });
+    if (res.ok) {
+      const actualizada = await res.json();
+      setCot(actualizada);
+      onGuardada?.(actualizada);
+    }
+  };
+
   const ultimo = informes[informes.length - 1];
 
   const pasos = [
@@ -341,61 +365,20 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
           </div>
           <div className="flex items-center gap-4">
             <div className="text-right">
-              <p className="text-[10px] text-white/60 uppercase tracking-widest leading-none">Total</p>
-              <p className="text-lg font-bold leading-tight">{money(cot.total, cot.moneda)}</p>
+              {puedeVerPrecios && (
+                <>
+                  <p className="text-[10px] text-white/60 uppercase tracking-widest leading-none">Total</p>
+                  <p className="text-lg font-bold leading-tight">{money(cot.total, cot.moneda)}</p>
+                </>
+              )}
               <Chip className="mt-0.5 bg-white/20 text-white">{cot.tipo}</Chip>
             </div>
-            {!cot.anulado && (
-              <div className="text-right">
-                <p className="text-[10px] text-white/60 uppercase tracking-widest leading-none">Aprobación</p>
-                {puedeAprobar ? (
-                  <label className="flex items-center gap-1.5 justify-end mt-0.5 cursor-pointer select-none">
-                    <input type="checkbox" checked={cot.aprobado} onChange={toggleAprobar} className="w-4 h-4" />
-                    <span className="text-sm font-medium">{cot.aprobado ? "Aprobada" : "Pendiente"}</span>
-                  </label>
-                ) : (
-                  <Chip className={`mt-0.5 ${cot.aprobado ? "bg-green-500/40 text-white" : "bg-white/20 text-white"}`}>
-                    {cot.aprobado ? "Aprobada" : "Pendiente"}
-                  </Chip>
-                )}
-                {cot.aprobado && cot.aprobadoPor && (
-                  <p className="text-[10px] text-white/60 leading-tight mt-0.5">
-                    {cot.aprobadoPor}{cot.fechaAprobacion && ` · ${new Date(cot.fechaAprobacion).toLocaleDateString("es-PE")}`}
-                  </p>
-                )}
-              </div>
-            )}
-            {!cot.anulado && (
-              <div className="text-right">
-                <p className="text-[10px] text-white/60 uppercase tracking-widest leading-none">Envío</p>
-                {puedeEnviar ? (
-                  <label className={`flex items-center gap-1.5 justify-end mt-0.5 select-none ${bloqueadoPorAprobacion && !cot.enviado ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}>
-                    <input type="checkbox" checked={cot.enviado}
-                      disabled={bloqueadoPorAprobacion && !cot.enviado}
-                      onChange={toggleEnviar} className="w-4 h-4" />
-                    <span className="text-sm font-medium">{cot.enviado ? "Enviada" : "No enviada"}</span>
-                  </label>
-                ) : (
-                  <Chip className={`mt-0.5 ${cot.enviado ? "bg-green-500/40 text-white" : "bg-white/20 text-white"}`}>
-                    {cot.enviado ? "Enviada" : "No enviada"}
-                  </Chip>
-                )}
-                {bloqueadoPorAprobacion && !cot.enviado && (
-                  <p className="text-[10px] text-amber-200 leading-tight mt-0.5">Debe aprobarse antes de enviar</p>
-                )}
-                {cot.enviado && cot.enviadoPor && (
-                  <p className="text-[10px] text-white/60 leading-tight mt-0.5">
-                    {cot.enviadoPor}{cot.fechaEnvio && ` · ${new Date(cot.fechaEnvio).toLocaleDateString("es-PE")}`}
-                  </p>
-                )}
-              </div>
-            )}
             <button onClick={() => exportarCotizacionPdf(datosParaPdf())}
               className="bg-white/15 text-white text-sm px-4 py-2 rounded-lg hover:bg-white/25 transition font-medium shrink-0">
               Exportar PDF
             </button>
-            {!cot.anulado && puedeEditar && <BotonAnular onAnular={anular} />}
-            {!cot.anulado && !cot.enviado && puedeEditar && (
+            {!cot.anulado && !cadenaCerrada && puedeAnular && <BotonAnular onAnular={anular} />}
+            {!cot.anulado && !cot.enviado && !cadenaCerrada && puedeEditar && (
               <button onClick={guardar} disabled={guardando}
                 className="bg-white text-sky-700 text-sm px-5 py-2 rounded-lg hover:bg-sky-50 disabled:opacity-60 transition font-semibold shadow-sm shrink-0">
                 {guardando ? "Guardando…" : "Guardar cambios"}
@@ -403,6 +386,82 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
             )}
           </div>
         </div>
+        {!cot.anulado && (
+          <div className="bg-sky-800/40 border-t border-white/10">
+            <div className="max-w-6xl mx-auto px-8 py-2.5 flex items-center gap-6 flex-wrap">
+              <span className="text-xs text-white/70 uppercase tracking-wide font-semibold">Estado del documento</span>
+
+              {puedeAprobar ? (
+                <label className="flex items-center gap-2 text-sm text-white cursor-pointer">
+                  <input type="checkbox" checked={cot.aprobado} onChange={toggleAprobar} className="w-4 h-4" />
+                  {cot.aprobado ? "Aprobada" : "Pendiente de aprobación"}
+                  {cot.aprobado && cot.aprobadoPor && (
+                    <span className="text-xs text-white/50">
+                      — {cot.aprobadoPor}{cot.fechaAprobacion && ` · ${new Date(cot.fechaAprobacion).toLocaleDateString("es-PE")}`}
+                    </span>
+                  )}
+                </label>
+              ) : (
+                <span className="flex items-center gap-2 text-sm text-white">
+                  <Chip className={cot.aprobado ? "bg-green-500/40 text-white" : "bg-white/20 text-white"}>
+                    {cot.aprobado ? "Aprobada" : "Pendiente"}
+                  </Chip>
+                  {cot.aprobado && cot.aprobadoPor && (
+                    <span className="text-xs text-white/50">
+                      {cot.aprobadoPor}{cot.fechaAprobacion && ` · ${new Date(cot.fechaAprobacion).toLocaleDateString("es-PE")}`}
+                    </span>
+                  )}
+                </span>
+              )}
+
+              {puedeEnviar ? (
+                <label className={`flex items-center gap-2 text-sm text-white select-none ${bloqueadoPorAprobacion && !cot.enviado ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}>
+                  <input type="checkbox" checked={cot.enviado}
+                    disabled={bloqueadoPorAprobacion && !cot.enviado}
+                    onChange={toggleEnviar} className="w-4 h-4" />
+                  {cot.enviado ? "Enviada" : "No enviada"}
+                  {cot.enviado && cot.enviadoPor && (
+                    <span className="text-xs text-white/50">
+                      — {cot.enviadoPor}{cot.fechaEnvio && ` · ${new Date(cot.fechaEnvio).toLocaleDateString("es-PE")}`}
+                    </span>
+                  )}
+                </label>
+              ) : (
+                <span className="flex items-center gap-2 text-sm text-white">
+                  <Chip className={cot.enviado ? "bg-green-500/40 text-white" : "bg-white/20 text-white"}>
+                    {cot.enviado ? "Enviada" : "No enviada"}
+                  </Chip>
+                </span>
+              )}
+              {bloqueadoPorAprobacion && !cot.enviado && (
+                <span className="text-xs text-amber-200">Debe aprobarse antes de enviar</span>
+              )}
+
+              {puedeConfirmarInformeEnviado ? (
+                <label className={`flex items-center gap-2 text-sm text-white select-none ${bloqueadoPorInforme && !cot.informeEnviado ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}>
+                  <input type="checkbox" checked={cot.informeEnviado}
+                    disabled={bloqueadoPorInforme && !cot.informeEnviado}
+                    onChange={toggleInformeEnviado} className="w-4 h-4" />
+                  {cot.informeEnviado ? "Informe enviado" : "Informe no enviado"}
+                  {cot.informeEnviado && cot.informeEnviadoPor && (
+                    <span className="text-xs text-white/50">
+                      — {cot.informeEnviadoPor}{cot.fechaInformeEnviado && ` · ${new Date(cot.fechaInformeEnviado).toLocaleDateString("es-PE")}`}
+                    </span>
+                  )}
+                </label>
+              ) : (
+                <span className="flex items-center gap-2 text-sm text-white">
+                  <Chip className={cot.informeEnviado ? "bg-green-500/40 text-white" : "bg-white/20 text-white"}>
+                    {cot.informeEnviado ? "Informe enviado" : "Informe no enviado"}
+                  </Chip>
+                </span>
+              )}
+              {bloqueadoPorInforme && !cot.informeEnviado && (
+                <span className="text-xs text-amber-200">Debe enviarse antes de confirmar el informe</span>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Stepper de flujo */}
@@ -417,7 +476,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
         <div className="max-w-6xl mx-auto px-8 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
 
           {/* Datos editables */}
-          <fieldset disabled={cot.anulado || cot.enviado || !puedeEditar} className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5 self-start">
+          <fieldset disabled={cot.anulado || cot.enviado || cadenaCerrada || !puedeEditar} className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5 self-start">
             <div className="flex items-center gap-2">
               <span className="w-1.5 h-5 rounded-full bg-sky-500" />
               <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Datos de la cotización</h2>
@@ -429,7 +488,13 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
 
             {!cot.anulado && cot.enviado && (
               <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                Cotización enviada — de solo lectura. {puedeEnviar ? "Desmárcala como enviada (arriba) para poder editarla." : "Solo Admin o Asistente pueden retirarla del estado enviado."}
+                Cotización enviada — de solo lectura. {puedeEnviar ? "Desmárcala como enviada (arriba) para poder editarla." : "Solo Admin o Administración pueden retirarla del estado enviado."}
+              </p>
+            )}
+
+            {!cot.anulado && cadenaCerrada && (
+              <p className="text-xs text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                La cadena de este documento está cerrada (factura pagada) — de solo lectura. Solo Jefatura puede editarlo.
               </p>
             )}
 
@@ -591,7 +656,8 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
               </div>
             </div>
 
-            {/* Cálculos */}
+            {/* Cálculos — precios, información sensible: oculto sin privilegio */}
+            {puedeVerPrecios && (
             <div className="rounded-xl bg-gradient-to-br from-gray-50 to-sky-50/40 border border-gray-100 p-4 space-y-4">
               <div>
                 <label className="text-xs text-gray-500 block mb-1">
@@ -618,6 +684,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
                 </div>
               </div>
             </div>
+            )}
 
             {error && <p className="text-xs text-red-500">{error}</p>}
           </fieldset>
@@ -699,6 +766,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
             generando={generandoOT}
             onVerOT={(o) => onNavegar?.({ tipo: "ot", data: ots.find(x => x._id === o._id) || o })}
             onQuitarOT={quitarOT}
+            puedeVerPrecios={puedeVerPrecios}
           />
         </div>
       </div>

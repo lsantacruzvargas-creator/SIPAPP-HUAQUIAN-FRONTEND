@@ -8,11 +8,12 @@ import FormInformeTecnico from "./FormInformeTecnico";
 import VistaInformeTecnico from "./VistaInformeTecnico";
 import ModalNuevaSubOT from "./ModalNuevaSubOT";
 import ModalRequerimiento from "./ModalRequerimiento";
+import TablaServiciosExternos from "./TablaServiciosExternos";
 import ModalGenerarGRE from "./ModalGenerarGRE";
 import { exportarInformeTecnicoExcel } from "../utils/informeTecnicoExcel";
 import {
   FlujoNegocio, TarjetaRelacion, Chip,
-  badgePago, badgeOT, money, BotonAnular, BannerAnulado,
+  badgePago, badgeOT, money, BotonAnular, BannerAnulado, bloqueadoPorCadenaCerrada,
 } from "./detalleShared";
 
 const INP = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 w-full transition";
@@ -59,17 +60,29 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
   const navigate = useNavigate();
   const rolActual = getUsuario()?.rol;
   // Supervisor edita los campos de la OT y los Informes Técnicos, pero no
-  // puede anularla (eso queda solo para admin/asistente). Igual que técnico,
-  // supervisor no ve el resto de la cadena (Cotización/OC/Factura).
-  const puedeEditarCampos = ["admin", "asistente", "supervisor", "planner"].includes(rolActual);
-  const puedeAnular = ["admin", "asistente"].includes(rolActual);
+  // puede anularla. Igual que técnico, supervisor no ve el resto de la
+  // cadena (Cotización/OC/Factura).
+  const puedeEditarCampos = ["admin", "supervisor", "planner"].includes(rolActual);
+  // Anular un documento queda reservado a Admin, Facturación y Jefatura.
+  const puedeAnular = ["admin", "facturacion", "jefatura"].includes(rolActual);
   const esVistaLimitada = ["tecnico", "supervisor", "planner"].includes(rolActual);
+  // Tabla de Servicios Externos: la ven todos los roles menos técnico.
+  const puedeVerServicios = rolActual !== "tecnico";
+  const cadenaCerrada = bloqueadoPorCadenaCerrada(ot.estadoCadena, rolActual);
+  // Estado (Encargado Intervención) y Progreso (Encargado Prueba) son cards
+  // independientes del fieldset principal — un técnico no edita el resto de
+  // la OT, solo la tarjeta que le corresponde según si su nombre de usuario
+  // coincide con `encargado`/`encargado2` de esta OT.
+  const nombreActual = getUsuario()?.nombre;
+  const coincideNombre = (a, b) => !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
+  const puedeEditarEstado = puedeEditarCampos || (rolActual === "tecnico" && coincideNombre(ot.encargado2, nombreActual));
+  const puedeEditarEstadoPrueba = puedeEditarCampos || (rolActual === "tecnico" && coincideNombre(ot.encargado, nombreActual));
   // Aprueba/desaprueba Informes Técnicos — una vez aprobado, solo estos tres
   // roles pueden seguir editándolo (ver onModificar más abajo).
   const puedeAprobarInforme = ["admin", "jefatura", "planner"].includes(rolActual);
   // Mismo set de roles que ya tiene acceso a /facturacion-electronica/guias —
   // técnico (y cualquier otro rol sin acceso a esa ruta) no ve este card.
-  const puedeGenerarGRE = ["admin", "asistente", "facturacion", "almacenero", "jefatura"].includes(rolActual);
+  const puedeGenerarGRE = ["admin", "asistente", "facturacion", "almacenero", "jefatura", "planner"].includes(rolActual);
   const [usuarios, setUsuarios] = useState([]);
   const [empresas, setEmpresas] = useState([]);
   const [empresasOpen, setEmpresasOpen] = useState(false);
@@ -81,6 +94,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
   const [greMap, setGreMap] = useState({});
   const [requerimientos, setRequerimientos] = useState([]);
   const [crearRequerimientoOpen, setCrearRequerimientoOpen] = useState(false);
+  const [servicios, setServicios] = useState([]);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
   const [crearOCOpen, setCrearOCOpen] = useState(false);
@@ -157,13 +171,22 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
     fetchAuth(`/requerimientos?ordenTrabajoPadre=${ot._id}`)
       .then(r => r.ok && r.json())
       .then(reqs => setRequerimientos(reqs || []));
+
+    if (puedeVerServicios) {
+      fetchAuth(`/servicios-externos?ordenTrabajoPadre=${ot._id}`)
+        .then(r => r.ok && r.json())
+        .then(servs => setServicios(servs || []));
+    }
   };
 
   const cargarEmpresas = () =>
     fetchAuth("/empresas").then((res) => res.ok && res.json().then(setEmpresas));
 
   useEffect(() => {
-    fetchAuth("/personal/lista?todos=true").then(r => r.ok && r.json().then(u => setUsuarios(u || [])));
+    // Encargado Prueba / Encargado Intervención se eligen entre los
+    // usuarios con login y rol "tecnico" (ver Fase 13 — antes salían de
+    // Personal, sin relación real con quién puede loguearse como técnico).
+    fetchAuth("/usuarios/lista").then(r => r.ok && r.json()).then(u => setUsuarios((u || []).filter(x => x.rol === "tecnico")));
     cargarEmpresas();
     cargarRelaciones();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -207,6 +230,32 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
       setError("Error al guardar los cambios.");
     }
     setGuardando(false);
+  };
+
+  // Cambian de inmediato (sin pasar por "Guardar cambios", que técnico no
+  // puede usar) — no llaman `onGuardada` a propósito: ese callback cierra el
+  // modal entero (ver DetalleDocumento.jsx `cerrarGuardando`), y marcar un
+  // estado no debería sacar al usuario de la vista.
+  const cambiarEstado = async (nuevo) => {
+    const res = await fetchAuth(`/ordenes-trabajo/${ot._id}/estado`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ estado: nuevo }),
+    });
+    if (res.ok) {
+      const actualizada = await res.json();
+      setOt(actualizada);
+      setForm((f) => ({ ...f, estado: actualizada.estado }));
+    }
+  };
+
+  const cambiarEstadoPrueba = async (nuevo) => {
+    const res = await fetchAuth(`/ordenes-trabajo/${ot._id}/estado-prueba`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ estadoPrueba: nuevo }),
+    });
+    if (res.ok) setOt(await res.json());
   };
 
   const anular = async (motivo) => {
@@ -354,8 +403,8 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
                 <Chip className="mt-1 bg-teal-400/30 text-white block">Informes aprobados</Chip>
               )}
             </div>
-            {!ot.anulado && puedeAnular && <BotonAnular onAnular={anular} />}
-            {!ot.anulado && puedeEditarCampos && (
+            {!ot.anulado && !cadenaCerrada && puedeAnular && <BotonAnular onAnular={anular} />}
+            {!ot.anulado && !cadenaCerrada && puedeEditarCampos && (
               <button onClick={guardar} disabled={guardando}
                 className="bg-white text-indigo-700 text-sm px-5 py-2 rounded-lg hover:bg-indigo-50 disabled:opacity-60 transition font-semibold shadow-sm shrink-0">
                 {guardando ? "Guardando…" : "Guardar cambios"}
@@ -374,10 +423,47 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto">
+        <div className="max-w-6xl mx-auto px-8 pt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Progreso (Encargado Prueba) y Estado (Encargado Intervención) —
+              cards independientes del fieldset principal: un técnico solo
+              edita la que le corresponde según encargado/encargado2. */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-2">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              Progreso — Encargado Prueba{ot.encargado && <span className="normal-case font-normal text-gray-400"> ({ot.encargado})</span>}
+            </p>
+            <div className="flex gap-2">
+              {ESTADOS.map(e => (
+                <button key={e} type="button" disabled={hayHijasSanas || !puedeEditarEstadoPrueba}
+                  onClick={() => cambiarEstadoPrueba(e)}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-medium capitalize transition disabled:opacity-60 disabled:cursor-not-allowed ${colorEstado(e, ot.estadoPrueba === e)}`}>
+                  {e}
+                </button>
+              ))}
+            </div>
+            {hayHijasSanas && <p className="text-xs text-gray-400">Calculado automáticamente según las sub-órdenes.</p>}
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-2">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              Estado — Encargado Intervención{ot.encargado2 && <span className="normal-case font-normal text-gray-400"> ({ot.encargado2})</span>}
+            </p>
+            <div className="flex gap-2">
+              {ESTADOS.map(e => (
+                <button key={e} type="button" disabled={hayHijasSanas || !puedeEditarEstado}
+                  onClick={() => cambiarEstado(e)}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-medium capitalize transition disabled:opacity-60 disabled:cursor-not-allowed ${colorEstado(e, ot.estado === e)}`}>
+                  {e}
+                </button>
+              ))}
+            </div>
+            {hayHijasSanas && <p className="text-xs text-gray-400">Calculado automáticamente según las sub-órdenes.</p>}
+          </div>
+        </div>
+
         <div className="max-w-6xl mx-auto px-8 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
 
           {/* Datos editables */}
-          <fieldset disabled={ot.anulado || !puedeEditarCampos} className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5 self-start">
+          <fieldset disabled={ot.anulado || cadenaCerrada || !puedeEditarCampos} className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5 self-start">
             <div className="flex items-center gap-2">
               <span className="w-1.5 h-5 rounded-full bg-indigo-500" />
               <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Datos de la orden de trabajo</h2>
@@ -385,6 +471,12 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
 
             {ot.anulado && (
               <BannerAnulado motivo={ot.motivoAnulacion} por={ot.anuladoPor} fecha={ot.fechaAnulacion} />
+            )}
+
+            {!ot.anulado && cadenaCerrada && (
+              <p className="text-xs text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                La cadena de este documento está cerrada (factura pagada) — de solo lectura. Solo Jefatura puede editarlo.
+              </p>
             )}
 
             {/* Ingreso de equipo (solo lectura) */}
@@ -497,20 +589,20 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-xs text-gray-500 block mb-1">Encargado</label>
+                <label className="text-xs text-gray-500 block mb-1">Encargado Prueba</label>
                 <select name="encargado" value={form.encargado} onChange={handleChange} className={INP}>
                   <option value="">Sin asignar</option>
                   {usuarios.map(u => (
-                    <option key={u._id} value={u.nombre}>{u.nombre}{!u.activo ? " (inactivo)" : ""}</option>
+                    <option key={u._id} value={u.nombre}>{u.nombre}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="text-xs text-gray-500 block mb-1">Encargado 2</label>
+                <label className="text-xs text-gray-500 block mb-1">Encargado Intervención</label>
                 <select name="encargado2" value={form.encargado2} onChange={handleChange} className={INP}>
                   <option value="">Sin asignar</option>
                   {usuarios.map(u => (
-                    <option key={u._id} value={u.nombre}>{u.nombre}{!u.activo ? " (inactivo)" : ""}</option>
+                    <option key={u._id} value={u.nombre}>{u.nombre}</option>
                   ))}
                 </select>
               </div>
@@ -549,22 +641,6 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
                 rows={3} className={`${INP} resize-none`} />
             </div>
 
-            <div>
-              <label className="text-xs text-gray-500 block mb-2">Estado</label>
-              <div className="flex gap-2">
-                {ESTADOS.map(e => (
-                  <button key={e} type="button" disabled={hayHijasSanas}
-                    onClick={() => setForm({ ...form, estado: e })}
-                    className={`flex-1 py-1.5 rounded-lg text-xs font-medium capitalize transition disabled:opacity-60 disabled:cursor-not-allowed ${colorEstado(e, form.estado === e)}`}>
-                    {e}
-                  </button>
-                ))}
-              </div>
-              {hayHijasSanas && (
-                <p className="text-xs text-gray-400 mt-1.5">Calculado automáticamente según las sub-órdenes.</p>
-              )}
-            </div>
-
             {error && <p className="text-xs text-red-500">{error}</p>}
           </fieldset>
 
@@ -594,7 +670,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
                   Sub-Órdenes ({subOTs.length})
                 </p>
-                {!ot.anulado && (
+                {!ot.anulado && !cadenaCerrada && (
                   <button type="button" onClick={() => setCrearSubOTOpen(true)}
                     className="text-xs text-blue-600 hover:text-blue-800 underline">
                     + Crear Sub-OT
@@ -825,6 +901,11 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
             )}
           </div>
         </div>
+
+        {puedeVerServicios && (
+          <TablaServiciosExternos ot={ot} subOTs={subOTs} servicios={servicios}
+            puedeEditar={puedeEditarCampos} onCambio={cargarRelaciones} />
+        )}
       </div>
 
       {crearRequerimientoOpen && (

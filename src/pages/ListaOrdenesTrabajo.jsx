@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { fetchAuth } from "../utils/fetchAuth";
+import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import DetalleDocumento from "../components/DetalleDocumento";
 import ModalNuevaOT from "../components/ModalNuevaOT";
 import { DotChip, badgeOT, dotOT, badgeInformes, dotInformes } from "../components/detalleShared";
@@ -54,6 +54,7 @@ function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg }) {
                 <th className={`${TH} text-left`}>Planta</th>
                 <th className={`${TH} text-left`}>Encargado</th>
                 <th className={`${TH} text-left`}>Descripción</th>
+                <th className={`${TH} text-center`}>Prueba</th>
                 <th className={`${TH} text-center`}>Estado</th>
                 <th className={`${TH} text-center`}>Estado Informes</th>
               </tr>
@@ -61,7 +62,7 @@ function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg }) {
             <tbody className="divide-y divide-gray-100">
               {ordenes.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-gray-400">{vacioMsg}</td>
+                  <td colSpan={10} className="px-4 py-8 text-center text-gray-400">{vacioMsg}</td>
                 </tr>
               ) : (
                 ordenes.flatMap((o) => [
@@ -93,6 +94,9 @@ function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg }) {
                     <td className="px-4 py-3.5 text-gray-600">{o.encargado || <span className="text-gray-300">—</span>}</td>
                     <td className="px-4 py-3.5 text-gray-700">{o.titulo || <span className="text-gray-300">—</span>}</td>
                     <td className="px-4 py-3.5 text-center">
+                      <DotChip chip={badgeOT(o.estadoPrueba)} dot={dotOT(o.estadoPrueba)}>{o.estadoPrueba}</DotChip>
+                    </td>
+                    <td className="px-4 py-3.5 text-center">
                       <DotChip chip={badgeOT(o.estado)} dot={dotOT(o.estado)}>{o.estado}</DotChip>
                     </td>
                     <td className="px-4 py-3.5 text-center">
@@ -119,6 +123,9 @@ function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg }) {
                       <td className="px-4 py-3 text-gray-600">{s.encargado || <span className="text-gray-300">—</span>}</td>
                       <td className="px-4 py-3 text-gray-700">{s.titulo || <span className="text-gray-300">—</span>}</td>
                       <td className="px-4 py-3 text-center">
+                        <DotChip chip={badgeOT(s.estadoPrueba)} dot={dotOT(s.estadoPrueba)}>{s.estadoPrueba}</DotChip>
+                      </td>
+                      <td className="px-4 py-3 text-center">
                         <DotChip chip={badgeOT(s.estado)} dot={dotOT(s.estado)}>{s.estado}</DotChip>
                       </td>
                       <td className="px-4 py-3 text-center">
@@ -144,6 +151,9 @@ export default function ListaOrdenesTrabajo() {
   const [sortBy, setSortBy] = useState("numeroOT");
   const [seleccionada, setSeleccionada] = useState(null);
   const [crearOTOpen, setCrearOTOpen] = useState(false);
+  // Filtro de grupo: qué bloque de tablas se muestra — Prueba, Intervención,
+  // o ambos. "Cerradas" queda siempre visible, es ortogonal a ambos tracks.
+  const [grupo, setGrupo] = useState("todos");
 
   const cargar = () =>
     Promise.all([
@@ -174,10 +184,24 @@ export default function ListaOrdenesTrabajo() {
   // `ordenes` — se agrupan bajo `subOTs` de su padre y TablaOTs las renderiza
   // como filas propias justo debajo de la fila padre (ver flatMap ahí).
   const padres = ordenes.filter((o) => !o.ordenPadre);
-  const conSubOTs = padres.map((p) => ({
+  const conSubOTsCompleto = padres.map((p) => ({
     ...p,
     subOTs: ordenes.filter((o) => (o.ordenPadre?._id || o.ordenPadre) === p._id),
   }));
+
+  // Técnico solo ve las OTs/sub-OTs donde es Encargado Prueba o Encargado
+  // Intervención — el padre se muestra si él mismo coincide o si al menos
+  // una de sus sub-OTs coincide (y en ese caso, solo esas sub-OTs se listan,
+  // no las de sus compañeros).
+  const rolActual = getUsuario()?.rol;
+  const nombreActual = getUsuario()?.nombre;
+  const coincideNombre = (a, b) => !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
+  const esAsignado = (o) => coincideNombre(o.encargado, nombreActual) || coincideNombre(o.encargado2, nombreActual);
+  const conSubOTs = rolActual !== "tecnico"
+    ? conSubOTsCompleto
+    : conSubOTsCompleto
+        .map((p) => ({ ...p, subOTs: p.subOTs.filter(esAsignado) }))
+        .filter((p) => esAsignado(p) || p.subOTs.length > 0);
 
   const empresasLista = [
     ...new Map(
@@ -234,10 +258,19 @@ export default function ListaOrdenesTrabajo() {
   // mezclada con las pendientes.
   const esCerrada = (o) => o.estadoCadena === "cerrado";
   const abiertas = filtradas.filter((o) => !esCerrada(o));
+  // Intervención (campo `estado`, el de siempre — ver Fase 13: Encargado
+  // Intervención es quien lo controla).
   const pendientes = abiertas.filter((o) => o.estado === "pendiente");
   const enProgreso = abiertas.filter((o) => o.estado === "en progreso");
   const completadas = abiertas.filter((o) => o.estado === "completado");
   const entregadas = abiertas.filter((o) => o.estado === "entregado");
+  // Prueba (campo `estadoPrueba`, propiedad del Encargado Prueba — mismas 4
+  // categorías, mismo criterio de "se mueve solo, sin duplicarse" por ser un
+  // simple filtro sobre un enum de valor único).
+  const pruebaPendientes = abiertas.filter((o) => o.estadoPrueba === "pendiente");
+  const pruebaEnProgreso = abiertas.filter((o) => o.estadoPrueba === "en progreso");
+  const pruebaCompletadas = abiertas.filter((o) => o.estadoPrueba === "completado");
+  const pruebaEntregadas = abiertas.filter((o) => o.estadoPrueba === "entregado");
   const cerradas = filtradas.filter((o) => esCerrada(o));
   const hayFiltro = Object.values(filtros).some(Boolean);
 
@@ -251,6 +284,7 @@ export default function ListaOrdenesTrabajo() {
     "Planta":         o.planta || "—",
     "Encargado":      o.encargado || "—",
     "Descripción":    o.titulo || "—",
+    "Prueba":         o.estadoPrueba || "—",
     "Estado":         o.estado || "—",
     "Estado Informes": o.estadoInformes || "—",
   });
@@ -258,10 +292,14 @@ export default function ListaOrdenesTrabajo() {
   const exportarExcel = () => {
     const wb = XLSX.utils.book_new();
     [
-      ["Pendientes", pendientes],
-      ["En progreso", enProgreso],
-      ["Completadas", completadas],
-      ["Entregadas", entregadas],
+      ["Prueba - Pendientes", pruebaPendientes],
+      ["Prueba - En progreso", pruebaEnProgreso],
+      ["Prueba - Completadas", pruebaCompletadas],
+      ["Prueba - Entregadas", pruebaEntregadas],
+      ["Intervención - Pendientes", pendientes],
+      ["Intervención - En progreso", enProgreso],
+      ["Intervención - Completadas", completadas],
+      ["Intervención - Entregadas", entregadas],
       ["Cerradas", cerradas],
     ].forEach(([nombre, lista]) => {
       const ws = XLSX.utils.json_to_sheet(lista.map(filaOT));
@@ -315,13 +353,13 @@ export default function ListaOrdenesTrabajo() {
           </select>
         )}        
 
-        <select name="estado" value={filtros.estado} onChange={handleFiltro} className={SELECT}>
+        {/* <select name="estado" value={filtros.estado} onChange={handleFiltro} className={SELECT}>
           <option value="">Todo estado</option>
           <option value="pendiente">Pendiente</option>
           <option value="en progreso">En progreso</option>
           <option value="completado">Completado</option>
           <option value="entregado">Entregado</option>
-        </select>
+        </select> */}
 
         
 
@@ -363,37 +401,102 @@ export default function ListaOrdenesTrabajo() {
         )}
       </div>
 
-      <TablaOTs
-        titulo="Órdenes pendientes"
-        acento="bg-amber-500"
-        ordenes={pendientes}
-        onSelect={setSeleccionada}
-        vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes pendientes"}
-      />
+      <div className="flex gap-2 mb-5">
+        {[
+          { valor: "todos", label: "Todos los grupos" },
+          { valor: "prueba", label: "Órdenes de prueba" },
+          { valor: "intervencion", label: "Órdenes de intervención" },
+        ].map((g) => (
+          <button
+            key={g.valor}
+            type="button"
+            onClick={() => setGrupo(g.valor)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+              grupo === g.valor
+                ? "bg-gray-900 text-white"
+                : "border border-gray-300 text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            {g.label}
+          </button>
+        ))}
+      </div>
 
-      <TablaOTs
-        titulo="Órdenes en progreso"
-        acento="bg-blue-500"
-        ordenes={enProgreso}
-        onSelect={setSeleccionada}
-        vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes en progreso"}
-      />
+      {grupo !== "intervencion" && (
+        <>
+          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 mt-2">Órdenes de Prueba</h3>
 
-      <TablaOTs
-        titulo="Órdenes completadas"
-        acento="bg-green-500"
-        ordenes={completadas}
-        onSelect={setSeleccionada}
-        vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes completadas"}
-      />
+          <TablaOTs
+            titulo="Órdenes de prueba pendientes"
+            acento="bg-amber-500"
+            ordenes={pruebaPendientes}
+            onSelect={setSeleccionada}
+            vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de prueba pendientes"}
+          />
 
-      <TablaOTs
-        titulo="Órdenes entregadas"
-        acento="bg-teal-500"
-        ordenes={entregadas}
-        onSelect={setSeleccionada}
-        vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes entregadas"}
-      />
+          <TablaOTs
+            titulo="Órdenes de prueba en progreso"
+            acento="bg-blue-500"
+            ordenes={pruebaEnProgreso}
+            onSelect={setSeleccionada}
+            vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de prueba en progreso"}
+          />
+
+          <TablaOTs
+            titulo="Órdenes de prueba completadas"
+            acento="bg-green-500"
+            ordenes={pruebaCompletadas}
+            onSelect={setSeleccionada}
+            vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de prueba completadas"}
+          />
+
+          <TablaOTs
+            titulo="Órdenes de prueba entregadas a Intervención"
+            acento="bg-teal-500"
+            ordenes={pruebaEntregadas}
+            onSelect={setSeleccionada}
+            vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de prueba entregadas a Intervención"}
+          />
+        </>
+      )}
+
+      {grupo !== "prueba" && (
+        <>
+          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 mt-6">Órdenes de Intervención</h3>
+
+          <TablaOTs
+            titulo="Órdenes de intervención pendientes"
+            acento="bg-amber-500"
+            ordenes={pendientes}
+            onSelect={setSeleccionada}
+            vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de intervención pendientes"}
+          />
+
+          <TablaOTs
+            titulo="Órdenes de intervención en progreso"
+            acento="bg-blue-500"
+            ordenes={enProgreso}
+            onSelect={setSeleccionada}
+            vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de intervención en progreso"}
+          />
+
+          <TablaOTs
+            titulo="Órdenes de intervención completadas"
+            acento="bg-green-500"
+            ordenes={completadas}
+            onSelect={setSeleccionada}
+            vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de intervención completadas"}
+          />
+
+          <TablaOTs
+            titulo="Órdenes de intervención entregadas"
+            acento="bg-teal-500"
+            ordenes={entregadas}
+            onSelect={setSeleccionada}
+            vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de intervención entregadas"}
+          />
+        </>
+      )}
 
       <TablaOTs
         titulo="Órdenes cerradas"

@@ -121,10 +121,11 @@ function SeccionUbicaciones() {
 function SeccionMateriales() {
   const [lista, setLista] = useState([]);
   const [ubicaciones, setUbicaciones] = useState([]);
-  const [form, setForm] = useState({ nombre: "", descripcion: "", unidad: "und", stockMinimo: 0, ubicacion: "" });
+  const [form, setForm] = useState({ nombre: "", descripcion: "", unidad: "und", stockMinimo: 0, ubicacion: "", tipoMaterial: "" });
   const [editando, setEditando] = useState(null);
   const [guardando, setGuardando] = useState(false);
   const [busqueda, setBusqueda] = useState("");
+  const [error, setError] = useState("");
 
   const cargar = useCallback(async () => {
     const [rm, ru] = await Promise.all([
@@ -147,17 +148,22 @@ function SeccionMateriales() {
       unidad: m.unidad,
       stockMinimo: m.stockMinimo,
       ubicacion: m.ubicacion?._id || "",
+      tipoMaterial: m.tipoMaterial || "",
     });
+    setError("");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const cancelar = () => {
     setEditando(null);
-    setForm({ nombre: "", descripcion: "", unidad: "und", stockMinimo: 0, ubicacion: "" });
+    setForm({ nombre: "", descripcion: "", unidad: "und", stockMinimo: 0, ubicacion: "", tipoMaterial: "" });
+    setError("");
   };
 
   const guardar = async () => {
     if (!form.nombre.trim()) return;
+    if (!form.tipoMaterial) { setError("Selecciona si es Repuesto o Consumible."); return; }
+    setError("");
     setGuardando(true);
     const metodo = editando ? "PUT" : "POST";
     const url = editando ? `/materiales/${editando}` : "/materiales";
@@ -169,6 +175,9 @@ function SeccionMateriales() {
     if (r.ok) {
       await cargar();
       cancelar();
+    } else {
+      const d = await r.json().catch(() => ({}));
+      setError(d.mensaje || "Error al guardar el material.");
     }
     setGuardando(false);
   };
@@ -220,7 +229,16 @@ function SeccionMateriales() {
               {ubicaciones.map((u) => <option key={u._id} value={u._id}>{u.nombre}</option>)}
             </select>
           </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Centro de costo *</label>
+            <select name="tipoMaterial" value={form.tipoMaterial} onChange={handleChange} className={`w-full ${INP}`}>
+              <option value="">Seleccionar…</option>
+              <option value="repuesto">Repuesto</option>
+              <option value="consumible">Consumible</option>
+            </select>
+          </div>
         </div>
+        {error && <p className="text-xs text-red-500 mt-3">{error}</p>}
         <div className="flex gap-2 mt-4">
           {editando && (
             <button onClick={cancelar}
@@ -228,7 +246,7 @@ function SeccionMateriales() {
               Cancelar
             </button>
           )}
-          <button onClick={guardar} disabled={guardando || !form.nombre.trim()}
+          <button onClick={guardar} disabled={guardando || !form.nombre.trim() || !form.tipoMaterial}
             className="text-sm bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition font-medium">
             {guardando ? "Guardando…" : editando ? "Actualizar" : "Crear material"}
           </button>
@@ -249,13 +267,14 @@ function SeccionMateriales() {
               <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Nombre</th>
               <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">Unidad</th>
               <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">Ubicación</th>
+              <th className="text-center px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Centro de costo</th>
               <th className="text-center px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Stock</th>
               <th className="px-5 py-3"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {filtrados.length === 0 && (
-              <tr><td colSpan={6} className="text-center py-10 text-gray-300 text-sm">Sin materiales</td></tr>
+              <tr><td colSpan={7} className="text-center py-10 text-gray-300 text-sm">Sin materiales</td></tr>
             )}
             {filtrados.map((m) => (
               <tr key={m._id} className="hover:bg-gray-50/50 transition">
@@ -266,6 +285,15 @@ function SeccionMateriales() {
                 </td>
                 <td className="px-5 py-3 text-gray-500 hidden md:table-cell">{m.unidad}</td>
                 <td className="px-5 py-3 text-gray-500 hidden md:table-cell">{m.ubicacion?.nombre || "—"}</td>
+                <td className="px-5 py-3 text-center">
+                  {m.tipoMaterial ? (
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${m.tipoMaterial === "repuesto" ? "bg-indigo-100 text-indigo-700" : "bg-cyan-100 text-cyan-700"}`}>
+                      {m.tipoMaterial}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-gray-300">—</span>
+                  )}
+                </td>
                 <td className="px-5 py-3 text-center">
                   <div className="flex flex-col items-center gap-0.5">
                     <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${badgeStock(m)}`}>
@@ -473,13 +501,13 @@ function ModalIngreso({ materiales, onClose, onGuardado }) {
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
   const [rqPendiente, setRqPendiente] = useState(null);
-  const [cerrarRq, setCerrarRq] = useState(true);
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
-  // Si este material tiene una solicitud de compra vinculada y pendiente de
-  // cerrar, se ofrece cerrarla al mismo tiempo que se registra el ingreso —
-  // así el almacenero no tiene que recordar ir a Requerimientos después.
+  // Si este material tiene una solicitud de compra vinculada y pendiente, se
+  // avisa acá — pero el ingreso por sí solo NO la resuelve: el almacenero
+  // todavía debe "Atender" el ítem desde Requerimientos (crea el egreso real
+  // hacia la OT que lo pidió) una vez que este stock esté disponible.
   useEffect(() => {
     if (!form.material) { setRqPendiente(null); return; }
     fetchAuth("/requerimientos").then((r) => r.ok ? r.json() : []).then((lista) => {
@@ -506,9 +534,6 @@ function ModalIngreso({ materiales, onClose, onGuardado }) {
     });
     if (r.ok) {
       const movimiento = await r.json();
-      if (rqPendiente && cerrarRq) {
-        await fetchAuth(`/requerimientos/${rqPendiente.requerimientoId}/items/${rqPendiente.itemId}/cerrar`, { method: "PATCH" });
-      }
       onGuardado(movimiento);
     } else {
       const d = await r.json();
@@ -580,12 +605,11 @@ function ModalIngreso({ materiales, onClose, onGuardado }) {
           </div>
 
           {rqPendiente && (
-            <label className="flex items-start gap-2 bg-blue-50 rounded-xl px-4 py-3 text-sm cursor-pointer">
-              <input type="checkbox" checked={cerrarRq} onChange={(e) => setCerrarRq(e.target.checked)} className="mt-0.5" />
+            <div className="bg-blue-50 rounded-xl px-4 py-3 text-sm">
               <span className="text-blue-700">
-                Este material cierra la solicitud de compra <strong>{rqPendiente.codigo}</strong> ({rqPendiente.categoria}) — se marcará como cerrada al guardar.
+                Este material abastece la solicitud de compra <strong>{rqPendiente.codigo}</strong> ({rqPendiente.categoria}) — despáchala desde Requerimientos ("Atender") una vez guardado este ingreso.
               </span>
-            </label>
+            </div>
           )}
         </div>
 

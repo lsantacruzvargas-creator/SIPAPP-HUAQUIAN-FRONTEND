@@ -5,6 +5,8 @@ const formatoFecha = (fecha) =>
     timeStyle: "short",
   });
 
+const ROL_LABEL = { admin: "Admin", tecnico: "Técnico", almacenero: "Almacenero", asistente: "Administración", supervisor: "Supervisor", jefatura: "Jefatura", facturacion: "Facturación", planner: "Planner" };
+
 export default function PanelNotificaciones({ notificaciones, onClose }) {
   return (
     <div
@@ -28,7 +30,14 @@ export default function PanelNotificaciones({ notificaciones, onClose }) {
               {notificaciones.map((n) => (
                 <li key={n._id} className="px-5 py-3">
                   <p className="text-sm text-gray-800">{n.mensaje}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">{n.usuarioNombre} · {formatoFecha(n.fecha)}</p>
+                  <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1.5">
+                    {n.usuarioRol && (
+                      <span className="px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">
+                        {ROL_LABEL[n.usuarioRol] ?? n.usuarioRol}
+                      </span>
+                    )}
+                    <span>{n.usuarioNombre} · {formatoFecha(n.fecha)}</span>
+                  </p>
                 </li>
               ))}
             </ul>

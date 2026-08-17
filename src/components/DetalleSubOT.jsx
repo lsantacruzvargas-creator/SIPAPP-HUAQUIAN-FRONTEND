@@ -4,7 +4,8 @@ import ModalSeleccionarTipoInforme from "./ModalSeleccionarTipoInforme";
 import FormInformeTecnico from "./FormInformeTecnico";
 import VistaInformeTecnico from "./VistaInformeTecnico";
 import ModalRequerimiento from "./ModalRequerimiento";
-import { Chip, BotonAnular, BannerAnulado } from "./detalleShared";
+import TablaServiciosExternos from "./TablaServiciosExternos";
+import { Chip, BotonAnular, BannerAnulado, bloqueadoPorCadenaCerrada } from "./detalleShared";
 
 const CATEGORIAS_TALLER = ["REPARACION", "MANTENIMIENTO PREVENTIVO", "MANTENIMIENTO CORRECTIVO", "GARANTIA"];
 
@@ -42,15 +43,30 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
     numeroGuiaRemision:    inicial.numeroGuiaRemision    || "",
     observaciones:          inicial.observaciones          || "",
     irreparable:            inicial.irreparable            || false,
+    encargado:              inicial.encargado              || "",
+    encargado2:             inicial.encargado2             || "",
   });
   const rolActual = getUsuario()?.rol;
-  const puedeEditarCampos = ["admin", "asistente", "supervisor", "planner"].includes(rolActual);
-  const puedeAnular = ["admin", "asistente"].includes(rolActual);
+  const puedeEditarCampos = ["admin", "supervisor", "planner"].includes(rolActual);
+  // Anular un documento queda reservado a Admin, Facturación y Jefatura.
+  const puedeAnular = ["admin", "facturacion", "jefatura"].includes(rolActual);
   const puedeAprobarInforme = ["admin", "jefatura", "planner"].includes(rolActual);
+  // Tabla de Servicios Externos: la ven todos los roles menos técnico.
+  const puedeVerServicios = rolActual !== "tecnico";
+  const cadenaCerrada = bloqueadoPorCadenaCerrada(ot.estadoCadena, rolActual);
+  // Estado (Encargado Intervención) y Progreso (Encargado Prueba) — mismo
+  // criterio que DetalleOrdenTrabajo.jsx: cards independientes del fieldset,
+  // editables por el técnico cuyo nombre coincide con encargado/encargado2.
+  const nombreActual = getUsuario()?.nombre;
+  const coincideNombre = (a, b) => !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
+  const puedeEditarEstado = puedeEditarCampos || (rolActual === "tecnico" && coincideNombre(ot.encargado2, nombreActual));
+  const puedeEditarEstadoPrueba = puedeEditarCampos || (rolActual === "tecnico" && coincideNombre(ot.encargado, nombreActual));
   const [usuarios, setUsuarios] = useState([]);
+  const [tecnicos, setTecnicos] = useState([]);
   const [informes, setInformes] = useState([]);
   const [requerimientos, setRequerimientos] = useState([]);
   const [crearRequerimientoOpen, setCrearRequerimientoOpen] = useState(false);
+  const [servicios, setServicios] = useState([]);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
   const [seleccionarTipoOpen, setSeleccionarTipoOpen] = useState(false);
@@ -65,10 +81,19 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
     fetchAuth(`/requerimientos?ordenTrabajo=${ot._id}`)
       .then(r => r.ok && r.json())
       .then(reqs => setRequerimientos(reqs || []));
+    if (puedeVerServicios) {
+      fetchAuth(`/servicios-externos?ordenTrabajo=${ot._id}`)
+        .then(r => r.ok && r.json())
+        .then(servs => setServicios(servs || []));
+    }
   };
 
   useEffect(() => {
     fetchAuth("/personal/lista?todos=true").then(r => r.ok && r.json().then(u => setUsuarios(u || [])));
+    // Encargado Prueba / Encargado Intervención se eligen entre los
+    // usuarios con login y rol "tecnico" (distinto de "Personal asignado")
+    // — ver Fase 13.
+    fetchAuth("/usuarios/lista").then(r => r.ok && r.json()).then(u => setTecnicos((u || []).filter(x => x.rol === "tecnico")));
     cargarRelaciones();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ot._id]);
@@ -99,6 +124,31 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
     setGuardando(false);
   };
 
+  // Cambian de inmediato (sin pasar por "Guardar cambios", que técnico no
+  // puede usar) — no llaman `onGuardada` a propósito: ese callback cierra el
+  // modal entero, y marcar un estado no debería sacar al usuario de la vista.
+  const cambiarEstado = async (nuevo) => {
+    const res = await fetchAuth(`/ordenes-trabajo/${ot._id}/estado`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ estado: nuevo }),
+    });
+    if (res.ok) {
+      const actualizada = await res.json();
+      setOt(actualizada);
+      setForm((f) => ({ ...f, estado: actualizada.estado }));
+    }
+  };
+
+  const cambiarEstadoPrueba = async (nuevo) => {
+    const res = await fetchAuth(`/ordenes-trabajo/${ot._id}/estado-prueba`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ estadoPrueba: nuevo }),
+    });
+    if (res.ok) setOt(await res.json());
+  };
+
   const anular = async (motivo) => {
     const res = await fetchAuth(`/ordenes-trabajo/${ot._id}/anular`, {
       method: "PATCH",
@@ -124,7 +174,6 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
   };
 
   const padre = ot.ordenPadre;
-  const ultimo = informes[0];
 
   // `ot.ordenPadre` viene liviano del backend (select: "codigo numeroOT",
   // solo para el breadcrumb) — navegar con eso tal cual monta el detalle del
@@ -170,8 +219,8 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
               )}
               {ot.irreparable && <Chip className="mt-1 bg-red-500/40 text-white block">Irreparable</Chip>}
             </div>
-            {!ot.anulado && puedeAnular && <BotonAnular onAnular={anular} />}
-            {!ot.anulado && puedeEditarCampos && (
+            {!ot.anulado && !cadenaCerrada && puedeAnular && <BotonAnular onAnular={anular} />}
+            {!ot.anulado && !cadenaCerrada && puedeEditarCampos && (
               <button onClick={guardar} disabled={guardando}
                 className="bg-white text-violet-700 text-sm px-5 py-2 rounded-lg hover:bg-violet-50 disabled:opacity-60 transition font-semibold shadow-sm shrink-0">
                 {guardando ? "Guardando…" : "Guardar cambios"}
@@ -193,10 +242,44 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto">
+        <div className="max-w-6xl mx-auto px-8 pt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Progreso (Encargado Prueba) y Estado (Encargado Intervención) —
+              cards independientes del fieldset principal. */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-2">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              Progreso — Encargado Prueba{ot.encargado && <span className="normal-case font-normal text-gray-400"> ({ot.encargado})</span>}
+            </p>
+            <div className="flex gap-2">
+              {ESTADOS.map(e => (
+                <button key={e} type="button" disabled={!puedeEditarEstadoPrueba}
+                  onClick={() => cambiarEstadoPrueba(e)}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-medium capitalize transition disabled:opacity-60 disabled:cursor-not-allowed ${colorEstado(e, ot.estadoPrueba === e)}`}>
+                  {e}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-2">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              Estado — Encargado Intervención{ot.encargado2 && <span className="normal-case font-normal text-gray-400"> ({ot.encargado2})</span>}
+            </p>
+            <div className="flex gap-2">
+              {ESTADOS.map(e => (
+                <button key={e} type="button" disabled={!puedeEditarEstado}
+                  onClick={() => cambiarEstado(e)}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-medium capitalize transition disabled:opacity-60 disabled:cursor-not-allowed ${colorEstado(e, ot.estado === e)}`}>
+                  {e}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
         <div className="max-w-6xl mx-auto px-8 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
 
           {/* Datos editables — solo lo propio de la sub-tarea */}
-          <fieldset disabled={ot.anulado || !puedeEditarCampos} className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5 self-start">
+          <fieldset disabled={ot.anulado || cadenaCerrada || !puedeEditarCampos} className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5 self-start">
             <div className="flex items-center gap-2">
               <span className="w-1.5 h-5 rounded-full bg-violet-500" />
               <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Datos de la sub-orden</h2>
@@ -204,6 +287,12 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
 
             {ot.anulado && (
               <BannerAnulado motivo={ot.motivoAnulacion} por={ot.anuladoPor} fecha={ot.fechaAnulacion} />
+            )}
+
+            {!ot.anulado && cadenaCerrada && (
+              <p className="text-xs text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                La cadena de este documento está cerrada (factura pagada) — de solo lectura. Solo Jefatura puede editarlo.
+              </p>
             )}
 
             <div>
@@ -247,15 +336,24 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
               </div>
             </div>
 
-            <div>
-              <label className="text-xs text-gray-500 block mb-2">Estado</label>
-              <div className="flex gap-2">
-                {ESTADOS.map(e => (
-                  <button key={e} type="button" onClick={() => setForm({ ...form, estado: e })}
-                    className={`flex-1 py-1.5 rounded-lg text-xs font-medium capitalize transition ${colorEstado(e, form.estado === e)}`}>
-                    {e}
-                  </button>
-                ))}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Encargado Prueba</label>
+                <select name="encargado" value={form.encargado} onChange={handleChange} className={INP}>
+                  <option value="">Sin asignar</option>
+                  {tecnicos.map(t => (
+                    <option key={t._id} value={t.nombre}>{t.nombre}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Encargado Intervención</label>
+                <select name="encargado2" value={form.encargado2} onChange={handleChange} className={INP}>
+                  <option value="">Sin asignar</option>
+                  {tecnicos.map(t => (
+                    <option key={t._id} value={t.nombre}>{t.nombre}</option>
+                  ))}
+                </select>
               </div>
             </div>
 
@@ -290,40 +388,46 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
             {error && <p className="text-xs text-red-500">{error}</p>}
           </fieldset>
 
-          {/* Relaciones — acá solo el informe más reciente de ESTA sub-OT */}
+          {/* Relaciones — todos los informes de ESTA sub-OT, cada uno como su
+              propia tarjeta clickeable (antes solo se mostraba el más
+              reciente y el resto quedaba inaccesible tras un "+N
+              anterior(es)" puramente informativo — bug corregido). */}
           <section className="space-y-4">
             <div className="flex items-center gap-2">
               <span className="w-1.5 h-5 rounded-full bg-teal-500" />
-              <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Informe Técnico</h2>
+              <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">
+                Informes Técnicos {informes.length > 0 && `(${informes.length})`}
+              </h2>
             </div>
 
-            {ultimo ? (
-              <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-4 hover:border-teal-200 transition space-y-2">
-                <button type="button" onClick={() => setVerInforme(ultimo)} className="w-full text-left">
-                  <p className="font-mono text-xs text-teal-600">{ultimo.codigo}</p>
-                  <p className="text-sm text-gray-700 mt-0.5">{ultimo.tipo}</p>
-                  {ultimo.fechaHoraGuardado && (
-                    <p className="text-xs text-gray-400 mt-1">
-                      {new Date(ultimo.fechaHoraGuardado).toLocaleDateString("es-PE")}
-                    </p>
-                  )}
-                  {informes.length > 1 && (
-                    <p className="text-xs text-gray-400 mt-1">+{informes.length - 1} anterior(es)</p>
-                  )}
-                </button>
-                {puedeAprobarInforme ? (
-                  <label className="flex items-center gap-1.5 text-xs cursor-pointer select-none pt-2 border-t border-gray-50">
-                    <input type="checkbox" checked={!!ultimo.aprobado}
-                      onChange={() => toggleAprobarInforme(ultimo._id, ultimo.aprobado)} />
-                    <span className={ultimo.aprobado ? "text-teal-600 font-medium" : "text-gray-400"}>
-                      {ultimo.aprobado ? "Aprobado" : "Pendiente de aprobación"}
-                    </span>
-                  </label>
-                ) : (
-                  <p className={`text-xs pt-2 border-t border-gray-50 ${ultimo.aprobado ? "text-teal-600 font-medium" : "text-gray-400"}`}>
-                    {ultimo.aprobado ? "Aprobado" : "Pendiente de aprobación"}
-                  </p>
-                )}
+            {informes.length > 0 ? (
+              <div className="space-y-2">
+                {informes.map(inf => (
+                  <div key={inf._id} className="bg-white border border-gray-100 rounded-2xl shadow-sm p-4 hover:border-teal-200 transition space-y-2">
+                    <button type="button" onClick={() => setVerInforme(inf)} className="w-full text-left">
+                      <p className="font-mono text-xs text-teal-600">{inf.codigo}</p>
+                      <p className="text-sm text-gray-700 mt-0.5">{inf.tipo}</p>
+                      {inf.fechaHoraGuardado && (
+                        <p className="text-xs text-gray-400 mt-1">
+                          {new Date(inf.fechaHoraGuardado).toLocaleDateString("es-PE")}
+                        </p>
+                      )}
+                    </button>
+                    {puedeAprobarInforme ? (
+                      <label className="flex items-center gap-1.5 text-xs cursor-pointer select-none pt-2 border-t border-gray-50">
+                        <input type="checkbox" checked={!!inf.aprobado}
+                          onChange={() => toggleAprobarInforme(inf._id, inf.aprobado)} />
+                        <span className={inf.aprobado ? "text-teal-600 font-medium" : "text-gray-400"}>
+                          {inf.aprobado ? "Aprobado" : "Pendiente de aprobación"}
+                        </span>
+                      </label>
+                    ) : (
+                      <p className={`text-xs pt-2 border-t border-gray-50 ${inf.aprobado ? "text-teal-600 font-medium" : "text-gray-400"}`}>
+                        {inf.aprobado ? "Aprobado" : "Pendiente de aprobación"}
+                      </p>
+                    )}
+                  </div>
+                ))}
               </div>
             ) : (
               <div className="bg-white border border-dashed border-gray-200 rounded-2xl p-4 text-center">
@@ -402,6 +506,11 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
             )}
           </div>
         </div>
+
+        {puedeVerServicios && (
+          <TablaServiciosExternos ot={ot} servicios={servicios}
+            puedeEditar={puedeEditarCampos} onCambio={cargarRelaciones} />
+        )}
       </div>
 
       {crearRequerimientoOpen && (

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import {
   FlujoNegocio, TarjetaRelacion, Chip,
-  badgeOT, badgePago, money, BotonAnular, BannerAnulado,
+  badgeOT, badgePago, money, BotonAnular, BannerAnulado, bloqueadoPorCadenaCerrada,
 } from "./detalleShared";
 
 const INP    = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 w-full transition";
@@ -86,7 +86,11 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
   const [guardando, setGuardando] = useState(false);
   const [error, setError]         = useState("");
   const [cargandoOC, setCargandoOC] = useState(false);
-  const puedeEditar = ["admin", "facturacion"].includes(getUsuario()?.rol);
+  // "jefatura" agregado acá para calzar con el gate real del backend
+  // (routes/facturas.js `puedeEditar`) — se había quedado desactualizado.
+  const rolActual = getUsuario()?.rol;
+  const puedeEditar = ["admin", "facturacion", "jefatura"].includes(rolActual);
+  const cadenaCerrada = bloqueadoPorCadenaCerrada(inicial.estadoCadena, rolActual);
 
   const abrirOC = async () => {
     if (!ocVinculada || cargandoOC) return;
@@ -258,8 +262,8 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
                   <Chip className="mt-0.5 bg-white/20 text-white">{inicial.estadoPago}</Chip>
                 )}
               </div>
-              {!inicial.anulado && puedeEditar && <BotonAnular onAnular={anular} />}
-              {!inicial.anulado && puedeEditar && (
+              {!inicial.anulado && !cadenaCerrada && puedeEditar && <BotonAnular onAnular={anular} />}
+              {!inicial.anulado && !cadenaCerrada && puedeEditar && (
                 <button onClick={guardar} disabled={guardando}
                   className="bg-white text-emerald-700 text-sm px-5 py-2 rounded-lg hover:bg-emerald-50 disabled:opacity-60 transition font-semibold shadow-sm shrink-0">
                   {guardando ? "Guardando…" : "Guardar cambios"}
@@ -281,7 +285,7 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
         <div className="max-w-6xl mx-auto px-8 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
 
           {/* Datos editables */}
-          <fieldset disabled={inicial.anulado || !puedeEditar} className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5 self-start">
+          <fieldset disabled={inicial.anulado || cadenaCerrada || !puedeEditar} className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5 self-start">
             <div className="flex items-center gap-2">
               <span className="w-1.5 h-5 rounded-full bg-emerald-500" />
               <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Datos de la factura</h2>
@@ -289,6 +293,12 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
 
             {inicial.anulado && (
               <BannerAnulado motivo={inicial.motivoAnulacion} por={inicial.anuladoPor} fecha={inicial.fechaAnulacion} />
+            )}
+
+            {!inicial.anulado && cadenaCerrada && (
+              <p className="text-xs text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                La cadena de este documento está cerrada (factura pagada) — de solo lectura. Solo Jefatura puede editarlo.
+              </p>
             )}
 
             <div className="grid grid-cols-2 gap-4">

@@ -232,6 +232,12 @@ export const dotInformes = (e) => {
   return "bg-gray-300"; // pendiente
 };
 
+// Una vez que la cadena de un documento se cierra (factura pagada), el
+// documento entero queda de solo lectura para todos los roles salvo
+// Jefatura — mismo criterio que el backend (utils/bloqueadoPorCadena.js).
+export const bloqueadoPorCadenaCerrada = (estadoCadena, rolActual) =>
+  estadoCadena === "cerrado" && rolActual !== "jefatura";
+
 export const money = (v, moneda = "PEN") =>
   (moneda === "USD" ? "US$ " : "S/ ") + Number(v ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2 });
 

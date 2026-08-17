@@ -16,6 +16,7 @@ export default function TablaItemsCotizacion({
   items, onItemsChange,
   tipo, puedeEditar, disabled, intentoGuardar, totalesMostrados,
   seleccionables = false, seleccionados = new Set(), onToggleSeleccion, onGenerarOT, generando = false, onVerOT, onQuitarOT,
+  puedeVerPrecios = true,
 }) {
   const [catalogoOpen, setCatalogoOpen] = useState(false);
   const [catalogoTarget, setCatalogoTarget] = useState(null); // null = "+ Agregar ítem de plantilla" (fusiona/crea fila); _key = agregar descripción a esa fila puntual
@@ -147,15 +148,15 @@ export default function TablaItemsCotizacion({
               <th className="px-3 py-3 text-center w-12">Item</th>
               <th className="px-3 py-3 text-left">Descripción *</th>
               <th className="px-3 py-3 text-center w-24">Cantidad *</th>
-              <th className="px-3 py-3 text-right w-32">Precio unitario *</th>
-              <th className="px-3 py-3 text-right w-32">Precio total</th>
+              {puedeVerPrecios && <th className="px-3 py-3 text-right w-32">Precio unitario *</th>}
+              {puedeVerPrecios && <th className="px-3 py-3 text-right w-32">Precio total</th>}
               {puedeEditar && <th className="px-3 py-3 w-10"><span className="sr-only">Quitar</span></th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {items.length === 0 ? (
               <tr>
-                <td colSpan={(puedeEditar ? 6 : 5) + (seleccionables ? 1 : 0)} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={(puedeEditar ? 6 : 5) + (seleccionables ? 1 : 0) - (puedeVerPrecios ? 0 : 2)} className="px-4 py-8 text-center text-gray-400">
                   Sin ítems agregados{puedeAgregar
                     ? (tipo === "servicio"
                       ? " — usa “+ Agregar ítem manual” para escribir uno o “+ Agregar ítem de plantilla” para elegir del catálogo de servicios."
@@ -243,14 +244,18 @@ export default function TablaItemsCotizacion({
                       onChange={(e) => handleItem(item._key, "cantidad", parseFloat(e.target.value) || 0)}
                       className={`w-full text-center ${editable ? INP : "bg-transparent border-transparent text-sm px-2 py-1"} ${intentoGuardar && cantidadInvalida(item) ? "border-red-400 ring-1 ring-red-300" : ""}`} />
                   </td>
-                  <td className="px-3 py-3">
-                    <input type="number" min="0" step="0.01" value={item.precio} disabled={!editable}
-                      onChange={(e) => handleItem(item._key, "precio", parseFloat(e.target.value) || 0)}
-                      className={`w-full text-right ${editable ? INP : "bg-transparent border-transparent text-sm px-2 py-1"} ${intentoGuardar && precioInvalido(item) ? "border-red-400 ring-1 ring-red-300" : ""}`} />
-                  </td>
-                  <td className="px-3 py-3 text-right font-medium text-gray-700 tabular-nums">
-                    {calcSubtotal(item).toFixed(2)}
-                  </td>
+                  {puedeVerPrecios && (
+                    <td className="px-3 py-3">
+                      <input type="number" min="0" step="0.01" value={item.precio} disabled={!editable}
+                        onChange={(e) => handleItem(item._key, "precio", parseFloat(e.target.value) || 0)}
+                        className={`w-full text-right ${editable ? INP : "bg-transparent border-transparent text-sm px-2 py-1"} ${intentoGuardar && precioInvalido(item) ? "border-red-400 ring-1 ring-red-300" : ""}`} />
+                    </td>
+                  )}
+                  {puedeVerPrecios && (
+                    <td className="px-3 py-3 text-right font-medium text-gray-700 tabular-nums">
+                      {calcSubtotal(item).toFixed(2)}
+                    </td>
+                  )}
                   {puedeEditar && (
                     <td className="px-3 py-3 text-center">
                       {editable && (
@@ -263,7 +268,7 @@ export default function TablaItemsCotizacion({
               ))
             )}
           </tbody>
-          {items.length > 0 && (
+          {items.length > 0 && puedeVerPrecios && (
             <tfoot className="border-t-2 border-gray-200 bg-gray-50">
               <tr>
                 <td colSpan={colsIzquierda} className="px-4 py-2 text-right text-xs text-gray-500">Subtotal</td>

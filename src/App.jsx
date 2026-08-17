@@ -75,7 +75,7 @@ export default function App() {
       <Route
         path="/empresas"
         element={
-          <ProtectedRoute roles={["admin", "asistente", "jefatura"]}>
+          <ProtectedRoute roles={["admin", "asistente", "jefatura", "almacenero", "planner"]}>
             <Layout><Empresas /></Layout>
           </ProtectedRoute>
         }
@@ -179,7 +179,7 @@ export default function App() {
       <Route
         path="/facturacion-electronica/guias"
         element={
-          <ProtectedRoute roles={["admin", "asistente", "facturacion", "almacenero", "jefatura"]}>
+          <ProtectedRoute roles={["admin", "asistente", "facturacion", "almacenero", "jefatura", "planner"]}>
             <Layout><ListaGuias /></Layout>
           </ProtectedRoute>
         }
@@ -187,7 +187,7 @@ export default function App() {
       <Route
         path="/facturacion-electronica/guias/emitir"
         element={
-          <ProtectedRoute roles={["admin", "asistente", "facturacion", "almacenero", "jefatura"]}>
+          <ProtectedRoute roles={["admin", "asistente", "facturacion", "almacenero", "jefatura", "planner"]}>
             <Layout><EmitirGuia /></Layout>
           </ProtectedRoute>
         }

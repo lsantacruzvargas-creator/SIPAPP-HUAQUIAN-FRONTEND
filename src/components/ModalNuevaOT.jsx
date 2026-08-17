@@ -13,7 +13,7 @@ const FORM_VACIO = {
   planta: "",
   titulo: "",
   condicion: "",
-  categorizacionTaller: "",
+  categorizacionTaller: "MANTENIMIENTO PREVENTIVO",
   micLinea: "",
   backup: "",
   entregadoPor: "",
@@ -29,7 +29,7 @@ const FORM_VACIO = {
 export default function ModalNuevaOT({ onClose, onCreada }) {
   const [form, setForm] = useState(FORM_VACIO);
   const [empresas, setEmpresas] = useState([]);
-  const [personal, setPersonal] = useState([]);
+  const [tecnicos, setTecnicos] = useState([]);
   const [empresasOpen, setEmpresasOpen] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
@@ -42,7 +42,11 @@ export default function ModalNuevaOT({ onClose, onCreada }) {
       r.ok && r.json().then((d) => setForm((f) => ({ ...f, numeroOT: d.siguiente })))
     );
     cargarEmpresas();
-    fetchAuth("/personal/lista?todos=true").then((r) => r.ok && r.json().then(setPersonal));
+    // Encargado Prueba / Encargado Intervención se eligen entre los
+    // usuarios con login y rol "tecnico" (antes salían de Personal, que no
+    // tiene ninguna relación real con quién puede loguearse como técnico y
+    // que su nombre coincida con el de la OT — ver Fase 13).
+    fetchAuth("/usuarios/lista").then((r) => r.ok && r.json()).then((u) => setTecnicos((u || []).filter((x) => x.rol === "tecnico")));
   }, []);
 
   const empresaSel = empresas.find((e) => e._id === form.empresa);
@@ -184,20 +188,20 @@ export default function ModalNuevaOT({ onClose, onCreada }) {
               </select>
             </div>
             <div>
-              <label className="text-xs text-gray-500 block mb-1">Encargado</label>
+              <label className="text-xs text-gray-500 block mb-1">Encargado Prueba</label>
               <select name="encargado" value={form.encargado} onChange={handleChange} className={INP}>
                 <option value="">Sin asignar</option>
-                {personal.map((p) => (
-                  <option key={p._id} value={p.nombre}>{p.nombre}{!p.activo ? " (inactivo)" : ""}</option>
+                {tecnicos.map((t) => (
+                  <option key={t._id} value={t.nombre}>{t.nombre}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="text-xs text-gray-500 block mb-1">Encargado 2</label>
+              <label className="text-xs text-gray-500 block mb-1">Encargado Intervención</label>
               <select name="encargado2" value={form.encargado2} onChange={handleChange} className={INP}>
                 <option value="">Sin asignar</option>
-                {personal.map((p) => (
-                  <option key={p._id} value={p.nombre}>{p.nombre}{!p.activo ? " (inactivo)" : ""}</option>
+                {tecnicos.map((t) => (
+                  <option key={t._id} value={t.nombre}>{t.nombre}</option>
                 ))}
               </select>
             </div>

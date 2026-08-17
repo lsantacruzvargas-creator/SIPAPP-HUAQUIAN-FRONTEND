@@ -4,7 +4,9 @@ import { getUsuario, logout, fetchAuth } from "../utils/fetchAuth.js";
 import { useSidebar } from "../context/SidebarContext.jsx";
 import PanelNotificaciones from "./PanelNotificaciones";
 
-const ROL_LABEL = { admin: "Admin", tecnico: "Técnico", almacenero: "Almacenero", asistente: "Asistente", supervisor: "Supervisor", jefatura: "Jefatura", facturacion: "Facturación", planner: "Planner" };
+// "asistente" es el valor de rol real (DB/JWT/permisos) — solo se renombra
+// la etiqueta visible a "Administración", nunca el valor almacenado.
+const ROL_LABEL = { admin: "Admin", tecnico: "Técnico", almacenero: "Almacenero", asistente: "Administración", supervisor: "Supervisor", jefatura: "Jefatura", facturacion: "Facturación", planner: "Planner" };
 
 const TEMAS = [
   { id: "claro",  icon: "☀️", title: "Tema claro" },
@@ -95,7 +97,6 @@ export default function Sidebar() {
   const esTecnico    = usuario?.rol === "tecnico";
   const esAlmacenero = usuario?.rol === "almacenero";
   const esAdmin      = usuario?.rol === "admin";
-  const esAsistente  = usuario?.rol === "asistente";
   const esSupervisor = usuario?.rol === "supervisor";
   const esJefatura   = usuario?.rol === "jefatura";
   const esFacturacion = usuario?.rol === "facturacion";
@@ -110,7 +111,6 @@ export default function Sidebar() {
   const [vistasHasta, setVistasHasta] = useState(() => Number(localStorage.getItem("notif_vistas_hasta")) || 0);
 
   useEffect(() => {
-    if (!esComercial) return;
     const cargar = () => {
       fetchAuth("/notificaciones")
         .then((r) => r.ok && r.json())
@@ -125,7 +125,7 @@ export default function Sidebar() {
       clearInterval(intervalo);
       window.removeEventListener("app:cambio-guardado", cargar);
     };
-  }, [esComercial]);
+  }, []);
 
   const sinVer = notificaciones.filter((n) => new Date(n.fecha).getTime() > vistasHasta).length;
 
@@ -150,12 +150,12 @@ export default function Sidebar() {
     { to: "/dashboard", label: "Dashboard", Icon: IconHome, show: esComercial || esJefatura },
     { to: "/ordenes-trabajo", label: "Orden de Trabajo", Icon: IconClipboard, show: esComercial || esTecnico || esSupervisor || esPlanner || esJefatura },
     { to: "/cotizaciones", label: "Cotizaciones", Icon: IconDocument, show: esComercial || esPlanner || esJefatura },
-    { to: "/ordenes-compra", label: "Órdenes de Compra", Icon: IconCart, show: esComercial || esFacturacion || esJefatura },
+    { to: "/ordenes-compra", label: "Órdenes de Compra", Icon: IconCart, show: esAdmin || esFacturacion || esJefatura },
     { to: "/facturas", label: "Facturas", Icon: IconReceipt, show: esAdmin || esFacturacion || esJefatura },
     { to: "/facturacion-electronica", label: "Fact. Electrónica", Icon: IconBolt, show: esComercial || esFacturacion || esJefatura },
     { to: "/facturacion-electronica/guias", label: "Guías", Icon: IconTruck, show: esAdmin || esFacturacion || esAlmacenero || esJefatura },
-    { to: "/tipo-cambio", label: "Tipo de Cambio", Icon: IconExchange, show: esAdmin || esAsistente || esFacturacion || esAlmacenero || esJefatura },
-    { to: "/empresas", label: "Empresas", Icon: IconBuilding, show: esComercial || esJefatura },
+    { to: "/tipo-cambio", label: "Tipo de Cambio", Icon: IconExchange, show: esAdmin || esFacturacion || esAlmacenero || esJefatura },
+    { to: "/empresas", label: "Empresas", Icon: IconBuilding, show: esComercial || esJefatura || esAlmacenero || esPlanner },
     { to: "/catalogo-servicios", label: "Catálogo", Icon: IconTag, show: esAdmin || esJefatura },
     { to: "/almacen", label: "Almacén", Icon: IconArchive, show: esAdmin || esAlmacenero || esJefatura },
     { to: "/inventario", label: "Inventario", Icon: IconBoxes, show: esAdmin || esAlmacenero || esTecnico || esPlanner || esJefatura },
@@ -245,26 +245,24 @@ export default function Sidebar() {
             ))}
           </div>
 
-          {esComercial && (
-            <button
-              onClick={togglePanel}
-              className={`group relative w-full flex items-center gap-3 px-2 py-2 rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-800 transition-colors ${colapsado ? "md:justify-center" : ""}`}
-            >
-              <span className="relative shrink-0">
-                <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                </svg>
-                {sinVer > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
-                    {sinVer > 9 ? "9+" : sinVer}
-                  </span>
-                )}
-              </span>
-              <span className={colapsado ? "md:hidden" : ""}>Notificaciones</span>
-              {colapsado && <span className="hidden md:contents"><Tooltip>Notificaciones</Tooltip></span>}
-            </button>
-          )}
+          <button
+            onClick={togglePanel}
+            className={`group relative w-full flex items-center gap-3 px-2 py-2 rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-800 transition-colors ${colapsado ? "md:justify-center" : ""}`}
+          >
+            <span className="relative shrink-0">
+              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              </svg>
+              {sinVer > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
+                  {sinVer > 9 ? "9+" : sinVer}
+                </span>
+              )}
+            </span>
+            <span className={colapsado ? "md:hidden" : ""}>Notificaciones</span>
+            {colapsado && <span className="hidden md:contents"><Tooltip>Notificaciones</Tooltip></span>}
+          </button>
 
           <div className={`flex items-center gap-2.5 px-1 pt-1 ${colapsado ? "md:justify-center" : ""}`}>
             <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-sm font-bold shadow-sm shrink-0">
