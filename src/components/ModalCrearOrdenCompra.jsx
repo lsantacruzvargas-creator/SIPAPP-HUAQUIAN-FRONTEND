@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { fetchAuth } from "../utils/fetchAuth";
+import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 
 const INP     = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 w-full";
 const INP_DIS = "border border-gray-100 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500 w-full";
@@ -55,6 +55,9 @@ function BuscadorCotizacion({ onSelect, onClose }) {
 }
 
 export default function ModalCrearOrdenCompra({ onClose, onCreada }) {
+  // Administración crea OC sin ver/editar el monto — lo completa después un
+  // rol con acceso a precios (mismo criterio que cotizaciones, Fase 16).
+  const esAsistente = getUsuario()?.rol === "asistente";
   const [form, setForm] = useState({
     numeroOrden: "", numeroFactura: "",
     empresa: "", titulo: "",
@@ -101,7 +104,11 @@ export default function ModalCrearOrdenCompra({ onClose, onCreada }) {
   };
 
   const guardar = async () => {
-    if (!form.subtotal || Number(form.subtotal) <= 0) return setError("El subtotal debe ser mayor a 0.");
+    // Administración no ve/edita el monto — su OC se crea en 0 y un rol con
+    // acceso a precios lo completa después (mismo criterio que cotizaciones).
+    if (!esAsistente && (!form.subtotal || Number(form.subtotal) <= 0)) {
+      return setError("El subtotal debe ser mayor a 0.");
+    }
     setError(""); setGuardando(true);
 
     const payload = {
@@ -196,30 +203,32 @@ export default function ModalCrearOrdenCompra({ onClose, onCreada }) {
             </select>
           </div>
 
-          {/* Cálculos */}
-          <div className="bg-gray-50 rounded-xl p-4 grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <label className="text-xs text-gray-500 block mb-1">Subtotal sin IGV *</label>
-              <input type="number" name="subtotal" value={form.subtotal} onChange={handleChange}
-                step="0.01" min="0" placeholder="0.00" className={INP} />
+          {/* Cálculos — ocultos para Administración, que no ve/edita montos */}
+          {!esAsistente && (
+            <div className="bg-gray-50 rounded-xl p-4 grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <label className="text-xs text-gray-500 block mb-1">Subtotal sin IGV *</label>
+                <input type="number" name="subtotal" value={form.subtotal} onChange={handleChange}
+                  disabled={esAsistente} step="0.01" min="0" placeholder="0.00" className={INP} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">IGV 18%</label>
+                <input value={calc.igv.toFixed(2)} disabled className={INP_DIS} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Total</label>
+                <input value={calc.total.toFixed(2)} disabled className={INP_DIS} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Detracción (12%)</label>
+                <input value={calc.detraccion.toFixed(2)} disabled className={INP_DIS} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Total a pagar</label>
+                <input value={calc.totalAPagar.toFixed(2)} disabled className={`${INP_DIS} font-semibold`} />
+              </div>
             </div>
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">IGV 18%</label>
-              <input value={calc.igv.toFixed(2)} disabled className={INP_DIS} />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">Total</label>
-              <input value={calc.total.toFixed(2)} disabled className={INP_DIS} />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">Detracción (12%)</label>
-              <input value={calc.detraccion.toFixed(2)} disabled className={INP_DIS} />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">Total a pagar</label>
-              <input value={calc.totalAPagar.toFixed(2)} disabled className={`${INP_DIS} font-semibold`} />
-            </div>
-          </div>
+          )}
 
           {/* Descripción y personal */}
           <div>

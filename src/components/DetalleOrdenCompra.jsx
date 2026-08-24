@@ -43,6 +43,7 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
   const [guardando, setGuardando] = useState(false);
   const [error, setError]         = useState("");
   const [cargandoFactura, setCargandoFactura] = useState(false);
+  const [cargandoCot, setCargandoCot] = useState(false);
   const [crearFacturaOpen, setCrearFacturaOpen] = useState(false);
   const [ordenActual, setOrdenActual] = useState(orden);
   const [guardandoConfirmacion, setGuardandoConfirmacion] = useState("");
@@ -85,6 +86,21 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
     const full = lista.find(f => f._id === facturaVinculada._id) || facturaVinculada;
     setCargandoFactura(false);
     onNavegar?.({ tipo: "factura", data: full });
+  };
+
+  // `orden.cotizacion` viene de un populate() acotado (solo trae codigo,
+  // numeroCotizacion, titulo, total, tipo, aprobado, enviado, informeEnviado
+  // — ver Backend/src/routes/ordenesCompra.js) — pasarlo tal cual a
+  // DetalleCotizacion dejaba el resto de sus ~25 campos (empresa, planta,
+  // items, moneda, etc.) en blanco. Mismo fix que `abrirFactura`.
+  const abrirCotizacion = async () => {
+    if (!cot || cargandoCot) return;
+    setCargandoCot(true);
+    const res = await fetchAuth("/cotizaciones");
+    const lista = res.ok ? await res.json() : [];
+    const full = lista.find(c => c._id === cot._id) || cot;
+    setCargandoCot(false);
+    onNavegar?.({ tipo: "cotizacion", data: full });
   };
 
   const cargarOTeInformes = () => {
@@ -195,8 +211,12 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
             </div>
             <div className="flex items-center gap-4">
               <div className="text-right">
-                <p className="text-[10px] text-white/60 uppercase tracking-widest leading-none">Total a pagar</p>
-                <p className="text-lg font-bold leading-tight">{money(calc.totalAPagar)}</p>
+                {rolActual !== "asistente" && (
+                  <>
+                    <p className="text-[10px] text-white/60 uppercase tracking-widest leading-none">Total a pagar</p>
+                    <p className="text-lg font-bold leading-tight">{money(calc.totalAPagar)}</p>
+                  </>
+                )}
                 {factura?.estadoPago && (
                   <Chip className="mt-0.5 bg-white/20 text-white">{factura.estadoPago}</Chip>
                 )}
@@ -355,32 +375,35 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
               </div>
             </div>
 
-            {/* Cálculos */}
-            <div className="rounded-xl bg-gradient-to-br from-gray-50 to-blue-50/40 border border-gray-100 p-4 space-y-4">
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Subtotal sin IGV</label>
-                <input type="number" name="subtotal" value={form.subtotal} onChange={handleChange}
-                  step="0.01" min="0" placeholder="0.00" className={`${INP} text-lg font-semibold`} />
-              </div>
-              <div className="grid grid-cols-3 gap-3 text-sm">
-                <div className="text-center">
-                  <p className="text-xs text-gray-400">IGV 18%</p>
-                  <p className="font-semibold text-gray-700">{calc.igv.toFixed(2)}</p>
+            {/* Cálculos — ocultos para Administración, que no ve/edita montos */}
+            {rolActual !== "asistente" && (
+              <div className="rounded-xl bg-gradient-to-br from-gray-50 to-blue-50/40 border border-gray-100 p-4 space-y-4">
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Subtotal sin IGV</label>
+                  <input type="number" name="subtotal" value={form.subtotal} onChange={handleChange}
+                    disabled={rolActual === "asistente"}
+                    step="0.01" min="0" placeholder="0.00" className={`${INP} text-lg font-semibold`} />
                 </div>
-                <div className="text-center">
-                  <p className="text-xs text-gray-400">Total</p>
-                  <p className="font-semibold text-gray-700">{calc.total.toFixed(2)}</p>
+                <div className="grid grid-cols-3 gap-3 text-sm">
+                  <div className="text-center">
+                    <p className="text-xs text-gray-400">IGV 18%</p>
+                    <p className="font-semibold text-gray-700">{calc.igv.toFixed(2)}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs text-gray-400">Total</p>
+                    <p className="font-semibold text-gray-700">{calc.total.toFixed(2)}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs text-gray-400">Detracción 12%</p>
+                    <p className="font-semibold text-gray-700">{calc.detraccion.toFixed(2)}</p>
+                  </div>
                 </div>
-                <div className="text-center">
-                  <p className="text-xs text-gray-400">Detracción 12%</p>
-                  <p className="font-semibold text-gray-700">{calc.detraccion.toFixed(2)}</p>
+                <div className="flex items-center justify-between pt-3 border-t border-gray-200">
+                  <span className="text-sm font-medium text-gray-600">Total a pagar</span>
+                  <span className="text-lg font-bold text-blue-700">{money(calc.totalAPagar)}</span>
                 </div>
               </div>
-              <div className="flex items-center justify-between pt-3 border-t border-gray-200">
-                <span className="text-sm font-medium text-gray-600">Total a pagar</span>
-                <span className="text-lg font-bold text-blue-700">{money(calc.totalAPagar)}</span>
-              </div>
-            </div>
+            )}
 
             {error && <p className="text-xs text-red-500">{error}</p>}
           </fieldset>
@@ -393,7 +416,7 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
             </div>
 
             <TarjetaRelacion tipo="cotizacion" codigo={cot?.codigo} numero={cot?.numeroCotizacion} vacio={!cot}
-              onClick={cot ? () => onNavegar?.({ tipo: "cotizacion", data: cot }) : undefined}>
+              onClick={cot ? abrirCotizacion : undefined} cargando={cargandoCot}>
               <p className="text-sm text-gray-700 line-clamp-2">{cot?.titulo}</p>
               {cot?.total > 0 && <p className="text-xs text-gray-500">{money(cot.total)}</p>}
             </TarjetaRelacion>

@@ -70,15 +70,25 @@ const BULLETS_ESTANDAR = (clave, titulo, simbolo = "▫") => ({
 
 // Checklist "de una sola columna" (# | Descripción | OK/NOK) — el técnico
 // escribe OK/NOK/NA en un solo input por ítem.
-const checklistSimple = (titulo, items) => ({
+// `prefijoClave` opcional: por defecto los ítems se llaman "item1",
+// "item2"... — funciona bien cuando el tipo de informe tiene un solo
+// checklist de este tipo (el caso común). Un tipo con VARIAS secciones
+// checklist independientes en el mismo form (ej. servomotor: inspección
+// visual / desarmado / armado) DEBE pasar un prefijo distinto a cada una
+// — si no, los 3 "item1" comparten la misma llave en `campos` y cambiar
+// un selector de una sección pisa el valor de las otras 2 (bug real,
+// reportado por el usuario). No se cambió el default sin prefijo para no
+// alterar la clave de los tipos que ya tenían un solo checklist (evita
+// romper informes ya guardados con esas claves).
+const checklistSimple = (titulo, items, prefijoClave = "") => ({
   tipo: "checklist", titulo,
-  items: items.map((label, i) => ({ clave: `item${i + 1}`, label })),
+  items: items.map((label, i) => ({ clave: `${prefijoClave}item${i + 1}`, label })),
 });
 
 // Variante de `checklistSimple` con selector OK/NOK en vez de texto libre —
 // mismo shape, solo agrega `opciones` (el renderer genérico la usa para
 // decidir <select> vs <input>, ver SeccionChecklist en FormInformeTecnico.jsx).
-const checklistOkNok = (titulo, items) => ({ ...checklistSimple(titulo, items), opciones: ["OK", "NOK"] });
+const checklistOkNok = (titulo, items, prefijoClave) => ({ ...checklistSimple(titulo, items, prefijoClave), opciones: ["OK", "NOK"] });
 
 // Checklist "de doble columna" (# | Descripción | OK/NOK Inicial | OK/NOK
 // Final) — usa el tipo "tabla" del renderer genérico (grilla filas x
@@ -96,6 +106,50 @@ const checklistDoble = (titulo, clave, items) => ({
 const checklistDobleOkNok = (titulo, clave, items) => ({ ...checklistDoble(titulo, clave, items), opciones: ["OK", "NOK"] });
 
 const EVIDENCIAS_ESTANDAR = { tipo: "evidencias", titulo: "Evidencias fotográficas", clave: "evidencias" };
+
+// "Protocolo de prueba inicial / final" (arrancador, variador_reparacion,
+// ups, servomotor): la plantilla real trae 2 tablas independientes lado a
+// lado, cada una con sus propios valores — nunca un solo set compartido.
+// Antes esto era UNA sola sección con un input por etiqueta (sin distinguir
+// inicial de final), por eso nunca tuvo celda mapeada en el Excel: no había
+// forma de saber a cuál de las 2 tablas iba cada valor. `PROTOCOLO_PRUEBA`
+// genera una sección independiente por variante ("inicial"/"final"), con
+// clave prefijada para que cada una tenga su propio dato en `campos`.
+const PROTOCOLO_ITEMS_ESTANDAR = [
+  ["Encendido", "Encendido"], ["Backup", "Backup"], ["Temperatura", "Temperatura (°C)"],
+  ["Ventilador", "Ventilador"], ["TiempoPrueba", "Tiempo de prueba (min)"], ["CorrienteSalida", "Corriente de salida"],
+  ["CorrienteSoftware", "Corriente de software"], ["VoltajeSalida", "Voltaje salida"], ["VoltajeSoftware", "Voltaje de software"],
+  ["MedicionBusDc", "Medición Bus DC"], ["MedicionLineaTierra", "Medición línea tierra"],
+  ["ProtocoloComunicacion", "Protocolo de comunicación"], ["IdProtocolo", "ID de protocolo"],
+];
+const PROTOCOLO_ITEMS_SERVOMOTOR = [
+  ["Encendido", "Encendido"], ["Temperatura", "Temperatura (°C)"], ["Ventilador", "Ventilador"],
+  ["TiempoPrueba", "Tiempo de prueba (min)"], ["TensionAc", "Tensión AC"], ["VelocidadRpm", "Velocidad RPM"],
+  ["Vibracion", "Vibración"], ["CorrienteFases", "Corriente de medida de fases"],
+  ["CorrienteLu", "Corriente Lu"], ["CorrienteLv", "Corriente Lv"], ["CorrienteLw", "Corriente Lw"],
+  ["MedicionPolos", "Medición de polos"],
+];
+const PROTOCOLO_PRUEBA = (items, variante, prefijo) => ({
+  tipo: "campos", titulo: `Protocolo de prueba ${variante}`,
+  campos: [
+    ...items.map(([sufijo, label]) => ({ clave: `${prefijo}${sufijo}`, label })),
+    { clave: `${prefijo}Observacion`, label: "Observación" },
+  ],
+});
+
+// El cuadro "PRUEBA DE EQUIPO INICIAL/FINAL" de la plantilla (junto al
+// protocolo) es un recuadro de foto, no texto libre — un slotFijo por
+// variante, ver SLOTS_FOTOS.<tipo> en informeTecnicoExcel.js (rango
+// C19:D31 inicial / H19:I31 final en las 4 plantillas que usan
+// PROTOCOLO_PRUEBA).
+// Un slot por variante (no una sola sección combinada) para poder
+// intercalar cada foto justo debajo de SU card de protocolo — no las dos
+// juntas al final, lejos de sus datos correspondientes.
+const EVIDENCIA_PRUEBA_EQUIPO = (variante, prefijo) => ({
+  tipo: "evidencias", titulo: `Foto — Prueba de equipo ${variante}`,
+  clave: `evidenciaPruebaEquipo${variante === "inicial" ? "Inicial" : "Final"}`,
+  slotsFijos: [{ clave: `${prefijo}Prueba`, label: `Prueba de equipo ${variante}` }],
+});
 
 // `slotsFijos` — recuadros de foto fijos e impresos en la plantilla (no se
 // pueden agregar/quitar, a diferencia de EVIDENCIAS_ESTANDAR en modo libre).
@@ -355,9 +409,27 @@ export const TIPOS_INFORME = [
     secciones: [
       { tipo: "campos", titulo: "Datos generales", campos: CAMPOS_HEADER_SERVICIO },
       { tipo: "campos", titulo: "Datos del equipo", campos: [...CAMPOS_EQUIPO_ESTANDAR, ...CAMPOS_OPERARIO] },
-      EVIDENCIAS_ESTANDAR,
-      PIEZAS_A_REEMPLAZAR,
-      checklistDoble("Checklist de verificación técnica", "checklistTecnico", [
+      // 10 recuadros fijos impresos en la plantilla — ver SLOTS_FOTOS.panel
+      // en informeTecnicoExcel.js, que ubica cada foto por la clave del
+      // slot, no por orden de subida. "Cambio de LCD" está repetido a
+      // propósito (antes/después, mismo patrón que "Cambio de Touch").
+      {
+        ...EVIDENCIAS_ESTANDAR, titulo: "Fotos del mantenimiento",
+        slotsFijos: [
+          { clave: "vistaFrontal", label: "Vista frontal del equipo" },
+          { clave: "placaEquipo", label: "Placa Equipo" },
+          { clave: "carcasaContaminada", label: "Carcasa contaminada" },
+          { clave: "carcasaDescontaminada", label: "Carcasa descontaminada" },
+          { clave: "limpiezaTarjetaInicial", label: "Limpieza de tarjeta inicial" },
+          { clave: "limpiezaTarjetaFinal", label: "Limpieza de tarjeta Final" },
+          { clave: "cambioLcdInicial", label: "Cambio de LCD" },
+          { clave: "cambioLcdFinal", label: "Cambio de LCD" },
+          { clave: "cambioTouchInicial", label: "Cambio de Touch" },
+          { clave: "cambioTouchFinal", label: "Cambio de Touch" },
+        ],
+      },
+      PIEZAS_A_REEMPLAZAR_TABLA,
+      checklistDobleOkNok("Checklist de verificación técnica", "checklistTecnico", [
         "Estado de conectores",
         "Estado conexiones de potencia y control",
         "Estado de LCD",
@@ -387,8 +459,17 @@ export const TIPOS_INFORME = [
           { clave: "equipoPotencia", label: "Equipo — Potencia" }, { clave: "equipoCantidad", label: "Equipo — Cantidad" },
         ],
       },
-      EVIDENCIAS_ESTANDAR,
-      checklistSimple("Checklist de verificación técnica", [
+      // 2 recuadros fijos impresos en la plantilla — ver SLOTS_FOTOS.adicional
+      // en informeTecnicoExcel.js, que ubica cada foto por la clave del
+      // slot, no por orden de subida.
+      {
+        ...EVIDENCIAS_ESTANDAR, titulo: "Fotos del componente y del equipo",
+        slotsFijos: [
+          { clave: "vistaFrontalComponente", label: "Vista frontal del componente" },
+          { clave: "vistaFrontalEquipo", label: "Vista frontal del equipo" },
+        ],
+      },
+      checklistOkNok("Checklist de verificación técnica", [
         "Estado visual del componente",
         "Verificación visual de tarjetas y conectores",
         "Estado de la comunicación o encendido del componente del equipo",
@@ -407,9 +488,23 @@ export const TIPOS_INFORME = [
     secciones: [
       { tipo: "campos", titulo: "Datos generales", campos: CAMPOS_HEADER_SERVICIO },
       { tipo: "campos", titulo: "Datos del equipo", campos: [...CAMPOS_EQUIPO_ESTANDAR, ...CAMPOS_OPERARIO] },
-      EVIDENCIAS_ESTANDAR,
-      PIEZAS_A_REEMPLAZAR,
-      checklistDoble("Checklist de verificación técnica", "checklistTecnico", [
+      // 7 recuadros fijos impresos en la plantilla — ver SLOTS_FOTOS.plc en
+      // informeTecnicoExcel.js, que ubica cada foto por la clave del slot,
+      // no por orden de subida.
+      {
+        ...EVIDENCIAS_ESTANDAR, titulo: "Fotos del mantenimiento",
+        slotsFijos: [
+          { clave: "vistaFrontal", label: "Vista frontal del equipo" },
+          { clave: "placaEquipo", label: "Placa Equipo" },
+          { clave: "carcasaContaminada", label: "Carcasa contaminada" },
+          { clave: "carcasaDescontaminada", label: "Carcasa descontaminada" },
+          { clave: "limpiezaTarjetaInicial", label: "Limpieza de tarjeta inicial" },
+          { clave: "limpiezaTarjetaFinal", label: "Limpieza de tarjeta Final" },
+          { clave: "cambioComponentes", label: "Cambio de componentes" },
+        ],
+      },
+      PIEZAS_A_REEMPLAZAR_TABLA,
+      checklistDobleOkNok("Checklist de verificación técnica", "checklistTecnico", [
         "Estado de conectores",
         "Estado conexiones de potencia y control",
         "Estado de tierra y posibles cortocircuitos",
@@ -431,27 +526,41 @@ export const TIPOS_INFORME = [
     secciones: [
       { tipo: "campos", titulo: "Datos generales", campos: CAMPOS_HEADER_SERVICIO },
       { tipo: "campos", titulo: "Datos del equipo", campos: [...CAMPOS_EQUIPO_ESTANDAR, ...CAMPOS_OPERARIO] },
+      PROTOCOLO_PRUEBA(PROTOCOLO_ITEMS_ESTANDAR, "inicial", "protoInicial"),
+      EVIDENCIA_PRUEBA_EQUIPO("inicial", "protoInicial"),
+      PROTOCOLO_PRUEBA(PROTOCOLO_ITEMS_ESTANDAR, "final", "protoFinal"),
+      EVIDENCIA_PRUEBA_EQUIPO("final", "protoFinal"),
+      // 13 recuadros fijos impresos en la plantilla — ver
+      // SLOTS_FOTOS.arrancador en informeTecnicoExcel.js, que ubica cada
+      // foto por la clave del slot, no por orden de subida. "Cambio de
+      // componentes" y "Medición de SCR" están repetidos a propósito
+      // (antes/después de la intervención), mismo patrón que otros tipos.
       {
-        tipo: "campos", titulo: "Protocolo de prueba inicial / final",
-        campos: [
-          { clave: "protoEncendido", label: "Encendido" }, { clave: "protoBackup", label: "Backup" },
-          { clave: "protoTemperatura", label: "Temperatura (°C)" }, { clave: "protoVentilador", label: "Ventilador" },
-          { clave: "protoTiempoPrueba", label: "Tiempo de prueba (min)" }, { clave: "protoCorrienteSalida", label: "Corriente de salida" },
-          { clave: "protoCorrienteSoftware", label: "Corriente de software" }, { clave: "protoVoltajeSalida", label: "Voltaje salida" },
-          { clave: "protoVoltajeSoftware", label: "Voltaje de software" }, { clave: "protoMedicionBusDc", label: "Medición Bus DC" },
-          { clave: "protoMedicionLineaTierra", label: "Medición línea tierra" }, { clave: "protoProtocoloComunicacion", label: "Protocolo de comunicación" },
-          { clave: "protoIdProtocolo", label: "ID de protocolo" }, { clave: "protoObservacion", label: "Observación" },
+        ...EVIDENCIAS_ESTANDAR, titulo: "Fotos del mantenimiento",
+        slotsFijos: [
+          { clave: "vistaFrontal", label: "Vista frontal del equipo" },
+          { clave: "placaEquipo", label: "Placa Equipo" },
+          { clave: "carcasaContaminada", label: "Carcasa contaminada" },
+          { clave: "carcasaDescontaminada", label: "Carcasa descontaminada" },
+          { clave: "limpiezaContaminada", label: "Limpieza Contaminada" },
+          { clave: "limpiezaDescontaminada", label: "Limpieza Descontaminada" },
+          { clave: "pastaTermicaSeca", label: "Pasta térmica seca" },
+          { clave: "pastaTermicaNueva", label: "Pasta térmica nueva" },
+          { clave: "cambioVentilador", label: "Cambio ventilador" },
+          { clave: "cambioComponentesInicial", label: "Cambio de componentes" },
+          { clave: "cambioComponentesFinal", label: "Cambio de componentes" },
+          { clave: "medicionScrInicial", label: "Medición de SCR" },
+          { clave: "medicionScrFinal", label: "Medición de SCR" },
         ],
       },
-      EVIDENCIAS_ESTANDAR,
       {
         tipo: "tabla", titulo: "Medición de SCR", clave: "medicionScr",
         columnas: [{ clave: "gateAnode", label: "Gate-Anode (Ω)" }, { clave: "gateCathode", label: "Gate-Cathode (Ω)" }],
         filas: [{ clave: "scr1", label: "SCR 1" }, { clave: "scr2", label: "SCR 2" }, { clave: "scr3", label: "SCR 3" }],
       },
       BULLETS_ESTANDAR("observacionesScr", "Observaciones de la medición"),
-      PIEZAS_A_REEMPLAZAR,
-      checklistDoble("Checklist de verificación técnica", "checklistTecnico", [
+      PIEZAS_A_REEMPLAZAR_TABLA,
+      checklistDobleOkNok("Checklist de verificación técnica", "checklistTecnico", [
         "Estado general del gabinete y carcasa",
         "Estado visual de tarjetas y conectores",
         "Estado conexiones de potencia y control",
@@ -478,19 +587,36 @@ export const TIPOS_INFORME = [
     secciones: [
       { tipo: "campos", titulo: "Datos generales", campos: CAMPOS_HEADER_SERVICIO },
       { tipo: "campos", titulo: "Datos del equipo", campos: [...CAMPOS_EQUIPO_ESTANDAR, ...CAMPOS_OPERARIO] },
+      PROTOCOLO_PRUEBA(PROTOCOLO_ITEMS_ESTANDAR, "inicial", "protoInicial"),
+      EVIDENCIA_PRUEBA_EQUIPO("inicial", "protoInicial"),
+      PROTOCOLO_PRUEBA(PROTOCOLO_ITEMS_ESTANDAR, "final", "protoFinal"),
+      EVIDENCIA_PRUEBA_EQUIPO("final", "protoFinal"),
+      // 13 recuadros fijos impresos en la plantilla — ver
+      // SLOTS_FOTOS.variador_reparacion en informeTecnicoExcel.js, que
+      // ubica cada foto por la clave del slot, no por orden de subida.
+      // "Cambio de componentes" y "Medición de IGBT" están repetidos a
+      // propósito (antes/después de la intervención). El rótulo impreso de
+      // este último dice "MEDICION DE IGBT" (no "SCR" — ese componente es
+      // de arrancador, no de variador), corregido acá aunque el usuario
+      // pidió "Medición de SCR" copiando el texto del informe anterior.
       {
-        tipo: "campos", titulo: "Protocolo de prueba inicial / final",
-        campos: [
-          { clave: "protoEncendido", label: "Encendido" }, { clave: "protoBackup", label: "Backup" },
-          { clave: "protoTemperatura", label: "Temperatura (°C)" }, { clave: "protoVentilador", label: "Ventilador" },
-          { clave: "protoTiempoPrueba", label: "Tiempo de prueba (min)" }, { clave: "protoCorrienteSalida", label: "Corriente de salida" },
-          { clave: "protoCorrienteSoftware", label: "Corriente de software" }, { clave: "protoVoltajeSalida", label: "Voltaje salida" },
-          { clave: "protoVoltajeSoftware", label: "Voltaje de software" }, { clave: "protoMedicionBusDc", label: "Medición Bus DC" },
-          { clave: "protoMedicionLineaTierra", label: "Medición línea tierra" }, { clave: "protoProtocoloComunicacion", label: "Protocolo de comunicación" },
-          { clave: "protoIdProtocolo", label: "ID de protocolo" }, { clave: "protoObservacion", label: "Observación" },
+        ...EVIDENCIAS_ESTANDAR, titulo: "Fotos del mantenimiento",
+        slotsFijos: [
+          { clave: "vistaFrontal", label: "Vista frontal del equipo" },
+          { clave: "placaEquipo", label: "Placa Equipo" },
+          { clave: "carcasaContaminada", label: "Carcasa contaminada" },
+          { clave: "carcasaDescontaminada", label: "Carcasa descontaminada" },
+          { clave: "tarjetaContaminada", label: "Tarjeta Contaminada" },
+          { clave: "tarjetaDescontaminada", label: "Tarjeta Descontaminada" },
+          { clave: "pastaTermicaSeca", label: "Pasta térmica seca" },
+          { clave: "pastaTermicaNueva", label: "Pasta térmica nueva" },
+          { clave: "cambioVentilador", label: "Cambio ventilador" },
+          { clave: "cambioComponentesInicial", label: "Cambio de componentes" },
+          { clave: "cambioComponentesFinal", label: "Cambio de componentes" },
+          { clave: "medicionIgbtFotoInicial", label: "Medición de IGBT" },
+          { clave: "medicionIgbtFotoFinal", label: "Medición de IGBT" },
         ],
       },
-      EVIDENCIAS_ESTANDAR,
       {
         tipo: "tabla", titulo: "Medición de diodos de IGBT — ingreso", clave: "medicionIgbtIngreso",
         columnas: [{ clave: "dcMenos", label: "DC-" }, { clave: "dcMas", label: "DC+" }],
@@ -502,8 +628,8 @@ export const TIPOS_INFORME = [
         filas: [{ clave: "u", label: "U" }, { clave: "v", label: "V" }, { clave: "w", label: "W" }],
       },
       BULLETS_ESTANDAR("observacionesIgbt", "Observaciones de la medición"),
-      PIEZAS_A_REEMPLAZAR,
-      checklistDoble("Checklist de verificación técnica", "checklistTecnico", [
+      PIEZAS_A_REEMPLAZAR_TABLA,
+      checklistDobleOkNok("Checklist de verificación técnica", "checklistTecnico", [
         "Estado general del gabinete y carcasa",
         "Estado visual de tarjetas y conectores",
         "Estado conexiones de potencia y control",
@@ -529,18 +655,10 @@ export const TIPOS_INFORME = [
     secciones: [
       { tipo: "campos", titulo: "Datos generales", campos: CAMPOS_HEADER_SERVICIO },
       { tipo: "campos", titulo: "Datos del equipo", campos: [...CAMPOS_EQUIPO_ESTANDAR, ...CAMPOS_OPERARIO] },
-      {
-        tipo: "campos", titulo: "Protocolo de prueba inicial / final",
-        campos: [
-          { clave: "protoEncendido", label: "Encendido" }, { clave: "protoBackup", label: "Backup" },
-          { clave: "protoTemperatura", label: "Temperatura (°C)" }, { clave: "protoVentilador", label: "Ventilador" },
-          { clave: "protoTiempoPrueba", label: "Tiempo de prueba (min)" }, { clave: "protoCorrienteSalida", label: "Corriente de salida" },
-          { clave: "protoCorrienteSoftware", label: "Corriente de software" }, { clave: "protoVoltajeSalida", label: "Voltaje salida" },
-          { clave: "protoVoltajeSoftware", label: "Voltaje de software" }, { clave: "protoMedicionBusDc", label: "Medición Bus DC" },
-          { clave: "protoMedicionLineaTierra", label: "Medición línea tierra" }, { clave: "protoProtocoloComunicacion", label: "Protocolo de comunicación" },
-          { clave: "protoIdProtocolo", label: "ID de protocolo" }, { clave: "protoObservacion", label: "Observación" },
-        ],
-      },
+      PROTOCOLO_PRUEBA(PROTOCOLO_ITEMS_ESTANDAR, "inicial", "protoInicial"),
+      EVIDENCIA_PRUEBA_EQUIPO("inicial", "protoInicial"),
+      PROTOCOLO_PRUEBA(PROTOCOLO_ITEMS_ESTANDAR, "final", "protoFinal"),
+      EVIDENCIA_PRUEBA_EQUIPO("final", "protoFinal"),
       EVIDENCIAS_ESTANDAR,
       {
         tipo: "tabla", titulo: "Medición de baterías", clave: "medicionBaterias",
@@ -582,20 +700,12 @@ export const TIPOS_INFORME = [
           ...CAMPOS_OPERARIO,
         ],
       },
-      {
-        tipo: "campos", titulo: "Protocolo de prueba inicial / final",
-        campos: [
-          { clave: "protoEncendido", label: "Encendido" }, { clave: "protoTemperatura", label: "Temperatura (°C)" },
-          { clave: "protoVentilador", label: "Ventilador" }, { clave: "protoTiempoPrueba", label: "Tiempo de prueba (min)" },
-          { clave: "protoTensionAc", label: "Tensión AC" }, { clave: "protoVelocidadRpm", label: "Velocidad RPM" },
-          { clave: "protoVibracion", label: "Vibración" }, { clave: "protoCorrienteFases", label: "Corriente de medida de fases" },
-          { clave: "protoCorrienteLu", label: "Corriente Lu" }, { clave: "protoCorrienteLv", label: "Corriente Lv" },
-          { clave: "protoCorrienteLw", label: "Corriente Lw" }, { clave: "protoMedicionPolos", label: "Medición de polos" },
-          { clave: "protoObservacion", label: "Observación" },
-        ],
-      },
-      PIEZAS_A_REEMPLAZAR,
-      checklistSimple("Checklist — Inspección visual y medición básica", [
+      PROTOCOLO_PRUEBA(PROTOCOLO_ITEMS_SERVOMOTOR, "inicial", "protoInicial"),
+      EVIDENCIA_PRUEBA_EQUIPO("inicial", "protoInicial"),
+      PROTOCOLO_PRUEBA(PROTOCOLO_ITEMS_SERVOMOTOR, "final", "protoFinal"),
+      EVIDENCIA_PRUEBA_EQUIPO("final", "protoFinal"),
+      PIEZAS_A_REEMPLAZAR_TABLA,
+      checklistOkNok("Checklist — Inspección visual y medición básica", [
         "Pernos completos",
         "Revisión de pernos dañados / barridos",
         "Estado del servomotor (rupturas o soporte en mal estado, oxidación)",
@@ -618,8 +728,8 @@ export const TIPOS_INFORME = [
         "Medida de la resistencia de la bobina",
         "Medida de las fases con tierra",
         "Medida de la deflexión del eje del rotor",
-      ]),
-      checklistSimple("Checklist del proceso desarmado", [
+      ], "insp_"),
+      checklistOkNok("Checklist del proceso desarmado", [
         "Marcas de referencias para el desarmado",
         "Estado de la resistencia de aislamiento de la bobina de servomotor",
         "Estado de la resistencia de la bobina",
@@ -641,8 +751,8 @@ export const TIPOS_INFORME = [
         "Estado de los alojamientos de rodamiento del ventilador",
         "Estado de los asientos de rodamiento del ventilador",
         "Estado del funcionamiento mecánico del brake",
-      ]),
-      checklistSimple("Checklist del proceso de armado", [
+      ], "desarme_"),
+      checklistOkNok("Checklist del proceso de armado", [
         "Sincronización del resolver",
         "Torque de pernos del resolver/encoder",
         "Ajuste de perno a la tapa del servomotor",
@@ -658,16 +768,19 @@ export const TIPOS_INFORME = [
         "Estado de alineamiento del encoder/resolver",
         "Medida de la corriente de las fases",
         "Medida de vibración",
-      ]),
+      ], "armado_"),
       BULLETS_ESTANDAR("observacionesArmado", "Observaciones del proceso de armado"),
       {
+        // "Medición de sensor del estator" y "Resistencia de aislamiento —
+        // Condiciones" son títulos de grupo impresos en la plantilla real
+        // (fila 105/106), no campos con su propio dato — los campos reales
+        // de cada grupo (Termistor.../Resistencia de aislamiento...) ya
+        // llevan el contexto en su propia etiqueta compuesta.
         tipo: "campos", titulo: "Pruebas eléctricas estáticas (equipo desenergizado)",
         campos: [
-          { clave: "medicionSensorEstator", label: "Medición de sensor del estator" },
           { clave: "termistorValor", label: "Termistor — Valor (Ω)" },
           { clave: "termistorSituacion", label: "Termistor — Situación" },
           { clave: "termistorEstado", label: "Termistor — Estado" },
-          { clave: "aislamientoCondiciones", label: "Resistencia de aislamiento — Condiciones" },
           { clave: "aislamientoTempAmbiente", label: "Resistencia de aislamiento — Temperatura ambiente (°C)" },
           { clave: "aislamientoTensionPrueba", label: "Resistencia de aislamiento — Tensión de prueba" },
           { clave: "aislamientoTiempoPrueba", label: "Resistencia de aislamiento — Tiempo de prueba (min)" },
@@ -708,22 +821,60 @@ export const TIPOS_INFORME = [
         ],
       },
       {
+        // "Sección (mm)" es el rótulo de columna de la mini-tabla impresa
+        // (fila 113) — la única fila de esa tabla ya trae su "sección"
+        // fija impresa ("EJE DE ACOPLE", fila 114), no es un dato a
+        // ingresar.
         tipo: "campos", titulo: "Deflexión del eje de acople",
         campos: [
-          { clave: "deflexionSeccion", label: "Sección (mm)" }, { clave: "deflexionDiametro", label: "Diámetro" },
+          { clave: "deflexionDiametro", label: "Diámetro" },
           { clave: "deflexionValor", label: "Deflexión" }, { clave: "deflexionEstado", label: "Estado" },
           { clave: "deflexionToleranciaDesde", label: "Tolerancia AR100 — Desde" }, { clave: "deflexionToleranciaHasta", label: "Tolerancia AR100 — Hasta" },
         ],
       },
       BULLETS_ESTANDAR("herramientasMateriales", "Herramientas y materiales utilizados", "🔧"),
-      { ...EVIDENCIAS_ESTANDAR, titulo: "Evidencias de mantenimiento" },
+      // 14 recuadros fijos impresos en la plantilla, en 4 bandas (filas
+      // 128-139, 141-154, 169-188, 190-209) — ver SLOTS_FOTOS.servomotor en
+      // informeTecnicoExcel.js, que ubica cada foto por la clave del slot,
+      // no por orden de subida. "EVIDENCIAS DE MANTENIMIENTO" (impreso en
+      // la fila 168) es el título de esta sección completa, no una
+      // etiqueta de foto — confirmado con el usuario tras encontrar un
+      // posible malentendido (los rótulos de fila 128-154 SÍ son
+      // específicos: eje del rotor, rodamientos, chavetero/chaveta, etc.,
+      // no genéricos A/B/C/D).
+      {
+        ...EVIDENCIAS_ESTANDAR, titulo: "Evidencias de mantenimiento",
+        slotsFijos: [
+          { clave: "estadoEjeRotor", label: "Estado del eje del rotor" },
+          { clave: "asientoRodamientoDelantero", label: "Asiento de rodamiento delantero" },
+          { clave: "estadoNucleoRotor", label: "Estado del núcleo del rotor" },
+          { clave: "asientoTrasero", label: "Asiento trasero" },
+          { clave: "estadoChaveteroChaveta", label: "Estado de chavetero/chaveta" },
+          { clave: "rodamientoDelantero", label: "Rodamiento delantero" },
+          { clave: "fotoOriginalRotor", label: "Foto original del rotor" },
+          { clave: "rodamientoTrasero", label: "Rodamiento trasero" },
+          // 4 recuadros genéricos A/B/C/D, captionados en la plantilla real
+          // por el título "EVIDENCIAS DE MANTENIMIENTO" (fila 168) — a
+          // diferencia de las bandas anteriores, esta sí usa letras
+          // genéricas en vez de rótulos específicos.
+          { clave: "evidenciaA", label: "A", separador: "Evidencias del mantenimiento" },
+          { clave: "evidenciaB", label: "B" },
+          { clave: "evidenciaC", label: "C" },
+          { clave: "evidenciaD", label: "D" },
+          { clave: "vistaFrontalEquipo", label: "Vista frontal del equipo" },
+          { clave: "placaEquipoFoto", label: "Placa del equipo" },
+          { clave: "fotoEncoder", label: "Foto encoder" },
+          { clave: "cambioRodamientosFoto", label: "Cambio de rodamientos" },
+          { clave: "estadoInternoEquipoInicial", label: "Estado interno del equipo inicial" },
+          { clave: "estadoInternoEquipoFinal", label: "Estado interno del equipo final" },
+        ],
+      },
       {
         tipo: "campos", titulo: "Placa del equipo",
         campos: [
           { clave: "placaMarca", label: "Marca" }, { clave: "placaModelo", label: "Modelo" }, { clave: "placaVoltaje", label: "Voltaje" },
         ],
       },
-      BULLETS_ESTANDAR("cambioRodamientos", "Cambio de rodamientos"),
       BULLETS_ESTANDAR("observaciones", "Observaciones"),
       BULLETS_ESTANDAR("conclusiones", "Conclusiones"),
       BULLETS_ESTANDAR("recomendaciones", "Recomendaciones"),

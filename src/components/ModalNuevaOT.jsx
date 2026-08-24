@@ -46,7 +46,7 @@ export default function ModalNuevaOT({ onClose, onCreada }) {
     // usuarios con login y rol "tecnico" (antes salían de Personal, que no
     // tiene ninguna relación real con quién puede loguearse como técnico y
     // que su nombre coincida con el de la OT — ver Fase 13).
-    fetchAuth("/usuarios/lista").then((r) => r.ok && r.json()).then((u) => setTecnicos((u || []).filter((x) => x.rol === "tecnico")));
+    fetchAuth("/usuarios/lista").then((r) => r.ok && r.json()).then((u) => setTecnicos((u || []).filter((x) => ["tecnico", "tecnico_prueba", "tecnico_intervencion"].includes(x.rol))));
   }, []);
 
   const empresaSel = empresas.find((e) => e._id === form.empresa);
@@ -191,7 +191,7 @@ export default function ModalNuevaOT({ onClose, onCreada }) {
               <label className="text-xs text-gray-500 block mb-1">Encargado Prueba</label>
               <select name="encargado" value={form.encargado} onChange={handleChange} className={INP}>
                 <option value="">Sin asignar</option>
-                {tecnicos.map((t) => (
+                {tecnicos.filter((t) => t.rol === "tecnico_prueba").map((t) => (
                   <option key={t._id} value={t.nombre}>{t.nombre}</option>
                 ))}
               </select>
@@ -200,7 +200,7 @@ export default function ModalNuevaOT({ onClose, onCreada }) {
               <label className="text-xs text-gray-500 block mb-1">Encargado Intervención</label>
               <select name="encargado2" value={form.encargado2} onChange={handleChange} className={INP}>
                 <option value="">Sin asignar</option>
-                {tecnicos.map((t) => (
+                {tecnicos.filter((t) => t.rol === "tecnico_intervencion").map((t) => (
                   <option key={t._id} value={t.nombre}>{t.nombre}</option>
                 ))}
               </select>

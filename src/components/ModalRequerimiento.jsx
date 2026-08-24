@@ -132,7 +132,7 @@ export default function ModalRequerimiento({ ot, onClose, onCreado }) {
                   ) : (
                     <>
                       <p className="text-sm font-medium text-gray-800">{it.materialInfo.nombre}</p>
-                      <p className="text-xs text-gray-400 font-mono">{it.materialInfo.codigo} — stock: {it.materialInfo.stock} {it.materialInfo.unidad}</p>
+                      <p className="text-xs text-gray-400 font-mono">{it.materialInfo.sku} — stock: {it.materialInfo.stock} {it.materialInfo.unidad}</p>
                     </>
                   )}
                 </div>

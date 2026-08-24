@@ -204,7 +204,7 @@ function SeccionEvidencias({ seccion, campos, onCampos }) {
   const gruposAMostrar = seccion.slotsFijos
     ? seccion.slotsFijos.map((slot) => {
         const g = grupos.find((gr) => gr.titulo === slot.clave);
-        return g ? { ...g, _label: slot.label } : null;
+        return g ? { ...g, _label: slot.label, _separador: slot.separador } : null;
       }).filter(Boolean)
     : grupos;
 
@@ -231,41 +231,46 @@ function SeccionEvidencias({ seccion, campos, onCampos }) {
     <Seccion titulo={seccion.titulo}>
       <div className="space-y-3">
         {gruposAMostrar.map((g) => (
-          <div key={g._key} className="border border-gray-100 rounded-xl p-3 space-y-2 bg-gray-50/50">
-            <div className="flex items-center gap-2">
-              {seccion.slotsFijos ? (
-                <span className="flex-1 text-sm font-semibold text-gray-700">{g._label}</span>
-              ) : (
-                <>
-                  <input value={g.titulo} onChange={(e) => actualizarTitulo(g._key, e.target.value)}
-                    placeholder="Leyenda (ej. Ingreso de equipo)" className={`${INP} flex-1`} />
-                  <button type="button" onClick={() => eliminarGrupo(g._key)} className="text-red-300 hover:text-red-500 shrink-0">✕</button>
-                </>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {g.imagenes.map((img, i) => (
-                <div key={i} className="relative group/foto shrink-0">
-                  <ImagenProtegida src={img} className="w-16 h-16 object-cover rounded-lg border border-gray-200" />
-                  <button type="button" onClick={() => eliminarImagen(g._key, i)}
-                    title="Eliminar foto"
-                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white text-xs leading-none flex items-center justify-center opacity-0 group-hover/foto:opacity-100 hover:bg-red-600 transition shadow">
-                    ✕
-                  </button>
-                </div>
-              ))}
-              {["environment", null].map((capture) => (
-                <label key={capture || "galeria"}
-                  className={`w-16 h-16 flex flex-col items-center justify-center border-2 border-dashed rounded-lg cursor-pointer transition text-gray-400 select-none
-                    ${subiendo === g._key ? "opacity-50 cursor-wait border-gray-200" : "border-gray-300 hover:border-amber-400 hover:text-amber-500"}`}>
-                  <span className="text-lg leading-none">{capture ? "📷" : "🖼️"}</span>
-                  <span className="text-[10px] mt-0.5">{capture ? "Cámara" : "Galería"}</span>
-                  <input type="file" accept="image/*" multiple className="hidden"
-                    capture={capture || undefined}
-                    disabled={subiendo === g._key}
-                    onChange={(e) => subir(g._key, e.target.files)} />
-                </label>
-              ))}
+          <div key={g._key}>
+            {g._separador && (
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2 mt-1 first:mt-0">{g._separador}</p>
+            )}
+            <div className="border border-gray-100 rounded-xl p-3 space-y-2 bg-gray-50/50">
+              <div className="flex items-center gap-2">
+                {seccion.slotsFijos ? (
+                  <span className="flex-1 text-sm font-semibold text-gray-700">{g._label}</span>
+                ) : (
+                  <>
+                    <input value={g.titulo} onChange={(e) => actualizarTitulo(g._key, e.target.value)}
+                      placeholder="Leyenda (ej. Ingreso de equipo)" className={`${INP} flex-1`} />
+                    <button type="button" onClick={() => eliminarGrupo(g._key)} className="text-red-300 hover:text-red-500 shrink-0">✕</button>
+                  </>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {g.imagenes.map((img, i) => (
+                  <div key={i} className="relative group/foto shrink-0">
+                    <ImagenProtegida src={img} className="w-16 h-16 object-cover rounded-lg border border-gray-200" />
+                    <button type="button" onClick={() => eliminarImagen(g._key, i)}
+                      title="Eliminar foto"
+                      className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white text-xs leading-none flex items-center justify-center opacity-0 group-hover/foto:opacity-100 hover:bg-red-600 transition shadow">
+                      ✕
+                    </button>
+                  </div>
+                ))}
+                {["environment", null].map((capture) => (
+                  <label key={capture || "galeria"}
+                    className={`w-16 h-16 flex flex-col items-center justify-center border-2 border-dashed rounded-lg cursor-pointer transition text-gray-400 select-none
+                      ${subiendo === g._key ? "opacity-50 cursor-wait border-gray-200" : "border-gray-300 hover:border-amber-400 hover:text-amber-500"}`}>
+                    <span className="text-lg leading-none">{capture ? "📷" : "🖼️"}</span>
+                    <span className="text-[10px] mt-0.5">{capture ? "Cámara" : "Galería"}</span>
+                    <input type="file" accept="image/*" multiple className="hidden"
+                      capture={capture || undefined}
+                      disabled={subiendo === g._key}
+                      onChange={(e) => subir(g._key, e.target.files)} />
+                  </label>
+                ))}
+              </div>
             </div>
           </div>
         ))}

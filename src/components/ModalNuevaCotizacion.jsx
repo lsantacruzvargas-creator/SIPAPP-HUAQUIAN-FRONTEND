@@ -18,6 +18,9 @@ const FORM_VACIO = {
   titulo: "", encargado: "", planta: "", condicionPago: "",
   plazoEntrega: "", lugarEntrega: "", validezOferta: "",
   numeroGuiaEmision: "", numeroGuiaRemision: "", codigoSap: "", fechaSalida: "",
+  asesorComercial: "", numeroCelular: "", numeroSolicitudPedido: "",
+  numeroPeticionOferta: "", tiempoGarantia: "",
+  area: "", omAviso: "", numeroGuia: "", jefeSupervisorSolicitante: "", compradorResponsable: "",
   subtotal: "", moneda: "PEN",
 };
 
@@ -95,9 +98,19 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
       numeroGuiaRemision: form.numeroGuiaRemision,
       codigoSap: form.codigoSap,
       fechaSalida: form.fechaSalida || null,
+      asesorComercial: form.asesorComercial,
+      numeroCelular: form.numeroCelular,
+      numeroSolicitudPedido: form.numeroSolicitudPedido,
+      numeroPeticionOferta: form.numeroPeticionOferta,
+      tiempoGarantia: form.tiempoGarantia,
+      area: form.area,
+      omAviso: form.omAviso,
+      numeroGuia: form.numeroGuia,
+      jefeSupervisorSolicitante: form.jefeSupervisorSolicitante,
+      compradorResponsable: form.compradorResponsable,
       items: items.map(i => {
         const it = {
-          descripcion: i.descripcion, cantidad: i.cantidad, precio: i.precio,
+          descripcion: i.descripcion, unidad: i.unidad || "und", cantidad: i.cantidad, precio: i.precio,
           moneda: i.moneda, subtotal: calcSubtotal(i),
         };
         if (i.subItems?.length > 0) it.subItems = i.subItems.map(s => s.texto).filter(Boolean);
@@ -233,6 +246,57 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
+                <label className="text-xs text-gray-500 block mb-1">Asesor comercial</label>
+                <input name="asesorComercial" value={form.asesorComercial} onChange={handleChange} placeholder="Nombre del asesor" className={INP} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">N° Celular</label>
+                <input name="numeroCelular" value={form.numeroCelular} onChange={handleChange} placeholder="—" className={INP} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">N° de solicitud de pedido</label>
+                <input name="numeroSolicitudPedido" value={form.numeroSolicitudPedido} onChange={handleChange} placeholder="—" className={INP} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">N° de petición de oferta</label>
+                <input name="numeroPeticionOferta" value={form.numeroPeticionOferta} onChange={handleChange} placeholder="—" className={INP} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Área</label>
+                <input name="area" value={form.area} onChange={handleChange} placeholder="—" className={INP} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Jefe / Supervisor solicitante</label>
+                <input name="jefeSupervisorSolicitante" value={form.jefeSupervisorSolicitante} onChange={handleChange} placeholder="—" className={INP} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">OM / Aviso</label>
+                <input name="omAviso" value={form.omAviso} onChange={handleChange} placeholder="—" className={INP} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Comprador responsable</label>
+                <input name="compradorResponsable" value={form.compradorResponsable} onChange={handleChange} placeholder="—" className={INP} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">N° de guía</label>
+                <input name="numeroGuia" value={form.numeroGuia} onChange={handleChange} placeholder="—" className={INP} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
                 <label className="text-xs text-gray-500 block mb-1">Moneda de la cotización</label>
                 <select name="moneda" value={form.moneda} onChange={handleChange} className={INP}>
                   <option value="PEN">Soles (S/)</option>
@@ -287,6 +351,10 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
               <div>
                 <label className="text-xs text-gray-500 block mb-1">Validez de la oferta</label>
                 <input name="validezOferta" value={form.validezOferta} onChange={handleChange} placeholder="Ej. 15 días" className={INP} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Tiempo de garantía</label>
+                <input name="tiempoGarantia" value={form.tiempoGarantia} onChange={handleChange} placeholder="Ej. 12 meses" className={INP} />
               </div>
             </div>
 

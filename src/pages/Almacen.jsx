@@ -118,46 +118,61 @@ function SeccionUbicaciones() {
 
 // ─── Sección Materiales ─────────────────────────────────────────────────────
 
+const FORM_MATERIAL_VACIO = {
+  tipoComponente: "", categoria: "", codigo: "", nombre: "", descripcion: "",
+  unidad: "und", stockMinimo: 0, ubicacion: "", tipoMaterial: "",
+};
+
 function SeccionMateriales() {
   const [lista, setLista] = useState([]);
   const [ubicaciones, setUbicaciones] = useState([]);
-  const [form, setForm] = useState({ nombre: "", descripcion: "", unidad: "und", stockMinimo: 0, ubicacion: "", tipoMaterial: "" });
-  const [editando, setEditando] = useState(null);
+  const [tiposComponente, setTiposComponente] = useState([]);
+  const [categoriasComponente, setCategoriasComponente] = useState([]);
+  const [form, setForm] = useState(FORM_MATERIAL_VACIO);
   const [guardando, setGuardando] = useState(false);
   const [busqueda, setBusqueda] = useState("");
+  const [mostrarInactivos, setMostrarInactivos] = useState(false);
   const [error, setError] = useState("");
 
   const cargar = useCallback(async () => {
-    const [rm, ru] = await Promise.all([
-      fetchAuth("/materiales"),
+    const [rm, ru, rt, rc] = await Promise.all([
+      fetchAuth("/materiales?todas=true"),
       fetchAuth("/ubicaciones"),
+      fetchAuth("/tipos-componente"),
+      fetchAuth("/categorias-componente"),
     ]);
     if (rm.ok) setLista(await rm.json());
     if (ru.ok) setUbicaciones(await ru.json());
+    if (rt.ok) setTiposComponente(await rt.json());
+    if (rc.ok) setCategoriasComponente(await rc.json());
   }, []);
 
   useEffect(() => { cargar(); }, [cargar]);
 
-  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
-
-  const iniciarEdicion = (m) => {
-    setEditando(m._id);
-    setForm({
-      nombre: m.nombre,
-      descripcion: m.descripcion,
-      unidad: m.unidad,
-      stockMinimo: m.stockMinimo,
-      ubicacion: m.ubicacion?._id || "",
-      tipoMaterial: m.tipoMaterial || "",
-    });
-    setError("");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    // Cambiar el Tipo Componente invalida la Categoría elegida (es hija del
+    // tipo anterior) — se resetea para no dejar una combinación inconsistente.
+    if (name === "tipoComponente") {
+      setForm({ ...form, tipoComponente: value, categoria: "" });
+    } else {
+      setForm({ ...form, [name]: value });
+    }
   };
 
-  const cancelar = () => {
-    setEditando(null);
-    setForm({ nombre: "", descripcion: "", unidad: "und", stockMinimo: 0, ubicacion: "", tipoMaterial: "" });
-    setError("");
+  const categoriasDelTipo = categoriasComponente.filter(
+    (c) => (c.tipoComponente?._id || c.tipoComponente) === form.tipoComponente
+  );
+
+  // Un SKU es inmutable una vez creado (ver PUT /materiales/:id en backend) —
+  // lo único que se puede cambiar después es `activo`, con este toggle.
+  const cambiarActivo = async (m, activo) => {
+    const r = await fetchAuth(`/materiales/${m._id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ activo }),
+    });
+    if (r.ok) await cargar();
   };
 
   const guardar = async () => {
@@ -165,16 +180,14 @@ function SeccionMateriales() {
     if (!form.tipoMaterial) { setError("Selecciona si es Repuesto o Consumible."); return; }
     setError("");
     setGuardando(true);
-    const metodo = editando ? "PUT" : "POST";
-    const url = editando ? `/materiales/${editando}` : "/materiales";
-    const r = await fetchAuth(url, {
-      method: metodo,
+    const r = await fetchAuth("/materiales", {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
     });
     if (r.ok) {
       await cargar();
-      cancelar();
+      setForm(FORM_MATERIAL_VACIO);
     } else {
       const d = await r.json().catch(() => ({}));
       setError(d.mensaje || "Error al guardar el material.");
@@ -182,10 +195,13 @@ function SeccionMateriales() {
     setGuardando(false);
   };
 
-  const filtrados = lista.filter((m) =>
-    m.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-    m.codigo.toLowerCase().includes(busqueda.toLowerCase())
-  );
+  const filtrados = lista
+    .filter((m) => mostrarInactivos || m.activo)
+    .filter((m) =>
+      m.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+      m.sku?.toLowerCase().includes(busqueda.toLowerCase()) ||
+      m.codigo?.toLowerCase().includes(busqueda.toLowerCase())
+    );
 
   const badgeStock = (m) => {
     if (m.stock <= 0) return "bg-red-100 text-red-700";
@@ -195,14 +211,35 @@ function SeccionMateriales() {
 
   return (
     <div className="space-y-6">
-      {/* Formulario */}
+      {/* Formulario — solo creación: un SKU ya creado es inmutable, la única
+          acción posterior es activarlo/desactivarlo desde la tabla. */}
       <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">
-          {editando ? "Editar material" : "Nuevo material (SKU)"}
+          Nuevo material (SKU)
         </p>
+        {/* Orden del formulario: Tipo Componente → Categoría → Código → Título/Descripción */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Nombre *</label>
+            <label className="text-xs text-gray-500 block mb-1">Tipo Componente</label>
+            <select name="tipoComponente" value={form.tipoComponente} onChange={handleChange} className={`w-full ${INP}`}>
+              <option value="">Sin clasificar</option>
+              {tiposComponente.map((t) => <option key={t._id} value={t._id}>{t.nombre}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Categoría</label>
+            <select name="categoria" value={form.categoria} onChange={handleChange} disabled={!form.tipoComponente} className={`w-full ${INP}`}>
+              <option value="">{form.tipoComponente ? "Sin clasificar" : "Elige un Tipo Componente primero"}</option>
+              {categoriasDelTipo.map((c) => <option key={c._id} value={c._id}>{c.nombre}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Código</label>
+            <input name="codigo" value={form.codigo} onChange={handleChange}
+              className={`w-full ${INP}`} placeholder="Opcional" />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Título *</label>
             <input name="nombre" value={form.nombre} onChange={handleChange}
               className={`w-full ${INP}`} placeholder="Ej: Válvula de expansión 3/8" />
           </div>
@@ -240,60 +277,53 @@ function SeccionMateriales() {
         </div>
         {error && <p className="text-xs text-red-500 mt-3">{error}</p>}
         <div className="flex gap-2 mt-4">
-          {editando && (
-            <button onClick={cancelar}
-              className="text-sm border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 transition">
-              Cancelar
-            </button>
-          )}
           <button onClick={guardar} disabled={guardando || !form.nombre.trim() || !form.tipoMaterial}
             className="text-sm bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition font-medium">
-            {guardando ? "Guardando…" : editando ? "Actualizar" : "Crear material"}
+            {guardando ? "Guardando…" : "Crear material"}
           </button>
         </div>
       </div>
 
       {/* Buscador */}
-      <input
-        value={busqueda} onChange={(e) => setBusqueda(e.target.value)}
-        className={`w-full ${INP}`} placeholder="Buscar por nombre o código…" />
+      <div className="flex items-center gap-4">
+        <input
+          value={busqueda} onChange={(e) => setBusqueda(e.target.value)}
+          className={`flex-1 ${INP}`} placeholder="Buscar por título, SKU o código…" />
+        <label className="flex items-center gap-1.5 text-xs text-gray-500 whitespace-nowrap">
+          <input type="checkbox" checked={mostrarInactivos} onChange={(e) => setMostrarInactivos(e.target.checked)} />
+          Mostrar inactivos
+        </label>
+      </div>
 
-      {/* Tabla */}
-      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+      {/* Tabla — ancha al 80vw (se sale del contenedor max-w-6xl de la página) */}
+      <div className="relative left-1/2 -ml-[40vw] w-[80vw] max-w-[80vw] bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">SKU</th>
               <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Código</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Nombre</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">Unidad</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">Ubicación</th>
-              <th className="text-center px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Centro de costo</th>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Título</th>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Descripción</th>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Tipo Componente</th>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Categoría</th>
               <th className="text-center px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Stock</th>
-              <th className="px-5 py-3"></th>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Ubicación</th>
+              <th className="text-center px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Activo</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {filtrados.length === 0 && (
-              <tr><td colSpan={7} className="text-center py-10 text-gray-300 text-sm">Sin materiales</td></tr>
+              <tr><td colSpan={9} className="text-center py-10 text-gray-300 text-sm">Sin materiales</td></tr>
             )}
             {filtrados.map((m) => (
-              <tr key={m._id} className="hover:bg-gray-50/50 transition">
-                <td className="px-5 py-3 font-mono text-xs text-gray-500">{m.codigo}</td>
-                <td className="px-5 py-3">
-                  <p className="font-medium text-gray-800">{m.nombre}</p>
-                  {m.descripcion && <p className="text-xs text-gray-400">{m.descripcion}</p>}
-                </td>
-                <td className="px-5 py-3 text-gray-500 hidden md:table-cell">{m.unidad}</td>
-                <td className="px-5 py-3 text-gray-500 hidden md:table-cell">{m.ubicacion?.nombre || "—"}</td>
-                <td className="px-5 py-3 text-center">
-                  {m.tipoMaterial ? (
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${m.tipoMaterial === "repuesto" ? "bg-indigo-100 text-indigo-700" : "bg-cyan-100 text-cyan-700"}`}>
-                      {m.tipoMaterial}
-                    </span>
-                  ) : (
-                    <span className="text-xs text-gray-300">—</span>
-                  )}
-                </td>
+              <tr key={m._id} className={`hover:bg-gray-50/50 transition ${!m.activo ? "opacity-50" : ""}`}>
+                <td className="px-5 py-3 font-mono text-xs text-gray-500">{m.sku}</td>
+                <td className="px-5 py-3 font-mono text-xs text-gray-500">{m.codigo || <span className="text-gray-300">—</span>}</td>
+                <td className="px-5 py-3 font-medium text-gray-800">{m.nombre}</td>
+                <td className="px-5 py-3 text-gray-500">{m.descripcion || <span className="text-gray-300">—</span>}</td>
+                <td className="px-5 py-3 text-gray-500">{m.tipoComponente?.nombre || <span className="text-gray-300">—</span>}</td>
+                <td className="px-5 py-3 text-gray-500">{m.categoria?.nombre || <span className="text-gray-300">—</span>}</td>
                 <td className="px-5 py-3 text-center">
                   <div className="flex flex-col items-center gap-0.5">
                     <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${badgeStock(m)}`}>
@@ -306,14 +336,16 @@ function SeccionMateriales() {
                     )}
                   </div>
                 </td>
-                <td className="px-5 py-3 text-right">
-                  <button onClick={() => iniciarEdicion(m)}
-                    className="text-xs text-blue-500 hover:text-blue-700 transition">Editar</button>
+                <td className="px-5 py-3 text-gray-500">{m.ubicacion?.nombre || "—"}</td>
+                <td className="px-5 py-3 text-center">
+                  <input type="checkbox" checked={m.activo}
+                    onChange={(e) => cambiarActivo(m, e.target.checked)} />
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
@@ -484,6 +516,190 @@ function SeccionCategorias() {
   );
 }
 
+// ─── Sección Tipo Componente / Categoría ────────────────────────────────────
+// Jerarquía de clasificación de Materiales (distinta de "Categorías de
+// compra" — esa es un catálogo aparte para formularios de solicitud). Un
+// Tipo Componente agrupa varias Categorías hijas; una Categoría no existe
+// sin su Tipo Componente padre.
+
+function SeccionComponentes() {
+  const [tipos, setTipos] = useState([]);
+  const [categorias, setCategorias] = useState([]);
+  const [tipoSel, setTipoSel] = useState(null);
+
+  const [nombreTipo, setNombreTipo] = useState("");
+  const [editandoTipo, setEditandoTipo] = useState(null);
+  const [guardandoTipo, setGuardandoTipo] = useState(false);
+  const [errorTipo, setErrorTipo] = useState("");
+
+  const [nombreCat, setNombreCat] = useState("");
+  const [editandoCat, setEditandoCat] = useState(null);
+  const [guardandoCat, setGuardandoCat] = useState(false);
+  const [errorCat, setErrorCat] = useState("");
+
+  const cargar = useCallback(async () => {
+    const [rt, rc] = await Promise.all([
+      fetchAuth("/tipos-componente"),
+      fetchAuth("/categorias-componente"),
+    ]);
+    if (rt.ok) setTipos(await rt.json());
+    if (rc.ok) setCategorias(await rc.json());
+  }, []);
+
+  useEffect(() => { cargar(); }, [cargar]);
+
+  const cancelarTipo = () => { setEditandoTipo(null); setNombreTipo(""); setErrorTipo(""); };
+  const iniciarEdicionTipo = (t) => { setEditandoTipo(t._id); setNombreTipo(t.nombre); setErrorTipo(""); };
+
+  const guardarTipo = async () => {
+    if (!nombreTipo.trim()) { setErrorTipo("El nombre es obligatorio."); return; }
+    setGuardandoTipo(true);
+    setErrorTipo("");
+    const metodo = editandoTipo ? "PUT" : "POST";
+    const url = editandoTipo ? `/tipos-componente/${editandoTipo}` : "/tipos-componente";
+    const r = await fetchAuth(url, { method: metodo, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nombre: nombreTipo.trim() }) });
+    if (r.ok) { await cargar(); cancelarTipo(); }
+    else { const d = await r.json().catch(() => ({})); setErrorTipo(d.mensaje || "Error al guardar el Tipo Componente."); }
+    setGuardandoTipo(false);
+  };
+
+  const eliminarTipo = async (t) => {
+    if (!window.confirm(`¿Desactivar el Tipo Componente "${t.nombre}"? También sus categorías hijas dejarán de aparecer para elegir.`)) return;
+    const r = await fetchAuth(`/tipos-componente/${t._id}`, { method: "DELETE" });
+    if (r.ok) { await cargar(); if (tipoSel === t._id) setTipoSel(null); }
+  };
+
+  const categoriasDelTipo = categorias.filter((c) => (c.tipoComponente?._id || c.tipoComponente) === tipoSel);
+
+  const cancelarCat = () => { setEditandoCat(null); setNombreCat(""); setErrorCat(""); };
+  const iniciarEdicionCat = (c) => { setEditandoCat(c._id); setNombreCat(c.nombre); setErrorCat(""); };
+
+  const guardarCat = async () => {
+    if (!nombreCat.trim()) { setErrorCat("El nombre es obligatorio."); return; }
+    setGuardandoCat(true);
+    setErrorCat("");
+    const metodo = editandoCat ? "PUT" : "POST";
+    const url = editandoCat ? `/categorias-componente/${editandoCat}` : "/categorias-componente";
+    const body = editandoCat ? { nombre: nombreCat.trim() } : { nombre: nombreCat.trim(), tipoComponente: tipoSel };
+    const r = await fetchAuth(url, { method: metodo, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (r.ok) { await cargar(); cancelarCat(); }
+    else { const d = await r.json().catch(() => ({})); setErrorCat(d.mensaje || "Error al guardar la Categoría."); }
+    setGuardandoCat(false);
+  };
+
+  const eliminarCat = async (c) => {
+    if (!window.confirm(`¿Desactivar la categoría "${c.nombre}"?`)) return;
+    const r = await fetchAuth(`/categorias-componente/${c._id}`, { method: "DELETE" });
+    if (r.ok) await cargar();
+  };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Tipos Componente */}
+      <div className="space-y-6">
+        <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">
+            {editandoTipo ? "Editar Tipo Componente" : "Nuevo Tipo Componente"}
+          </p>
+          {errorTipo && <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg mb-3">{errorTipo}</p>}
+          <input value={nombreTipo} onChange={(e) => setNombreTipo(e.target.value)}
+            className={`w-full ${INP}`} placeholder="Ej: Semiconductores" />
+          <div className="flex gap-2 mt-4">
+            {editandoTipo && (
+              <button onClick={cancelarTipo} className="text-sm border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 transition">Cancelar</button>
+            )}
+            <button onClick={guardarTipo} disabled={guardandoTipo || !nombreTipo.trim()}
+              className="text-sm bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition font-medium">
+              {guardandoTipo ? "Guardando…" : editandoTipo ? "Actualizar" : "Crear"}
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b border-gray-100">
+              <tr>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Tipo Componente</th>
+                <th className="px-5 py-3"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {tipos.length === 0 && (
+                <tr><td colSpan={2} className="text-center py-10 text-gray-300 text-sm">Sin tipos registrados</td></tr>
+              )}
+              {tipos.map((t) => (
+                <tr key={t._id}
+                  onClick={() => setTipoSel(t._id)}
+                  className={`cursor-pointer transition ${tipoSel === t._id ? "bg-blue-50" : "hover:bg-gray-50/50"}`}>
+                  <td className="px-5 py-3 font-medium text-gray-800">{t.nombre}</td>
+                  <td className="px-5 py-3 text-right space-x-3" onClick={(e) => e.stopPropagation()}>
+                    <button onClick={() => iniciarEdicionTipo(t)} className="text-xs text-blue-500 hover:text-blue-700 transition">Editar</button>
+                    <button onClick={() => eliminarTipo(t)} className="text-xs text-gray-400 hover:text-red-500 transition">Desactivar</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Categorías del Tipo Componente elegido */}
+      <div className="space-y-6">
+        <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">
+            {tipoSel
+              ? `${editandoCat ? "Editar" : "Nueva"} categoría de "${tipos.find((t) => t._id === tipoSel)?.nombre}"`
+              : "Elige un Tipo Componente a la izquierda"}
+          </p>
+          {tipoSel && (
+            <>
+              {errorCat && <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg mb-3">{errorCat}</p>}
+              <input value={nombreCat} onChange={(e) => setNombreCat(e.target.value)}
+                className={`w-full ${INP}`} placeholder="Ej: Compresores" />
+              <div className="flex gap-2 mt-4">
+                {editandoCat && (
+                  <button onClick={cancelarCat} className="text-sm border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 transition">Cancelar</button>
+                )}
+                <button onClick={guardarCat} disabled={guardandoCat || !nombreCat.trim()}
+                  className="text-sm bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition font-medium">
+                  {guardandoCat ? "Guardando…" : editandoCat ? "Actualizar" : "Crear"}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+
+        {tipoSel && (
+          <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-100">
+                <tr>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Categoría</th>
+                  <th className="px-5 py-3"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {categoriasDelTipo.length === 0 && (
+                  <tr><td colSpan={2} className="text-center py-10 text-gray-300 text-sm">Sin categorías registradas</td></tr>
+                )}
+                {categoriasDelTipo.map((c) => (
+                  <tr key={c._id} className="hover:bg-gray-50/50 transition">
+                    <td className="px-5 py-3 font-medium text-gray-800">{c.nombre}</td>
+                    <td className="px-5 py-3 text-right space-x-3">
+                      <button onClick={() => iniciarEdicionCat(c)} className="text-xs text-blue-500 hover:text-blue-700 transition">Editar</button>
+                      <button onClick={() => eliminarCat(c)} className="text-xs text-gray-400 hover:text-red-500 transition">Desactivar</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Modal Ingreso ──────────────────────────────────────────────────────────
 
 function ModalIngreso({ materiales, onClose, onGuardado }) {
@@ -559,7 +775,7 @@ function ModalIngreso({ materiales, onClose, onGuardado }) {
               <select name="material" value={form.material} onChange={handleChange} className={`w-full ${INP}`}>
                 <option value="">Seleccionar material…</option>
                 {materiales.map((m) => (
-                  <option key={m._id} value={m._id}>{m.codigo} — {m.nombre}</option>
+                  <option key={m._id} value={m._id}>{m.sku} — {m.nombre}</option>
                 ))}
               </select>
             </div>
@@ -694,7 +910,7 @@ function ModalEgreso({ materiales, onClose, onGuardado }) {
               <select name="material" value={form.material} onChange={handleChange} className={`w-full ${INP}`}>
                 <option value="">Seleccionar material…</option>
                 {materiales.map((m) => (
-                  <option key={m._id} value={m._id}>{m.codigo} — {m.nombre} (stock: {m.stock} {m.unidad})</option>
+                  <option key={m._id} value={m._id}>{m.sku} — {m.nombre} (stock: {m.stock} {m.unidad})</option>
                 ))}
               </select>
             </div>
@@ -860,7 +1076,7 @@ function SeccionMovimientos() {
                   </td>
                   <td className="px-4 py-3">
                     <p className="font-medium text-gray-800">{mv.material?.nombre || "—"}</p>
-                    <p className="text-xs text-gray-400 font-mono">{mv.material?.codigo}</p>
+                    <p className="text-xs text-gray-400 font-mono">{mv.material?.sku}</p>
                   </td>
                   <td className="px-4 py-3 text-right text-gray-700 font-mono">
                     {mv.cantidad} {mv.material?.unidad}
@@ -907,6 +1123,7 @@ const TABS = [
   { id: "ubicaciones", label: "Ubicaciones" },
   { id: "materiales", label: "Materiales (SKU)" },
   { id: "movimientos", label: "Movimientos" },
+  { id: "componentes", label: "Tipos de Componente" },
   { id: "categorias", label: "Categorías de compra" },
 ];
 
@@ -940,6 +1157,7 @@ export default function Almacen() {
       {tab === "ubicaciones" && <SeccionUbicaciones />}
       {tab === "materiales" && <SeccionMateriales />}
       {tab === "movimientos" && <SeccionMovimientos />}
+      {tab === "componentes" && <SeccionComponentes />}
       {tab === "categorias" && <SeccionCategorias />}
     </div>
   );

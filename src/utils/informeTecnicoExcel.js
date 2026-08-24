@@ -201,6 +201,51 @@ const CAMPOS_EQUIPO_9COL = {
   observacionIngreso: "E16",
 };
 
+// "Protocolo de prueba inicial / final" (arrancador, variador_reparacion,
+// ups, servomotor) — confirmado celda por celda contra las 4 plantillas
+// reales: los 13 (o 12, servomotor) valores van uno por fila, columna B
+// (inicial) / G (final) — filas 19..31, cada una su propia celda (o su
+// propio merge de altura fija en servomotor, ver abajo). "Observación" es
+// una celda aparte merge A33:B33 (inicial) / F33:G33 (final). "Prueba de
+// equipo" es un cuadro de texto libre grande, merge C19:D31 (inicial) /
+// H19:I31 (final) — con exceljs basta escribir en la celda "master" del
+// merge (la esquina superior-izquierda: C19/H19), escribir en cualquier
+// otra celda del rango no tiene efecto.
+// servomotor: "CORRIENTE DE MEDIDA DE FASES" se ve impreso en 2 filas (26 y
+// 27) pero es UN solo campo — B26:B27/G26:G27 están fusionadas 2 filas de
+// alto (igual A26:A27/F26:F27 del lado del rótulo), no son 2 valores
+// separados. Se mapea a la celda master B26/G26 igual que cualquier otro
+// merge de este archivo.
+const filaProtocolo = (n) => 19 + n; // n=0 -> fila 19, n=12 -> fila 31
+const CAMPOS_PROTOCOLO_ESTANDAR = (() => {
+  const items = [
+    "Encendido", "Backup", "Temperatura", "Ventilador", "TiempoPrueba", "CorrienteSalida",
+    "CorrienteSoftware", "VoltajeSalida", "VoltajeSoftware", "MedicionBusDc", "MedicionLineaTierra",
+    "ProtocoloComunicacion", "IdProtocolo",
+  ];
+  const campos = {};
+  items.forEach((sufijo, i) => {
+    campos[`protoInicial${sufijo}`] = `B${filaProtocolo(i)}`;
+    campos[`protoFinal${sufijo}`] = `G${filaProtocolo(i)}`;
+  });
+  campos.protoInicialObservacion = "A33"; campos.protoFinalObservacion = "F33";
+  return campos;
+})();
+// "PRUEBA DE EQUIPO INICIAL/FINAL" es un recuadro de foto (merge C19:D31 /
+// H19:I31), no texto — ver EVIDENCIAS_PRUEBA_EQUIPO en informesTecnicos.js
+// y SLOTS_FOTOS.<tipo> más abajo.
+const RANGOS_PRUEBA_EQUIPO = { protoInicialPrueba: "C19:D31", protoFinalPrueba: "H19:I31" };
+const CAMPOS_PROTOCOLO_SERVOMOTOR = {
+  protoInicialEncendido: "B19", protoInicialTemperatura: "B20", protoInicialVentilador: "B21", protoInicialTiempoPrueba: "B22",
+  protoInicialTensionAc: "B23", protoInicialVelocidadRpm: "B24", protoInicialVibracion: "B25", protoInicialCorrienteFases: "B26",
+  protoInicialCorrienteLu: "B28", protoInicialCorrienteLv: "B29", protoInicialCorrienteLw: "B30", protoInicialMedicionPolos: "B31",
+  protoInicialObservacion: "A33",
+  protoFinalEncendido: "G19", protoFinalTemperatura: "G20", protoFinalVentilador: "G21", protoFinalTiempoPrueba: "G22",
+  protoFinalTensionAc: "G23", protoFinalVelocidadRpm: "G24", protoFinalVibracion: "G25", protoFinalCorrienteFases: "G26",
+  protoFinalCorrienteLu: "G28", protoFinalCorrienteLv: "G29", protoFinalCorrienteLw: "G30", protoFinalMedicionPolos: "G31",
+  protoFinalObservacion: "F33",
+};
+
 const MAPEOS = {
   suministro: {
     campos: {
@@ -245,11 +290,11 @@ const MAPEOS = {
       observacionFallas: { col: "A", fila: 71, max: 3 },
       recomendacion: { col: "A", fila: 75, max: 4 },
     },
-    // "Estado general" (carcasa/tarjeta/componentes/ventiladores), la
-    // medición de diodos IGBT, piezas a reemplazar y sus observaciones no
-    // quedaron con posición de celda confirmada sin abrir el archivo en
-    // Excel — caen al bloque anexo (no se pierde el dato, solo no queda en
-    // su celda "de papel").
+    // "Estado general" ya no es texto libre — se migró a 8 slots de foto
+    // fijos, ver SLOTS_FOTOS.diagnostico_equipo. La medición de diodos IGBT
+    // y piezas a reemplazar (con sus observaciones) siguen sin celda
+    // confirmada — caen al bloque anexo (no se pierde el dato, solo no
+    // queda en su celda "de papel").
   },
 
   diagnostico_servomotor: {
@@ -267,8 +312,9 @@ const MAPEOS = {
       observacionFallas: { col: "A", fila: 66, max: 3 },
       actividadesARealizar: { col: "A", fila: 70, max: 4 },
     },
-    // "Estado general" y piezas a reemplazar: mismo caso que en
-    // diagnostico_equipo, caen al anexo.
+    // "Estado general" ya no es texto libre — se migró a 8 slots de foto
+    // fijos, ver SLOTS_FOTOS.diagnostico_servomotor. Piezas a reemplazar
+    // sigue sin celda confirmada, cae al anexo.
   },
 
   tarjetas: {
@@ -309,6 +355,9 @@ const MAPEOS = {
 
   panel: {
     campos: { ...CAMPOS_ENCABEZADO_SERVICIO, ...CAMPOS_EQUIPO_9COL },
+    filas: {
+      piezasAReemplazar: { colCantidad: "A", colDescripcion: "B", filaInicial: 64, max: 4 },
+    },
     tabla: {
       checklistTecnico: Object.fromEntries(
         Array.from({ length: 8 }, (_, i) => [i, 70 + i]).flatMap(([i, fila]) => [
@@ -339,6 +388,9 @@ const MAPEOS = {
 
   plc: {
     campos: { ...CAMPOS_ENCABEZADO_SERVICIO, ...CAMPOS_EQUIPO_9COL },
+    filas: {
+      piezasAReemplazar: { colCantidad: "A", colDescripcion: "B", filaInicial: 64, max: 4 },
+    },
     tabla: {
       checklistTecnico: Object.fromEntries(
         Array.from({ length: 8 }, (_, i) => [i, 70 + i]).flatMap(([i, fila]) => [
@@ -354,7 +406,10 @@ const MAPEOS = {
   },
 
   arrancador: {
-    campos: { ...CAMPOS_ENCABEZADO_SERVICIO, ...CAMPOS_EQUIPO_9COL },
+    campos: { ...CAMPOS_ENCABEZADO_SERVICIO, ...CAMPOS_EQUIPO_9COL, ...CAMPOS_PROTOCOLO_ESTANDAR },
+    filas: {
+      piezasAReemplazar: { colCantidad: "F", colDescripcion: "G", filaInicial: 101, max: 3 },
+    },
     tabla: {
       medicionScr: {
         scr1__gateAnode: "B101", scr1__gateCathode: "C101",
@@ -373,14 +428,13 @@ const MAPEOS = {
       conclusiones: { col: "A", fila: 124, max: 3 },
       recomendaciones: { col: "A", fila: 128, max: 2 },
     },
-    // Protocolo de prueba inicial/final y piezas a reemplazar: la zona de
-    // celdas (filas 19-33) corresponde a un bloque combinado más complejo
-    // que un input por fila — no se pudo confirmar la celda exacta de cada
-    // valor sin abrir el archivo en Excel. Caen al anexo.
   },
 
   variador_reparacion: {
-    campos: { ...CAMPOS_ENCABEZADO_SERVICIO, ...CAMPOS_EQUIPO_9COL },
+    campos: { ...CAMPOS_ENCABEZADO_SERVICIO, ...CAMPOS_EQUIPO_9COL, ...CAMPOS_PROTOCOLO_ESTANDAR },
+    filas: {
+      piezasAReemplazar: { colCantidad: "F", colDescripcion: "G", filaInicial: 101, max: 7 },
+    },
     tabla: {
       medicionIgbtIngreso: { l1__dcMenos: "B101", l1__dcMas: "C101", l2__dcMenos: "B102", l2__dcMas: "C102", l3__dcMenos: "B103", l3__dcMas: "C103" },
       medicionIgbtSalida: { u__dcMenos: "B105", u__dcMas: "C105", v__dcMenos: "B106", v__dcMas: "C106", w__dcMenos: "B107", w__dcMas: "C107" },
@@ -399,7 +453,7 @@ const MAPEOS = {
   },
 
   ups: {
-    campos: { ...CAMPOS_ENCABEZADO_SERVICIO, ...CAMPOS_EQUIPO_9COL },
+    campos: { ...CAMPOS_ENCABEZADO_SERVICIO, ...CAMPOS_EQUIPO_9COL, ...CAMPOS_PROTOCOLO_ESTANDAR },
     tabla: {
       medicionBaterias: Object.fromEntries(
         Array.from({ length: 10 }, (_, i) => [i, 101 + i]).flatMap(([i, fila]) => [
@@ -431,6 +485,29 @@ const MAPEOS = {
     campos: {
       ...CAMPOS_ENCABEZADO_SERVICIO,
       equipoMarca: "C15", modelo: "D15", tag: "E15", potencia: "F15", voltaje: "G15", rpm: "H15", serie: "I15",
+      ...CAMPOS_PROTOCOLO_SERVOMOTOR,
+      // "MARCA"/"MODELO"/"VOLTAJE" ya vienen impresos en G186/G187/G188 —
+      // solo hace falta el valor, en la celda merge H186:I186 etc.
+      placaMarca: "H186", placaModelo: "H187", placaVoltaje: "H188",
+    },
+    filas: {
+      piezasAReemplazar: { colCantidad: "A", colDescripcion: "B", filaInicial: 37, max: 4 },
+    },
+    // Los 3 checklists confirmados celda por celda contra la plantilla
+    // real: etiqueta fusionada A:H, valor en la columna I (única celda sin
+    // fusionar de la fila) — mismo layout en los 3, sólo cambia la fila
+    // inicial. Las claves (`insp_item1`...) deben coincidir con el
+    // prefijo pasado a `checklistOkNok` en informesTecnicos.js.
+    checklist: {
+      "Checklist — Inspección visual y medición básica": {
+        items: Object.fromEntries(Array.from({ length: 22 }, (_, i) => [`insp_item${i + 1}`, `I${43 + i}`])),
+      },
+      "Checklist del proceso desarmado": {
+        items: Object.fromEntries(Array.from({ length: 21 }, (_, i) => [`desarme_item${i + 1}`, `I${66 + i}`])),
+      },
+      "Checklist del proceso de armado": {
+        items: Object.fromEntries(Array.from({ length: 15 }, (_, i) => [`armado_item${i + 1}`, `I${88 + i}`])),
+      },
     },
     // "Operario"/"Observación de ingreso" (fila 16) no tienen una celda de
     // input distinguible del rótulo en esta plantilla (D16:I16 es todo el
@@ -483,6 +560,44 @@ const SLOTS_FOTOS = {
     vistaFrontal: "A19:C38", placaEquipo: "D19:F38", carcasaContaminada: "G19:I38",
     carcasaDescontaminada: "A40:C59", limpiezaTarjetaInicial: "D40:F49", limpiezaTarjetaFinal: "D50:F59",
     cambioVentilador: "G40:I59",
+  },
+  panel: {
+    vistaFrontal: "A19:C38", placaEquipo: "D19:F38",
+    carcasaContaminada: "G19:I28", carcasaDescontaminada: "G29:I38",
+    limpiezaTarjetaInicial: "A40:C49", limpiezaTarjetaFinal: "A50:C59",
+    cambioLcdInicial: "D40:F49", cambioLcdFinal: "D50:F59",
+    cambioTouchInicial: "G40:I49", cambioTouchFinal: "G50:I59",
+  },
+  adicional: { vistaFrontalComponente: "A17:D28", vistaFrontalEquipo: "E17:H28" },
+  plc: {
+    vistaFrontal: "A19:C38", placaEquipo: "D19:F38", carcasaContaminada: "G19:I38",
+    carcasaDescontaminada: "A40:C59", limpiezaTarjetaInicial: "D40:F49", limpiezaTarjetaFinal: "D50:F59",
+    cambioComponentes: "G40:I59",
+  },
+  arrancador: {
+    vistaFrontal: "A35:C54", placaEquipo: "D35:F54", carcasaContaminada: "G35:I54",
+    carcasaDescontaminada: "A56:C75", limpiezaContaminada: "D56:F65", limpiezaDescontaminada: "D66:F75",
+    pastaTermicaSeca: "G56:I65", pastaTermicaNueva: "G66:I75",
+    cambioVentilador: "A77:C96", cambioComponentesInicial: "D77:F86", cambioComponentesFinal: "D87:F96",
+    medicionScrInicial: "G77:I86", medicionScrFinal: "G87:I96",
+    ...RANGOS_PRUEBA_EQUIPO,
+  },
+  variador_reparacion: {
+    vistaFrontal: "A35:C54", placaEquipo: "D35:F54", carcasaContaminada: "G35:I54",
+    carcasaDescontaminada: "A56:C75", tarjetaContaminada: "D56:F65", tarjetaDescontaminada: "D66:F75",
+    pastaTermicaSeca: "G56:I65", pastaTermicaNueva: "G66:I75",
+    cambioVentilador: "A77:C96", cambioComponentesInicial: "D77:F86", cambioComponentesFinal: "D87:F96",
+    medicionIgbtFotoInicial: "G77:I86", medicionIgbtFotoFinal: "G87:I96",
+    ...RANGOS_PRUEBA_EQUIPO,
+  },
+  ups: { ...RANGOS_PRUEBA_EQUIPO },
+  servomotor: {
+    estadoEjeRotor: "A128:B139", asientoRodamientoDelantero: "C128:D139", estadoNucleoRotor: "E128:G139", asientoTrasero: "H128:I139",
+    estadoChaveteroChaveta: "A141:B154", rodamientoDelantero: "C141:D154", fotoOriginalRotor: "E141:G154", rodamientoTrasero: "H141:I154",
+    evidenciaA: "A156:B167", evidenciaB: "C156:D167", evidenciaC: "E156:G167", evidenciaD: "H156:I167",
+    vistaFrontalEquipo: "A169:C188", placaEquipoFoto: "D169:F188", fotoEncoder: "G169:I185",
+    cambioRodamientosFoto: "A190:C209", estadoInternoEquipoInicial: "D190:F209", estadoInternoEquipoFinal: "G190:I209",
+    ...RANGOS_PRUEBA_EQUIPO,
   },
 };
 

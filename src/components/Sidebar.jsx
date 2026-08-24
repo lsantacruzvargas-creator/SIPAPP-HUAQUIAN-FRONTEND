@@ -6,7 +6,7 @@ import PanelNotificaciones from "./PanelNotificaciones";
 
 // "asistente" es el valor de rol real (DB/JWT/permisos) — solo se renombra
 // la etiqueta visible a "Administración", nunca el valor almacenado.
-const ROL_LABEL = { admin: "Admin", tecnico: "Técnico", almacenero: "Almacenero", asistente: "Administración", supervisor: "Supervisor", jefatura: "Jefatura", facturacion: "Facturación", planner: "Planner" };
+const ROL_LABEL = { admin: "Admin", tecnico: "Técnico", tecnico_prueba: "Técnico de Prueba", tecnico_intervencion: "Técnico de Intervención", almacenero: "Almacenero", asistente: "Administración", supervisor: "Supervisor", jefatura: "Jefatura", facturacion: "Facturación", planner: "Planner" };
 
 const TEMAS = [
   { id: "claro",  icon: "☀️", title: "Tema claro" },
@@ -97,7 +97,7 @@ export default function Sidebar() {
 
   const esActivo = (path) => location.pathname.startsWith(path);
 
-  const esTecnico    = usuario?.rol === "tecnico";
+  const esTecnico    = ["tecnico", "tecnico_prueba", "tecnico_intervencion"].includes(usuario?.rol);
   const esAlmacenero = usuario?.rol === "almacenero";
   const esAdmin      = usuario?.rol === "admin";
   const esSupervisor = usuario?.rol === "supervisor";
@@ -153,7 +153,7 @@ export default function Sidebar() {
     { to: "/dashboard", label: "Dashboard", Icon: IconHome, show: esComercial || esJefatura },
     { to: "/ordenes-trabajo", label: "Orden de Trabajo", Icon: IconClipboard, show: esComercial || esTecnico || esSupervisor || esPlanner || esJefatura },
     { to: "/cotizaciones", label: "Cotizaciones", Icon: IconDocument, show: esComercial || esPlanner || esJefatura },
-    { to: "/ordenes-compra", label: "Órdenes de Compra", Icon: IconCart, show: esAdmin || esFacturacion || esJefatura },
+    { to: "/ordenes-compra", label: "Órdenes de Compra", Icon: IconCart, show: esComercial || esFacturacion || esJefatura },
     { to: "/facturas", label: "Facturas", Icon: IconReceipt, show: esAdmin || esFacturacion || esJefatura },
     { to: "/reportes", label: "Reportes", Icon: IconChartBar, show: esAdmin || esFacturacion || esJefatura },
     { to: "/facturacion-electronica", label: "Fact. Electrónica", Icon: IconBolt, show: esComercial || esFacturacion || esJefatura },

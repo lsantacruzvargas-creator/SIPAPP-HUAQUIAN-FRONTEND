@@ -1,7 +1,7 @@
 import { useState } from "react";
 import SelectorCatalogoServicios from "./SelectorCatalogoServicios";
 import {
-  calcSubtotal, itemVacioServicio,
+  calcSubtotal, itemVacioServicio, UNIDADES,
   descripcionInvalida, cantidadInvalida, precioInvalido, itemInvalido,
 } from "../utils/cotizacionItems";
 
@@ -101,7 +101,7 @@ export default function TablaItemsCotizacion({
 
   const agregarItemManual = () => onItemsChange([...items, itemVacioServicio()]);
 
-  const colsIzquierda = (puedeEditar ? 4 : 3) + (seleccionables ? 1 : 0);
+  const colsIzquierda = (puedeEditar ? 5 : 4) + (seleccionables ? 1 : 0);
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -147,6 +147,7 @@ export default function TablaItemsCotizacion({
               {seleccionables && <th className="px-3 py-3 w-12 text-center">OT</th>}
               <th className="px-3 py-3 text-center w-12">Item</th>
               <th className="px-3 py-3 text-left">Descripción *</th>
+              <th className="px-3 py-3 text-center w-20">Unidad</th>
               <th className="px-3 py-3 text-center w-24">Cantidad *</th>
               {puedeVerPrecios && <th className="px-3 py-3 text-right w-32">Precio unitario *</th>}
               {puedeVerPrecios && <th className="px-3 py-3 text-right w-32">Precio total</th>}
@@ -156,7 +157,7 @@ export default function TablaItemsCotizacion({
           <tbody className="divide-y divide-gray-100">
             {items.length === 0 ? (
               <tr>
-                <td colSpan={(puedeEditar ? 6 : 5) + (seleccionables ? 1 : 0) - (puedeVerPrecios ? 0 : 2)} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={(puedeEditar ? 7 : 6) + (seleccionables ? 1 : 0) - (puedeVerPrecios ? 0 : 2)} className="px-4 py-8 text-center text-gray-400">
                   Sin ítems agregados{puedeAgregar
                     ? (tipo === "servicio"
                       ? " — usa “+ Agregar ítem manual” para escribir uno o “+ Agregar ítem de plantilla” para elegir del catálogo de servicios."
@@ -238,6 +239,13 @@ export default function TablaItemsCotizacion({
                         )}
                       </div>
                     )}
+                  </td>
+                  <td className="px-3 py-3">
+                    <select value={item.unidad || "und"} disabled={!editable}
+                      onChange={(e) => handleItem(item._key, "unidad", e.target.value)}
+                      className={`w-full text-center ${editable ? INP : "bg-transparent border-transparent text-sm px-2 py-1"}`}>
+                      {UNIDADES.map((u) => <option key={u} value={u}>{u}</option>)}
+                    </select>
                   </td>
                   <td className="px-3 py-3">
                     <input type="number" min="0" step="1" value={item.cantidad} disabled={!editable}

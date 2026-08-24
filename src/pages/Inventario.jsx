@@ -24,7 +24,8 @@ export default function Inventario() {
 
   const filtrados = lista.filter((m) =>
     m.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-    m.codigo.toLowerCase().includes(busqueda.toLowerCase()) ||
+    m.sku?.toLowerCase().includes(busqueda.toLowerCase()) ||
+    m.codigo?.toLowerCase().includes(busqueda.toLowerCase()) ||
     (m.ubicacion?.nombre || "").toLowerCase().includes(busqueda.toLowerCase())
   );
 
@@ -39,37 +40,45 @@ export default function Inventario() {
         value={busqueda} onChange={(e) => setBusqueda(e.target.value)}
         className={`w-full ${INP}`} placeholder="Buscar por nombre, código o ubicación…" />
 
-      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+      {/* Tabla — ancha al 80vw (se sale del contenedor max-w-5xl de la página) */}
+      <div className="relative left-1/2 -ml-[40vw] w-[80vw] max-w-[80vw] bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">SKU</th>
               <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Código</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Nombre</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">Ubicación</th>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Título</th>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Descripción</th>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Tipo Componente</th>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Categoría</th>
               <th className="text-center px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Stock</th>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Ubicación</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {filtrados.length === 0 && (
-              <tr><td colSpan={4} className="text-center py-10 text-gray-300 text-sm">Sin materiales</td></tr>
+              <tr><td colSpan={8} className="text-center py-10 text-gray-300 text-sm">Sin materiales</td></tr>
             )}
             {filtrados.map((m) => (
               <tr key={m._id} className="hover:bg-gray-50/50 transition">
-                <td className="px-5 py-3 font-mono text-xs text-gray-500">{m.codigo}</td>
-                <td className="px-5 py-3">
-                  <p className="font-medium text-gray-800">{m.nombre}</p>
-                  {m.descripcion && <p className="text-xs text-gray-400">{m.descripcion}</p>}
-                </td>
-                <td className="px-5 py-3 text-gray-500 hidden md:table-cell">{m.ubicacion?.nombre || "—"}</td>
+                <td className="px-5 py-3 font-mono text-xs text-gray-500">{m.sku}</td>
+                <td className="px-5 py-3 font-mono text-xs text-gray-500">{m.codigo || <span className="text-gray-300">—</span>}</td>
+                <td className="px-5 py-3 font-medium text-gray-800">{m.nombre}</td>
+                <td className="px-5 py-3 text-gray-500">{m.descripcion || <span className="text-gray-300">—</span>}</td>
+                <td className="px-5 py-3 text-gray-500">{m.tipoComponente?.nombre || <span className="text-gray-300">—</span>}</td>
+                <td className="px-5 py-3 text-gray-500">{m.categoria?.nombre || <span className="text-gray-300">—</span>}</td>
                 <td className="px-5 py-3 text-center">
                   <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${badgeStock(m)}`}>
                     {m.stock} {m.unidad}
                   </span>
                 </td>
+                <td className="px-5 py-3 text-gray-500">{m.ubicacion?.nombre || "—"}</td>
               </tr>
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

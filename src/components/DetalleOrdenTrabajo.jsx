@@ -13,7 +13,7 @@ import ModalGenerarGRE from "./ModalGenerarGRE";
 import { exportarInformeTecnicoExcel } from "../utils/informeTecnicoExcel";
 import {
   FlujoNegocio, TarjetaRelacion, Chip,
-  badgePago, badgeOT, money, BotonAnular, BannerAnulado, bloqueadoPorCadenaCerrada,
+  badgePago, badgeOT, badgeGeneral, money, BotonAnular, BannerAnulado, bloqueadoPorCadenaCerrada,
 } from "./detalleShared";
 
 const INP = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 w-full transition";
@@ -65,9 +65,10 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
   const puedeEditarCampos = ["admin", "supervisor", "planner"].includes(rolActual);
   // Anular un documento queda reservado a Admin, Facturación y Jefatura.
   const puedeAnular = ["admin", "facturacion", "jefatura"].includes(rolActual);
-  const esVistaLimitada = ["tecnico", "supervisor", "planner"].includes(rolActual);
+  const esTecnico = ["tecnico", "tecnico_prueba", "tecnico_intervencion"].includes(rolActual);
+  const esVistaLimitada = esTecnico || ["supervisor", "planner"].includes(rolActual);
   // Tabla de Servicios Externos: la ven todos los roles menos técnico.
-  const puedeVerServicios = rolActual !== "tecnico";
+  const puedeVerServicios = !esTecnico;
   const cadenaCerrada = bloqueadoPorCadenaCerrada(ot.estadoCadena, rolActual);
   // Estado (Encargado Intervención) y Progreso (Encargado Prueba) son cards
   // independientes del fieldset principal — un técnico no edita el resto de
@@ -75,8 +76,8 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
   // coincide con `encargado`/`encargado2` de esta OT.
   const nombreActual = getUsuario()?.nombre;
   const coincideNombre = (a, b) => !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
-  const puedeEditarEstado = puedeEditarCampos || (rolActual === "tecnico" && coincideNombre(ot.encargado2, nombreActual));
-  const puedeEditarEstadoPrueba = puedeEditarCampos || (rolActual === "tecnico" && coincideNombre(ot.encargado, nombreActual));
+  const puedeEditarEstado = puedeEditarCampos || (esTecnico && coincideNombre(ot.encargado2, nombreActual));
+  const puedeEditarEstadoPrueba = puedeEditarCampos || (esTecnico && coincideNombre(ot.encargado, nombreActual));
   // Aprueba/desaprueba Informes Técnicos — una vez aprobado, solo estos tres
   // roles pueden seguir editándolo (ver onModificar más abajo).
   const puedeAprobarInforme = ["admin", "jefatura", "planner"].includes(rolActual);
@@ -186,7 +187,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
     // Encargado Prueba / Encargado Intervención se eligen entre los
     // usuarios con login y rol "tecnico" (ver Fase 13 — antes salían de
     // Personal, sin relación real con quién puede loguearse como técnico).
-    fetchAuth("/usuarios/lista").then(r => r.ok && r.json()).then(u => setUsuarios((u || []).filter(x => x.rol === "tecnico")));
+    fetchAuth("/usuarios/lista").then(r => r.ok && r.json()).then(u => setUsuarios((u || []).filter(x => ["tecnico", "tecnico_prueba", "tecnico_intervencion"].includes(x.rol))));
     cargarEmpresas();
     cargarRelaciones();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -397,7 +398,9 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
           </div>
           <div className="flex items-center gap-4">
             <div className="text-right">
-              <p className="text-[10px] text-white/60 uppercase tracking-widest leading-none">Estado</p>
+              <p className="text-[10px] text-white/60 uppercase tracking-widest leading-none">OT</p>
+              <Chip className={`mt-0.5 ${badgeGeneral(ot.estadoGeneral)}`}>{ot.estadoGeneral}</Chip>
+              <p className="text-[10px] text-white/60 uppercase tracking-widest leading-none mt-1.5">Estado</p>
               <Chip className="mt-0.5 bg-white/20 text-white">{ot.estado}</Chip>
               {ot.informesAprobados && (
                 <Chip className="mt-1 bg-teal-400/30 text-white block">Informes aprobados</Chip>
@@ -592,7 +595,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
                 <label className="text-xs text-gray-500 block mb-1">Encargado Prueba</label>
                 <select name="encargado" value={form.encargado} onChange={handleChange} className={INP}>
                   <option value="">Sin asignar</option>
-                  {usuarios.map(u => (
+                  {usuarios.filter(u => u.rol === "tecnico_prueba").map(u => (
                     <option key={u._id} value={u.nombre}>{u.nombre}</option>
                   ))}
                 </select>
@@ -601,7 +604,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
                 <label className="text-xs text-gray-500 block mb-1">Encargado Intervención</label>
                 <select name="encargado2" value={form.encargado2} onChange={handleChange} className={INP}>
                   <option value="">Sin asignar</option>
-                  {usuarios.map(u => (
+                  {usuarios.filter(u => u.rol === "tecnico_intervencion").map(u => (
                     <option key={u._id} value={u.nombre}>{u.nombre}</option>
                   ))}
                 </select>

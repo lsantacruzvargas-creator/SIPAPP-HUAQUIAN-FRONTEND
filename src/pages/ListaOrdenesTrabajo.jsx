@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import DetalleDocumento from "../components/DetalleDocumento";
 import ModalNuevaOT from "../components/ModalNuevaOT";
-import { DotChip, badgeOT, dotOT, badgeInformes, dotInformes } from "../components/detalleShared";
+import { DotChip, badgeOT, dotOT, badgeInformes, dotInformes, badgeGeneral, dotGeneral } from "../components/detalleShared";
 import * as XLSX from "xlsx";
 
 const MESES = [
@@ -34,6 +34,12 @@ const SELECT =
 
 const TH = "px-4 py-3 font-semibold text-gray-500 whitespace-nowrap";
 
+// Si nadie está asignado a ese track, `estadoPrueba`/`estado` se quedan en
+// el default "pendiente" del modelo — visualmente eso confunde con "ya
+// asignado pero sin empezar", así que en la tabla se muestra "No asignado".
+const pruebaLabel = (o) => (o.encargado?.trim() ? o.estadoPrueba : "No asignado");
+const intervencionLabel = (o) => (o.encargado2?.trim() ? o.estado : "No asignado");
+
 function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg }) {
   return (
     <div className="mb-6">
@@ -49,13 +55,13 @@ function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg }) {
               <tr>
                 <th className={`${TH} text-left`}>N° OT</th>
                 <th className={`${TH} text-left`}>N° Cotización</th>
-                <th className={`${TH} text-center`}>Fecha recibida</th>
+                <th className={`${TH} text-center`}>Servicio</th>
                 <th className={`${TH} text-left`}>Empresa</th>
-                <th className={`${TH} text-left`}>Planta</th>
-                <th className={`${TH} text-left`}>Encargado</th>
                 <th className={`${TH} text-left`}>Descripción</th>
                 <th className={`${TH} text-center`}>Prueba</th>
-                <th className={`${TH} text-center`}>Estado</th>
+                <th className={`${TH} text-left`}>Técnico de prueba</th>
+                <th className={`${TH} text-center`}>Intervención</th>
+                <th className={`${TH} text-left`}>Técnico de intervención</th>
                 <th className={`${TH} text-center`}>Estado Informes</th>
               </tr>
             </thead>
@@ -84,21 +90,21 @@ function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg }) {
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3.5 text-center text-gray-500 whitespace-nowrap">
-                      {o.fechaRecibida ? new Date(o.fechaRecibida).toLocaleDateString("es-PE") : <span className="text-gray-300">—</span>}
+                    <td className="px-4 py-3.5 text-center">
+                      <DotChip chip={badgeGeneral(o.estadoGeneral)} dot={dotGeneral(o.estadoGeneral)}>{o.estadoGeneral}</DotChip>
                     </td>
                     <td className="px-4 py-3.5 text-gray-700">
                       {o.empresa?.razonSocial || <span className="text-gray-300">—</span>}
                     </td>
-                    <td className="px-4 py-3.5 text-gray-600">{o.planta || <span className="text-gray-300">—</span>}</td>
-                    <td className="px-4 py-3.5 text-gray-600">{o.encargado || <span className="text-gray-300">—</span>}</td>
                     <td className="px-4 py-3.5 text-gray-700">{o.titulo || <span className="text-gray-300">—</span>}</td>
                     <td className="px-4 py-3.5 text-center">
-                      <DotChip chip={badgeOT(o.estadoPrueba)} dot={dotOT(o.estadoPrueba)}>{o.estadoPrueba}</DotChip>
+                      <DotChip chip={badgeOT(pruebaLabel(o))} dot={dotOT(pruebaLabel(o))}>{pruebaLabel(o)}</DotChip>
                     </td>
+                    <td className="px-4 py-3.5 text-gray-600">{o.encargado || <span className="text-gray-300">—</span>}</td>
                     <td className="px-4 py-3.5 text-center">
-                      <DotChip chip={badgeOT(o.estado)} dot={dotOT(o.estado)}>{o.estado}</DotChip>
+                      <DotChip chip={badgeOT(intervencionLabel(o))} dot={dotOT(intervencionLabel(o))}>{intervencionLabel(o)}</DotChip>
                     </td>
+                    <td className="px-4 py-3.5 text-gray-600">{o.encargado2 || <span className="text-gray-300">—</span>}</td>
                     <td className="px-4 py-3.5 text-center">
                       <DotChip chip={badgeInformes(o.estadoInformes)} dot={dotInformes(o.estadoInformes)}>{o.estadoInformes}</DotChip>
                     </td>
@@ -113,21 +119,21 @@ function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg }) {
                         ↳ {s.numeroOT}
                       </td>
                       <td className="px-4 py-3 text-gray-400 whitespace-nowrap">—</td>
-                      <td className="px-4 py-3 text-center text-gray-500 whitespace-nowrap">
-                        {s.fechaEntrega ? new Date(s.fechaEntrega).toLocaleDateString("es-PE") : <span className="text-gray-300">—</span>}
+                      <td className="px-4 py-3 text-center">
+                        <DotChip chip={badgeGeneral(s.estadoGeneral)} dot={dotGeneral(s.estadoGeneral)}>{s.estadoGeneral}</DotChip>
                       </td>
                       <td className="px-4 py-3 text-gray-700">
                         {s.empresa?.razonSocial || o.empresa?.razonSocial || <span className="text-gray-300">—</span>}
                       </td>
-                      <td className="px-4 py-3 text-gray-600">{s.planta || o.planta || <span className="text-gray-300">—</span>}</td>
-                      <td className="px-4 py-3 text-gray-600">{s.encargado || <span className="text-gray-300">—</span>}</td>
                       <td className="px-4 py-3 text-gray-700">{s.titulo || <span className="text-gray-300">—</span>}</td>
                       <td className="px-4 py-3 text-center">
-                        <DotChip chip={badgeOT(s.estadoPrueba)} dot={dotOT(s.estadoPrueba)}>{s.estadoPrueba}</DotChip>
+                        <DotChip chip={badgeOT(pruebaLabel(s))} dot={dotOT(pruebaLabel(s))}>{pruebaLabel(s)}</DotChip>
                       </td>
+                      <td className="px-4 py-3 text-gray-600">{s.encargado || <span className="text-gray-300">—</span>}</td>
                       <td className="px-4 py-3 text-center">
-                        <DotChip chip={badgeOT(s.estado)} dot={dotOT(s.estado)}>{s.estado}</DotChip>
+                        <DotChip chip={badgeOT(intervencionLabel(s))} dot={dotOT(intervencionLabel(s))}>{intervencionLabel(s)}</DotChip>
                       </td>
+                      <td className="px-4 py-3 text-gray-600">{s.encargado2 || <span className="text-gray-300">—</span>}</td>
                       <td className="px-4 py-3 text-center">
                         <DotChip chip={badgeInformes(s.estadoInformes)} dot={dotInformes(s.estadoInformes)}>{s.estadoInformes}</DotChip>
                       </td>
@@ -196,8 +202,18 @@ export default function ListaOrdenesTrabajo() {
   const rolActual = getUsuario()?.rol;
   const nombreActual = getUsuario()?.nombre;
   const coincideNombre = (a, b) => !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
+  // "tecnico" (legado) + los 2 roles especializados se tratan igual para el
+  // filtro de "solo mis OTs asignadas" — lo que cambia es qué tablas ve cada
+  // uno más abajo (esTecnicoPrueba/esTecnicoIntervencion).
+  const esTecnicoRol = ["tecnico", "tecnico_prueba", "tecnico_intervencion"].includes(rolActual);
+  // Vista simplificada de 4 grupos (No asignadas/En progreso/Completadas/
+  // Entregadas), sin el split Prueba/Intervención — planner y Administración
+  // ("asistente" es el valor de rol real, ver Sidebar.jsx).
+  const esVistaSimplificada = ["planner", "asistente"].includes(rolActual);
+  const esTecnicoPrueba = rolActual === "tecnico_prueba";
+  const esTecnicoIntervencion = rolActual === "tecnico_intervencion";
   const esAsignado = (o) => coincideNombre(o.encargado, nombreActual) || coincideNombre(o.encargado2, nombreActual);
-  const conSubOTs = rolActual !== "tecnico"
+  const conSubOTs = !esTecnicoRol
     ? conSubOTsCompleto
     : conSubOTsCompleto
         .map((p) => ({ ...p, subOTs: p.subOTs.filter(esAsignado) }))
@@ -258,20 +274,43 @@ export default function ListaOrdenesTrabajo() {
   // mezclada con las pendientes.
   const esCerrada = (o) => o.estadoCadena === "cerrado";
   const abiertas = filtradas.filter((o) => !esCerrada(o));
+
+  // Una OT solo vive en la sección de Prueba/Intervención si ese track tiene
+  // técnico asignado — si no, va exclusivamente a "Órdenes no asignadas"
+  // (estadoGeneral, ver Backend/src/utils/estadoGeneralOT.js). Para técnico,
+  // además debe ser SU nombre el que coincide (no el de un compañero
+  // asignado al otro track de la misma OT) — mismo criterio que `esAsignado`.
+  const pruebaBase = esTecnicoRol
+    ? abiertas.filter((o) => coincideNombre(o.encargado, nombreActual))
+    : abiertas.filter((o) => o.encargado?.trim());
+  const intervencionBase = esTecnicoRol
+    ? abiertas.filter((o) => coincideNombre(o.encargado2, nombreActual))
+    : abiertas.filter((o) => o.encargado2?.trim());
+  const noAsignadas = abiertas.filter((o) => o.estadoGeneral === "no asignado");
+
   // Intervención (campo `estado`, el de siempre — ver Fase 13: Encargado
   // Intervención es quien lo controla).
-  const pendientes = abiertas.filter((o) => o.estado === "pendiente");
-  const enProgreso = abiertas.filter((o) => o.estado === "en progreso");
-  const completadas = abiertas.filter((o) => o.estado === "completado");
-  const entregadas = abiertas.filter((o) => o.estado === "entregado");
+  const pendientes = intervencionBase.filter((o) => o.estado === "pendiente");
+  const enProgreso = intervencionBase.filter((o) => o.estado === "en progreso");
+  const completadas = intervencionBase.filter((o) => o.estado === "completado");
+  const entregadas = intervencionBase.filter((o) => o.estado === "entregado");
   // Prueba (campo `estadoPrueba`, propiedad del Encargado Prueba — mismas 4
   // categorías, mismo criterio de "se mueve solo, sin duplicarse" por ser un
   // simple filtro sobre un enum de valor único).
-  const pruebaPendientes = abiertas.filter((o) => o.estadoPrueba === "pendiente");
-  const pruebaEnProgreso = abiertas.filter((o) => o.estadoPrueba === "en progreso");
-  const pruebaCompletadas = abiertas.filter((o) => o.estadoPrueba === "completado");
-  const pruebaEntregadas = abiertas.filter((o) => o.estadoPrueba === "entregado");
+  const pruebaPendientes = pruebaBase.filter((o) => o.estadoPrueba === "pendiente");
+  const pruebaEnProgreso = pruebaBase.filter((o) => o.estadoPrueba === "en progreso");
+  const pruebaCompletadas = pruebaBase.filter((o) => o.estadoPrueba === "completado");
+  const pruebaEntregadas = pruebaBase.filter((o) => o.estadoPrueba === "entregado");
   const cerradas = filtradas.filter((o) => esCerrada(o));
+
+  // Vista simplificada del planner: un solo set de 4 grupos en vez del split
+  // Prueba/Intervención — agrupa por asignación + avance del track (el que
+  // sea) + aprobación de informe, sin distinguir de qué track viene.
+  const esTrackListo = (o) => ["completado", "entregado"].includes(o.estado) || ["completado", "entregado"].includes(o.estadoPrueba);
+  const asignadasPlanner = abiertas.filter((o) => o.encargado?.trim() || o.encargado2?.trim());
+  const plannerEntregadas  = asignadasPlanner.filter((o) => o.informesAprobados && esTrackListo(o));
+  const plannerCompletadas = asignadasPlanner.filter((o) => !o.informesAprobados && esTrackListo(o));
+  const plannerEnProgreso  = asignadasPlanner.filter((o) => !esTrackListo(o));
   const hayFiltro = Object.values(filtros).some(Boolean);
 
   // Mismas columnas que TablaOTs — una hoja por cada tabla visible.
@@ -287,11 +326,13 @@ export default function ListaOrdenesTrabajo() {
     "Prueba":         o.estadoPrueba || "—",
     "Estado":         o.estado || "—",
     "Estado Informes": o.estadoInformes || "—",
+    "OT":             o.estadoGeneral || "—",
   });
 
   const exportarExcel = () => {
     const wb = XLSX.utils.book_new();
     [
+      ["Sin asignar", noAsignadas],
       ["Prueba - Pendientes", pruebaPendientes],
       ["Prueba - En progreso", pruebaEnProgreso],
       ["Prueba - Completadas", pruebaCompletadas],
@@ -401,28 +442,64 @@ export default function ListaOrdenesTrabajo() {
         )}
       </div>
 
-      <div className="flex gap-2 mb-5">
-        {[
-          { valor: "todos", label: "Todos los grupos" },
-          { valor: "prueba", label: "Órdenes de prueba" },
-          { valor: "intervencion", label: "Órdenes de intervención" },
-        ].map((g) => (
-          <button
-            key={g.valor}
-            type="button"
-            onClick={() => setGrupo(g.valor)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-              grupo === g.valor
-                ? "bg-gray-900 text-white"
-                : "border border-gray-300 text-gray-600 hover:bg-gray-50"
-            }`}
-          >
-            {g.label}
-          </button>
-        ))}
-      </div>
+      {!esVistaSimplificada && !esTecnicoPrueba && !esTecnicoIntervencion && (
+        <div className="flex gap-2 mb-5">
+          {[
+            { valor: "todos", label: "Todos los grupos" },
+            { valor: "prueba", label: "Órdenes de prueba" },
+            { valor: "intervencion", label: "Órdenes de intervención" },
+          ].map((g) => (
+            <button
+              key={g.valor}
+              type="button"
+              onClick={() => setGrupo(g.valor)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                grupo === g.valor
+                  ? "bg-gray-900 text-white"
+                  : "border border-gray-300 text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              {g.label}
+            </button>
+          ))}
+        </div>
+      )}
 
-      {grupo !== "intervencion" && (
+      {esVistaSimplificada ? (
+        <>
+          <TablaOTs
+            titulo="Órdenes no asignadas"
+            acento="bg-red-500"
+            ordenes={noAsignadas}
+            onSelect={setSeleccionada}
+            vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes por asignar"}
+          />
+
+          <TablaOTs
+            titulo="Órdenes en progreso"
+            acento="bg-blue-500"
+            ordenes={plannerEnProgreso}
+            onSelect={setSeleccionada}
+            vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes en progreso"}
+          />
+
+          <TablaOTs
+            titulo="Órdenes completadas"
+            acento="bg-green-500"
+            ordenes={plannerCompletadas}
+            onSelect={setSeleccionada}
+            vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes completadas"}
+          />
+
+          <TablaOTs
+            titulo="Órdenes entregadas"
+            acento="bg-teal-500"
+            ordenes={plannerEntregadas}
+            onSelect={setSeleccionada}
+            vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes entregadas"}
+          />
+        </>
+      ) : !esTecnicoIntervencion && grupo !== "intervencion" && (
         <>
           <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 mt-2">Órdenes de Prueba</h3>
 
@@ -460,7 +537,7 @@ export default function ListaOrdenesTrabajo() {
         </>
       )}
 
-      {grupo !== "prueba" && (
+      {!esVistaSimplificada && !esTecnicoPrueba && grupo !== "prueba" && (
         <>
           <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 mt-6">Órdenes de Intervención</h3>
 

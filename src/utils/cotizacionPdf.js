@@ -13,32 +13,48 @@ function cargarImagen(url) {
   });
 }
 
-// Logos de marcas representadas — van siempre al pie de cada cotización.
-// El orden del array define el orden izquierda→derecha en el pie (ver más
-// abajo): ACHEM va primero (extrema izquierda) y HUAHAI al final (extrema
-// derecha), como en la imagen de referencia.
-const LOGOS_MARCAS = [
-  { src: "/assets/logos/logo_achem.png",     format: "PNG" },
-  { src: "/assets/logos/logo_Gruetzner.png", format: "PNG" },
-  { src: "/assets/logos/logo_KOGANEI.jpg",   format: "JPEG" },
-  { src: "/assets/logos/logo_beko.png",      format: "PNG" },
-  { src: "/assets/logos/logo_kcpc.jpg",      format: "JPEG" }, // XCPC
-  { src: "/assets/logos/logo_huahai.png",    format: "PNG" },
-];
+// Paleta y datos fijos de Huaquian, tomados de Plantilla-cotizacion.xlsx
+// (raíz del proyecto) — no varían por cotización, así que van hardcodeados
+// acá igual que ya hacía el header anterior con los datos de la empresa.
+const NAVY = [0, 0, 40];       // #000028 — barras de sección y banner
+const AZUL = [0, 74, 173];     // #004AAD — badge "COTIZACIÓN N°"
+const AZUL_CLARO = [173, 193, 229]; // #ADC1E5 — fila "VALOR DE LA OFERTA"
+const GRIS_CLARO = [232, 232, 232]; // #E8E8E8 — encabezados de tabla
+
+const HUAQUIAN = {
+  razonSocial: "HUAQUIAN S.A.C.",
+  ruc: "20601565235",
+  direccion: "MZ.A LT1. ASOCIACIÓN VILLA TALAVERA CAMPOY, SAN JUAN DE LURIGANCHO - LIMA.",
+  representante: "JOSE LIDER MATEO MUCHA",
+  telefono: "966 -757 - 528.",
+  correo: "ventas@huaquian.com",
+};
+
+const BANCOS = {
+  bcpCuentaSoles: "191-2364174-0-44",
+  bcpCciSoles: "002-19100236417404456",
+  bcpCuentaDolares: "191-2559651-1-69",
+  bcpCciDolares: "002-191002255965116958",
+  bnCuentaDetraccion: "00-062-084456",
+};
+
+const GARANTIA_TEXTO = "En condiciones normales de uso";
+const POLIZA_TEXTO = "- Responsabilidad / Seguro complementario de trabajo de riesgo";
 
 export const exportarCotizacionPdf = async (cotizacion) => {
   const doc = new jsPDF();
   const empresa = cotizacion.empresa;
-  const PAGE_R = 196;
+  const M = 12; // margen
+  const PAGE_W = doc.internal.pageSize.getWidth();
+  const PAGE_H = doc.internal.pageSize.getHeight();
+  const CONTENT_W = PAGE_W - M * 2;
 
-  const [icono, textoLogo, ...marcasImgs] = await Promise.all([
-    // Cuadrado (1:1): ícono globo+paloma con "ALCOINSAC" apilado debajo.
-    // TODO: logo pendiente de actualizar a Huaquian — el usuario aún no tiene el arte nuevo.
-    cargarImagen("/assets/logos/Logo_grande-DESKTOP-3FJUSSF.png"),
-    // Wordmark ancho (~4.46:1): "ALCOINSAC / ALPHA CONTROL E INGENIERIA S.A.C.".
-    // TODO: logo pendiente de actualizar a Huaquian — el usuario aún no tiene el arte nuevo.
-    cargarImagen("/assets/logos/Logo_pequeño.png"),
-    ...LOGOS_MARCAS.map((m) => cargarImagen(m.src)),
+  const [icono, headerBanner, marcasFooter, bcpLogo, bnLogo] = await Promise.all([
+    cargarImagen("/assets/logos/huaquian_icon.png"),
+    cargarImagen("/assets/logos/huaquian_header.png"),
+    cargarImagen("/assets/logos/marcas_footer.png"),
+    cargarImagen("/assets/logos/bcp_logo.png"),
+    cargarImagen("/assets/logos/banco_nacion_logo.png"),
   ]);
 
   // ─── Marca de agua: ícono centrado detrás de todo el contenido ───
@@ -46,176 +62,178 @@ export const exportarCotizacionPdf = async (cotizacion) => {
   // detrás — en PDF cada trazo nuevo se pinta encima de lo anterior.
   if (icono) {
     const wSize = 100;
-    const pageW = doc.internal.pageSize.getWidth();
-    const pageH = doc.internal.pageSize.getHeight();
     doc.saveGraphicsState();
-    doc.setGState(new doc.GState({ opacity: 0.08 }));
-    doc.addImage(icono, "PNG", (pageW - wSize) / 2, (pageH - wSize) / 2, wSize, wSize);
+    doc.setGState(new doc.GState({ opacity: 0.06 }));
+    doc.addImage(icono, "PNG", (PAGE_W - wSize) / 2, (PAGE_H - wSize) / 2, wSize, wSize);
     doc.restoreGraphicsState();
   }
 
-  // ─── Encabezado: logos a la izquierda, datos de contacto a la derecha ───
-  if (icono) doc.addImage(icono, "PNG", 14, 3, 30, 30);
-  if (textoLogo) doc.addImage(textoLogo, "PNG", 43, 10, 90, 18);
+  // ─── Banner de encabezado (navy, ancho completo) ───
+  let y = 6;
+  if (headerBanner) {
+    const h = CONTENT_W * (headerBanner.naturalHeight / headerBanner.naturalWidth);
+    doc.addImage(headerBanner, "PNG", M, y, CONTENT_W, h);
+    y += h + 6;
+  } else {
+    doc.setFillColor(...NAVY);
+    doc.rect(M, y, CONTENT_W, 14, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.text("HUAQUIAN", M + 4, y + 9);
+    y += 14 + 6;
+  }
 
-  doc.setFontSize(8);
+  // ─── Badge "COTIZACIÓN N°" (arriba a la derecha) ───
+  const badgeH = 8, badgeW1 = 40, badgeW2 = 28;
+  const badgeX = PAGE_W - M - badgeW1 - badgeW2;
+  doc.setFillColor(...AZUL);
+  doc.rect(badgeX, y, badgeW1, badgeH, "F");
+  doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
-  let ry = 14;
-  doc.text("Mza. F1 Lote 16 Urbanizacion El Dorado", PAGE_R-25, ry, { align: "center" }); ry += 4;
-  doc.text("Puente Piedra - Lima - Lima", PAGE_R-25, ry, { align: "center" }); ry += 4;
-  // TODO: dominio/correo placeholder — reemplazar cuando exista el dominio real de Huaquian.
-  doc.text("www.huaquian.com   ventas@huaquian.com", PAGE_R-25, ry, { align: "center" }); ry += 4;
-  doc.text("CEL: 969585300", PAGE_R-25, ry, { align: "center" });
-
-  let y = 32;
-  doc.setDrawColor(200);
-  doc.line(14, y, PAGE_R, y);
-  y += 7;
-
-  // ─── Señores/Atención (izquierda) + Cotización/Fecha (derecha) ───
-  const fechaStr = cotizacion.fecha ? new Date(cotizacion.fecha).toLocaleDateString("es-PE") : "-";
-
   doc.setFontSize(9);
+  doc.text("COTIZACIÓN N°", badgeX + badgeW1 / 2, y + badgeH / 2 + 1.2, { align: "center" });
+  doc.setDrawColor(0);
+  doc.rect(badgeX + badgeW1, y, badgeW2, badgeH);
+  doc.setTextColor(...AZUL);
+  doc.setFontSize(11);
+  doc.text(String(cotizacion.numeroCotizacion || cotizacion.codigo || "—"), badgeX + badgeW1 + badgeW2 / 2, y + badgeH / 2 + 1.5, { align: "center" });
+  doc.setTextColor(0, 0, 0);
+
+  const yBadgeBottom = y + badgeH;
+  y += badgeH + 6;
+
+  // ─── Datos de Huaquian (izquierda) + caja de datos comerciales (derecha) ───
+  const colIzqW = 110, colDerX = M + colIzqW + 4, colDerW = CONTENT_W - colIzqW - 4;
+  let yIzq = y;
+  const labelValor = (x, yy, label, valor, maxW) => {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.5);
+    const labelW = doc.getTextWidth(label);
+    doc.text(label, x, yy);
+    doc.setFont("helvetica", "normal");
+    if (maxW) {
+      const lineas = doc.splitTextToSize(valor || "—", maxW - labelW);
+      doc.text(lineas, x + labelW, yy);
+      return lineas.length;
+    }
+    doc.text(valor || "—", x + labelW, yy);
+    return 1;
+  };
+  yIzq += labelValor(M, yIzq, "RAZÓN SOCIAL: ", HUAQUIAN.razonSocial) * 4.2;
+  yIzq += labelValor(M, yIzq, "RUC: ", HUAQUIAN.ruc) * 4.2;
+  yIzq += labelValor(M, yIzq, "DIRECCIÓN: ", HUAQUIAN.direccion, colIzqW) * 4.2;
+  yIzq += labelValor(M, yIzq, "REPRESENTANTE DE LA EMPRESA: ", HUAQUIAN.representante, colIzqW) * 4.2;
+  yIzq += labelValor(M, yIzq, "TELÉFONO: ", HUAQUIAN.telefono) * 4.2;
+  yIzq += labelValor(M, yIzq, "CORREO: ", HUAQUIAN.correo) * 4.2;
+
+  const fechaStr = cotizacion.fecha ? new Date(cotizacion.fecha).toLocaleDateString("es-PE") : "—";
+  const filasDer = [
+    ["FECHA:", fechaStr],
+    ["TIEMPO DE ENTREGA DEL SERVICIO:", cotizacion.plazoEntrega],
+    ["VALIDEZ DE LA OFERTA:", cotizacion.validezOferta],
+    ["ASESOR COMERCIAL:", cotizacion.asesorComercial],
+    ["N° CELULAR:", cotizacion.numeroCelular],
+  ];
+  const filaDerH = 5.6;
+  const cajaDerH = filasDer.length * filaDerH;
+  doc.setDrawColor(0);
+  doc.rect(colDerX, y - 4, colDerW, cajaDerH);
+  let yDer = y;
+  doc.setFontSize(7.5);
+  filasDer.forEach(([label, valor]) => {
+    doc.setFont("helvetica", "bold");
+    doc.text(label, colDerX + colDerW - 2, yDer, { align: "right" });
+    yDer += 3.2;
+    doc.setFont("helvetica", "normal");
+    doc.text(valor || "—", colDerX + colDerW - 2, yDer, { align: "right" });
+    yDer += filaDerH - 3.2;
+  });
+
+  y = Math.max(yIzq, yDer, yBadgeBottom + cajaDerH) + 4;
+
+  // ─── Barra de sección navy, ancho completo ───
+  const barraSeccion = (titulo, yy, h = 6) => {
+    doc.setFillColor(...NAVY);
+    doc.rect(M, yy, CONTENT_W, h, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.text(titulo, M + 3, yy + h / 2 + 1.2);
+    doc.setTextColor(0, 0, 0);
+    return yy + h + 4;
+  };
+
+  // ─── DATOS DEL CLIENTE ───
+  y = barraSeccion("DATOS DEL CLIENTE", y);
+  const clienteColW = (CONTENT_W - 4) / 2;
+  doc.setFontSize(8.5);
+  let yClIzq = y, yClDer = y;
+  yClIzq += labelValor(M, yClIzq, "RAZÓN SOCIAL: ", empresa?.razonSocial, clienteColW) * 4.2;
+  yClIzq += labelValor(M, yClIzq, "ÁREA: ", cotizacion.area, clienteColW) * 4.2;
+  yClIzq += labelValor(M, yClIzq, "OM / AVISO: ", cotizacion.omAviso, clienteColW) * 4.2;
+  yClIzq += labelValor(M, yClIzq, "N° DE GUIA: ", cotizacion.numeroGuia, clienteColW) * 4.2;
+  const xClDer = M + clienteColW + 4;
+  yClDer += labelValor(xClDer, yClDer, "JEFE / SUPERVISOR SOLICITANTE: ", cotizacion.jefeSupervisorSolicitante, clienteColW) * 4.2;
+  yClDer += labelValor(xClDer, yClDer, "COMPRADOR RESPONSABLE: ", cotizacion.compradorResponsable, clienteColW) * 4.2;
+  yClDer += labelValor(xClDer, yClDer, "N° DE SOLICITUD DE PEDIDO: ", cotizacion.numeroSolicitudPedido, clienteColW) * 4.2;
+  yClDer += labelValor(xClDer, yClDer, "N° DE PETICIÓN DE OFERTA: ", cotizacion.numeroPeticionOferta, clienteColW) * 4.2;
+  y = Math.max(yClIzq, yClDer) + 4;
+
+  // ─── DETALLES DEL SERVICIO ───
+  y = barraSeccion("DETALLES DEL SERVICIO", y);
+  doc.setFillColor(...GRIS_CLARO);
+  doc.rect(M, y, CONTENT_W, 6, "F");
+  doc.setDrawColor(0);
+  doc.rect(M, y, CONTENT_W, 6);
   doc.setFont("helvetica", "bold");
-  doc.text("Señores:", 14, y);
-  doc.setFont("helvetica", "normal");
-  doc.text(empresa?.razonSocial || "-", 32, y);
-  doc.setFont("helvetica", "bold");
-  doc.text(`COTIZACION: ${cotizacion.numeroCotizacion || "-"}`, 150, y, { align: "right" });
+  doc.setFontSize(8.5);
+  doc.text(cotizacion.titulo || "—", PAGE_W / 2, y + 4, { align: "center" });
   y += 6;
 
-  doc.setFont("helvetica", "bold");
-  doc.text("Atención:", 14, y);
-  doc.setFont("helvetica", "normal");
-  doc.text(cotizacion.atencion || "-", 32, y);
-  doc.setFont("helvetica", "bold");
-  doc.text("Fecha:", 113, y);
-  doc.setFont("helvetica", "normal");
-  doc.text(fechaStr, 150, y, { align: "right" });
-  y += 10;
-
-  // ─── Párrafo de presentación (fijo) ───
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
-  doc.text("De nuestra mayor consideración:", 14, y);
-  y += 6;
-  const parrafo =
-    "Nos es grato presentarnos ante ud. Para saludarlo cordialmente y a su vez presentarle nuestra PROPUESTA COMERCIAL.";
-  const lineas = doc.splitTextToSize(parrafo, PAGE_R - 14);
-  doc.text(lineas, 14, y);
-  y += lineas.length * 5 + 6;
-
-  // ─── Título + condición de pago ───
-  // doc.setFontSize(10);
-  // doc.setFont("helvetica", "bold");
-  // const tituloLineas = doc.splitTextToSize(cotizacion.titulo || "", PAGE_R - 14);
-  // doc.text(tituloLineas, 14, y);
-  // y += tituloLineas.length * 5 + 3;
-
-  // Tipo "servicio": descripción con sub-ítems en viñetas + columna Moneda.
-  // Tipo "venta": tabla simple Item/Descripción/Cantidad/Precio unitario/Precio total.
-  const esVenta = cotizacion.tipo === "venta";
-  // Moneda de TODA la cotización (no la de cada ítem) — determina el símbolo
-  // de Subtotal/IGV/TOTAL al pie de la tabla.
+  // Moneda de TODA la cotización (no la de cada ítem) — determina el
+  // símbolo de Valor de la Oferta / IGV / Valor Total al pie de la tabla.
   const simboloDoc = cotizacion.moneda === "USD" ? "US$" : "S/";
 
-  // Para tipo "servicio": una fila de tabla por cada sub-ítem (en vez de
-  // apilar todos los sub-ítems dentro de la celda del ítem padre). `esSubfila`
-  // queda en paralelo a `body` para que didParseCell sepa a cuál de las dos
-  // filas (padre en negrita / sub-ítem normal) le toca cada estilo.
+  // Un ítem = una fila; sus sub-ítems (si tiene) van como filas adicionales
+  // en bullet, en la misma columna Descripción (ver recetas del skill
+  // pdf-cotizacion-recetas para el porqué de una fila por sub-ítem).
   const esSubfila = [];
   autoTable(doc, {
     startY: y,
-    head: esVenta
-      ? [["#", "Descripción", "Cant.", "Precio Unitario", "Precio Total"]]
-      : [["#", "Descripción", "Cant.", "Precio", "Mon.", "Subtotal"]],
-    body: esVenta
-      ? cotizacion.items.map((item, i) => {
-          // Ítems informativos (sin costo propio, p.ej. sub-agrupaciones del
-          // catálogo) suelen quedar en 0.00 — se ocultan #, Cantidad, Moneda,
-          // Precio y Subtotal (en blanco) en vez de mostrar ceros que no aplican.
-          const precioNum = Number(item.precio) || 0;
-          const subtotalNum = Number(item.subtotal) || 0;
-          const esInformativo = precioNum === 0;
-          const simbolo = item.moneda === "PEN" ? "S/" : "$";
-          return [
-            esInformativo ? "" : i + 1,
-            item.descripcion,
-            esInformativo ? "" : item.cantidad,
-            esInformativo ? "" : `${simbolo} ${precioNum.toFixed(2)}`,
-            subtotalNum === 0 ? "" : `${simbolo} ${subtotalNum.toFixed(2)}`,
-          ];
-        })
-      : cotizacion.items.flatMap((item, i) => {
-          const precioNum = Number(item.precio) || 0;
-          const subtotalNum = Number(item.subtotal) || 0;
-          const esInformativo = precioNum === 0;
-          esSubfila.push(false);
-          const filaPadre = [
-            esInformativo ? "" : i + 1,
-            item.descripcion,
-            esInformativo ? "" : item.cantidad,
-            esInformativo ? "" : precioNum.toFixed(2),
-            esInformativo ? "" : (item.moneda === "PEN" ? "S/" : "$"),
-            subtotalNum === 0 ? "" : subtotalNum.toFixed(2),
-          ];
-          const filasSub = (item.subItems || []).map((s) => {
-            esSubfila.push(true);
-            return ["", `   • ${s}`, "", "", "", ""];
-          });
-          return [filaPadre, ...filasSub];
-        }),
-    foot: esVenta
-      ? [
-          [{ content: "Subtotal:", colSpan: 4, styles: { halign: "right", fontStyle: "bold" } }, `${simboloDoc} ${Number(cotizacion.subtotal).toFixed(2)}`],
-          [{ content: "IGV 18%:", colSpan: 4, styles: { halign: "right", fontStyle: "bold" } }, `${simboloDoc} ${Number(cotizacion.igv).toFixed(2)}`],
-          [{ content: "TOTAL:", colSpan: 4, styles: { halign: "right", fontStyle: "bold" } }, `${simboloDoc} ${Number(cotizacion.total).toFixed(2)}`],
-        ]
-      : [
-          [{ content: "Subtotal:", colSpan: 5, styles: { halign: "right", fontStyle: "bold" } }, `${simboloDoc} ${Number(cotizacion.subtotal).toFixed(2)}`],
-          [{ content: "IGV 18%:", colSpan: 5, styles: { halign: "right", fontStyle: "bold" } }, `${simboloDoc} ${Number(cotizacion.igv).toFixed(2)}`],
-          [{ content: "TOTAL:", colSpan: 5, styles: { halign: "right", fontStyle: "bold" } }, `${simboloDoc} ${Number(cotizacion.total).toFixed(2)}`],
-        ],
+    head: [["ITEM", "DESCRIPCIÓN", "UNID.", "CANT.", "PRECIO UNITARIO", "PRECIO TOTAL"]],
+    body: cotizacion.items.flatMap((item, i) => {
+      const precioNum = Number(item.precio) || 0;
+      const subtotalNum = Number(item.subtotal) || 0;
+      const esInformativo = precioNum === 0;
+      esSubfila.push(false);
+      const filaPadre = [
+        esInformativo ? "" : i + 1,
+        item.descripcion,
+        esInformativo ? "" : (item.unidad || "und"),
+        esInformativo ? "" : item.cantidad,
+        esInformativo ? "" : precioNum.toFixed(2),
+        subtotalNum === 0 ? "" : subtotalNum.toFixed(2),
+      ];
+      const filasSub = (item.subItems || []).map((s) => {
+        esSubfila.push(true);
+        return ["", `   • ${s}`, "", "", "", ""];
+      });
+      return [filaPadre, ...filasSub];
+    }),
     theme: "grid",
-    margin: { left: 10, right: 10 },
-    // Subtotal/IGV/Total (foot) solo en la última página — por defecto
-    // autoTable repite el foot en cada página cuando la tabla se parte.
-    showFoot: "lastPage",
-    // Como las filas del cuerpo ya no tienen borde inferior propio (ver
-    // "styles" más abajo), sin esto la tabla queda "abierta" al final de
-    // cada página cuando se corta en varias — tableLineWidth dibuja un
-    // rectángulo de cierre alrededor de todo el contenido de esa página en
-    // cada salto (y otra vez al final de la última página).
-    tableLineWidth: 0.1,
-    tableLineColor: [0, 0, 0],
-    // El marco exterior de la tabla se arma con el borde completo de
-    // encabezado y pie (top+bottom+left+right) — solo las FILAS DEL CUERPO
-    // pierden las líneas horizontales entre sí (top/bottom en 0, se
-    // mantienen las verticales left/right para separar columnas).
-    styles: { fontSize: 9, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: { top: 0, bottom: 0, left: 0.1, right: 0.1 }, fillColor: false },
-    headStyles: { fontSize: 8, fontStyle: "bold", textColor: [0, 0, 0], fillColor: false, lineColor: [0, 0, 0], lineWidth: 0.1 },
-    footStyles: { halign: "right", fontStyle: "bold", textColor: [0, 0, 0], fillColor: false, lineColor: [0, 0, 0], lineWidth: 0.1 },
-    alternateRowStyles: { fillColor: false },
-    columnStyles: esVenta
-      ? {
-          0: { cellWidth: 8,  halign: "center" },
-          2: { cellWidth: 18, halign: "center" },
-          3: { cellWidth: 32, halign: "right" },
-          4: { cellWidth: 32, halign: "right" },
-        }
-      : {
-          0: { cellWidth: 8,  halign: "center" },
-          2: { cellWidth: 14, halign: "center" },
-          3: { cellWidth: 22, halign: "right" },
-          4: { cellWidth: 12, halign: "center" },
-          5: { cellWidth: 26, halign: "right" },
-        },
-    // Cada sub-ítem ahora es su propia fila (ver `esSubfila` más arriba), así
-    // que ya no hay que mezclar negrita+normal dentro de una misma celda:
-    // alcanza con negrita en la columna Descripción de las filas padre, y
-    // peso normal (con sangría) en las filas de sub-ítem.
+    margin: { left: M, right: M },
+    styles: { fontSize: 8, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.1 },
+    headStyles: { fontSize: 8, fontStyle: "bold", textColor: [0, 0, 0], fillColor: GRIS_CLARO, lineColor: [0, 0, 0], lineWidth: 0.1, halign: "center" },
+    columnStyles: {
+      0: { cellWidth: 10, halign: "center" },
+      2: { cellWidth: 16, halign: "center" },
+      3: { cellWidth: 16, halign: "center" },
+      4: { cellWidth: 30, halign: "right" },
+      5: { cellWidth: 30, halign: "right" },
+    },
     didParseCell: (data) => {
-      if (esVenta || data.section !== "body" || data.column.index !== 1) return;
+      if (data.section !== "body" || data.column.index !== 1) return;
       if (esSubfila[data.row.index]) {
         data.cell.styles.cellPadding = { ...data.cell.styles.cellPadding, left: (data.cell.styles.cellPadding.left || 0) + 4 };
       } else {
@@ -223,60 +241,97 @@ export const exportarCotizacionPdf = async (cotizacion) => {
       }
     },
   });
+  y = doc.lastAutoTable.finalY + 4;
 
-  // ─── Condiciones comerciales ───
-  let y2 = doc.lastAutoTable.finalY + 10;
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "bold");
-  doc.text("Condiciones comerciales:", 14, y2);
-  y2 += 6;
-
-  doc.setFont("helvetica", "normal");
-  const condiciones = [
-    ["Forma de pago", cotizacion.condicionPago],
-    ["Plazo de entrega", cotizacion.plazoEntrega],
-    ["Lugar de entrega", cotizacion.lugarEntrega],
-    ["Validez de la oferta", cotizacion.validezOferta],
+  // ─── Totales (VALOR DE LA OFERTA / I.G.V. / VALOR TOTAL) ───
+  if (y + 24 > PAGE_H - 15) { doc.addPage(); y = 15; }
+  const totW = 80, totX = PAGE_W - M - totW, filaTotH = 7;
+  const totales = [
+    ["VALOR DE LA OFERTA", `${simboloDoc} ${Number(cotizacion.subtotal).toFixed(2)}`, AZUL_CLARO, false],
+    ["I.G.V. (18%)", `${simboloDoc} ${Number(cotizacion.igv).toFixed(2)}`, [255, 255, 255], false],
+    ["VALOR TOTAL DE LA OFERTA", `${simboloDoc} ${Number(cotizacion.total).toFixed(2)}`, [255, 255, 255], true],
   ];
-  condiciones.forEach(([label, valor]) => {
-    doc.text(label, 14, y2);
-    doc.text(":", 50, y2);
-    doc.text(valor || "-", 54, y2);
-    y2 += 5;
+  totales.forEach(([label, valor, bg, negrita]) => {
+    doc.setFillColor(...bg);
+    doc.rect(totX, y, totW, filaTotH, "F");
+    doc.setDrawColor(0);
+    doc.rect(totX, y, totW, filaTotH);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(negrita ? 9 : 8);
+    doc.text(label, totX + 3, y + filaTotH / 2 + 1.2);
+    doc.text(valor, totX + totW - 3, y + filaTotH / 2 + 1.2, { align: "right" });
+    y += filaTotH;
   });
-  y2 += 5;
+  y += 6;
 
-  const cierre = "Sin otro en particular quedamos a la espera de su grata orden de compra.";
-  const cierreLineas = doc.splitTextToSize(cierre, PAGE_R - 14);
-  doc.text(cierreLineas, 14, y2);
-  y2 += cierreLineas.length * 5 + 10;
-
-  doc.text("Atentamente,", 14, y2);
-  y2 += 12;
+  // ─── TERMINOS Y CONDICIONES ───
+  if (y + 40 > PAGE_H - 15) { doc.addPage(); y = 15; }
+  const yTerminosBarra = y;
+  y = barraSeccion("TERMINOS Y CONDICIONES", y);
+  const yTerminosInicio = y;
+  doc.setFontSize(8.5);
   doc.setFont("helvetica", "bold");
-  doc.text("JESUS HERRERA", 14, y2);
-  y2 += 5;
-  doc.text("HUAQUIAN", 14, y2);
-    y2 += 5;
-  doc.text("CEL: 969585300", 14, y2);
+  doc.text("FORMAS DE PAGO: ", M + 2, y);
+  doc.setFont("helvetica", "normal");
+  doc.text(cotizacion.condicionPago || "—", M + 2 + doc.getTextWidth("FORMAS DE PAGO: "), y);
+  y += 4.5;
+  doc.text("* PRECIOS INCLUYEN IGV", M + 2, y); y += 4.5;
+  doc.setFont("helvetica", "bold");
+  doc.text("GARANTÍA: ", M + 2, y);
+  doc.setFont("helvetica", "normal");
+  doc.text(GARANTIA_TEXTO, M + 2 + doc.getTextWidth("GARANTÍA: "), y); y += 4.5;
+  doc.setFont("helvetica", "bold");
+  doc.text("TIEMPO DE GARANTIA: ", M + 2, y);
+  doc.setFont("helvetica", "normal");
+  doc.text(cotizacion.tiempoGarantia || "—", M + 2 + doc.getTextWidth("TIEMPO DE GARANTIA: "), y); y += 4.5;
+  doc.setFont("helvetica", "bold");
+  doc.text("POLIZAS DE GARANTÍA: ", M + 2, y); y += 4.5;
+  doc.setFont("helvetica", "normal");
+  doc.text(POLIZA_TEXTO, M + 2, y); y += 4;
+  doc.setDrawColor(0);
+  doc.rect(M, yTerminosBarra, CONTENT_W, (y - yTerminosInicio) + 6 + (yTerminosInicio - yTerminosBarra));
+  y += 6;
 
-  // ─── Pie de página: logos de marcas representadas ───
-  const marcasCargadas = LOGOS_MARCAS
-    .map((m, i) => ({ ...m, img: marcasImgs[i] }))
-    .filter((m) => m.img);
-  if (marcasCargadas.length > 0) {
-    const altoLogo = 20;
-    const espacio = 8;
-    const anchos = marcasCargadas.map((m) => (m.img.naturalWidth / m.img.naturalHeight) * altoLogo);
-    const anchoTotal = anchos.reduce((a, b) => a + b, 0) + espacio * (marcasCargadas.length - 1);
-    const pageW = doc.internal.pageSize.getWidth();
-    const pageH = doc.internal.pageSize.getHeight();
-    let fx = (pageW - anchoTotal) / 2;
-    const fy = pageH - altoLogo - 8;
-    marcasCargadas.forEach((m, i) => {
-      doc.addImage(m.img, m.format, fx, fy, anchos[i], altoLogo);
-      fx += anchos[i] + espacio;
-    });
+  // ─── METODO DE PAGO ───
+  if (y + 34 > PAGE_H - 15) { doc.addPage(); y = 15; }
+  const yPagoBarra = y;
+  y = barraSeccion("METODO DE PAGO", y);
+  const yPagoInicio = y;
+  const logoAltoBanco = 6;
+  if (bcpLogo) {
+    const w = logoAltoBanco * (bcpLogo.naturalWidth / bcpLogo.naturalHeight);
+    doc.addImage(bcpLogo, "PNG", M + 2, y, w, logoAltoBanco);
+  }
+  y += logoAltoBanco + 2;
+  doc.setFontSize(8);
+  const lineaPago = (label, valor) => {
+    doc.setFont("helvetica", "bold");
+    doc.text(label, M + 2, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(valor, M + 2 + doc.getTextWidth(label), y);
+    y += 4;
+  };
+  lineaPago("* N° DE CUENTA EN SOLES: ", BANCOS.bcpCuentaSoles);
+  lineaPago(" N° DE CCI EN SOLES: ", BANCOS.bcpCciSoles);
+  lineaPago("* N° DE CUENTA EN DOLARES: ", BANCOS.bcpCuentaDolares);
+  lineaPago(" N° DE CCI EN DOLARES: ", BANCOS.bcpCciDolares);
+  y += 1;
+  if (bnLogo) {
+    const w = logoAltoBanco * (bnLogo.naturalWidth / bnLogo.naturalHeight);
+    doc.addImage(bnLogo, "PNG", M + 2, y, w, logoAltoBanco);
+  }
+  y += logoAltoBanco + 2;
+  lineaPago("* N° DE CUENTA DETRACCIÓN: ", BANCOS.bnCuentaDetraccion);
+  doc.setDrawColor(0);
+  doc.rect(M, yPagoBarra, CONTENT_W, (y - yPagoInicio) + 2 + (yPagoInicio - yPagoBarra));
+  y += 4;
+
+  // ─── Pie de página: grid de marcas representadas ───
+  if (marcasFooter) {
+    const h = CONTENT_W * (marcasFooter.naturalHeight / marcasFooter.naturalWidth) * 0.5;
+    const w = h * (marcasFooter.naturalWidth / marcasFooter.naturalHeight);
+    if (y + h > PAGE_H - 6) { doc.addPage(); y = 15; }
+    doc.addImage(marcasFooter, "PNG", (PAGE_W - w) / 2, y, w, h);
   }
 
   doc.save(`${cotizacion.codigo}.pdf`);

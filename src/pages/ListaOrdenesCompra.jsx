@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { fetchAuth, uploadAuth, abrirArchivoProtegido } from "../utils/fetchAuth";
+import { fetchAuth, uploadAuth, abrirArchivoProtegido, getUsuario } from "../utils/fetchAuth";
 import DetalleDocumento from "../components/DetalleDocumento";
 import ModalCrearOrdenCompra   from "../components/ModalCrearOrdenCompra";
 import ModalImportarExcel, { COLS_OC, COLS_CADENA } from "../components/ModalImportarExcel";
@@ -47,9 +47,10 @@ function PillSiNo({ si }) {
 function TablaOC({
   titulo, acento, ordenes, otGroupMap, factMap, factByOCMap, greMap, tipoCambio, onSelect, subirDocumento,
   mostrarFactura = true, mostrarTitulo = true, mostrarDocumento = true, mostrarHesActa = false,
-  vacioMsg,
+  puedeVerPrecios = true, vacioMsg,
 }) {
-  const totalColumnas = 10
+  const totalColumnas = 8
+    + (puedeVerPrecios ? 2 : 0)
     + (mostrarFactura ? 1 : 0) + (mostrarTitulo ? 1 : 0)
     + (mostrarHesActa ? 2 : 0) + (mostrarDocumento ? 1 : 0);
   return (
@@ -70,8 +71,8 @@ function TablaOC({
               {mostrarFactura && <th className={`${TH} text-left`}>N° Factura</th>}
               <th className={`${TH} text-left`}>Empresa</th>
               {mostrarTitulo && <th className={`${TH} text-left`}>Título</th>}
-              <th className={`${TH} text-right`}>Total (S/)</th>
-              <th className={`${TH} text-right`}>Total (US$)</th>
+              {puedeVerPrecios && <th className={`${TH} text-right`}>Total (S/)</th>}
+              {puedeVerPrecios && <th className={`${TH} text-right`}>Total (US$)</th>}
               <th className={`${TH} text-center`}>Estado Cotización</th>
               <th className={`${TH} text-center`}>Estado OT</th>
               <th className={`${TH} text-center`}>Estado Informes</th>
@@ -113,12 +114,16 @@ function TablaOC({
                   )}
                   <td className="px-4 py-3.5 text-gray-700">{o.empresa?.razonSocial || "—"}</td>
                   {mostrarTitulo && <td className="px-4 py-3.5 text-gray-600">{o.titulo}</td>}
-                  <td className="px-4 py-3.5 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap">
-                    {pen.toLocaleString("es-PE", { minimumFractionDigits: 2 })}
-                  </td>
-                  <td className="px-4 py-3.5 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap">
-                    {usd != null ? usd.toLocaleString("es-PE", { minimumFractionDigits: 2 }) : "—"}
-                  </td>
+                  {puedeVerPrecios && (
+                    <td className="px-4 py-3.5 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap">
+                      {pen.toLocaleString("es-PE", { minimumFractionDigits: 2 })}
+                    </td>
+                  )}
+                  {puedeVerPrecios && (
+                    <td className="px-4 py-3.5 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap">
+                      {usd != null ? usd.toLocaleString("es-PE", { minimumFractionDigits: 2 }) : "—"}
+                    </td>
+                  )}
                   <td className="px-4 py-3.5 text-center">
                     <div className="flex flex-col items-center gap-1">
                       <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full uppercase tracking-wide whitespace-nowrap ${o.cotizacion?.aprobado ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
@@ -197,8 +202,8 @@ function TablaOC({
                   {mostrarFactura && <td className="px-4 py-3" />}
                   <td className="px-4 py-3" />
                   {mostrarTitulo && <td className="px-4 py-3" />}
-                  <td className="px-4 py-3" />
-                  <td className="px-4 py-3" />
+                  {puedeVerPrecios && <td className="px-4 py-3" />}
+                  {puedeVerPrecios && <td className="px-4 py-3" />}
                   <td className="px-4 py-3" />
                   <td className="px-4 py-3 text-center">
                     <DotChip chip={badgeOT(s.estado)} dot={dotOT(s.estado)}>{s.estado}</DotChip>
@@ -232,6 +237,9 @@ function TablaOC({
 }
 
 export default function ListaOrdenesCompra() {
+  // Administración ve la vista de OC pero no montos/costos — mismo criterio
+  // que Cotizaciones (Fase 16).
+  const puedeVerPrecios = ["admin", "facturacion", "jefatura"].includes(getUsuario()?.rol);
   const hoy = new Date();
   const [ordenes, setOrdenes]       = useState([]);
   const [otGroupMap, setOtGroupMap] = useState({});
@@ -385,8 +393,10 @@ export default function ListaOrdenesCompra() {
       "N° Factura":         o.numeroFactura || factura?.numeroFactura || "—",
       "Empresa":            o.empresa?.razonSocial || "—",
       "Título":             o.titulo || "—",
-      "Total (S/)":         pen.toFixed(2),
-      "Total (US$)":        usd != null ? usd.toFixed(2) : "—",
+      ...(puedeVerPrecios ? {
+        "Total (S/)":       pen.toFixed(2),
+        "Total (US$)":      usd != null ? usd.toFixed(2) : "—",
+      } : {}),
       "Aprobado":           o.cotizacion?.aprobado ? "Aprobada" : "Pendiente",
       "Enviado":            o.cotizacion?.enviado ? "Enviada" : "No enviada",
       "Informe enviado":    o.cotizacion?.informeEnviado ? "Enviado" : "No enviado",
@@ -525,7 +535,7 @@ export default function ListaOrdenesCompra() {
         titulo="Órdenes de Compra sin factura"
         acento="bg-amber-500"
         ordenes={sinFactura}
-        otGroupMap={otGroupMap} factMap={factMap} factByOCMap={factByOCMap} greMap={greMap} tipoCambio={tipoCambio}
+        otGroupMap={otGroupMap} factMap={factMap} factByOCMap={factByOCMap} greMap={greMap} tipoCambio={tipoCambio} puedeVerPrecios={puedeVerPrecios}
         onSelect={setOrdenSeleccionada}
         subirDocumento={subirDocumento}
         mostrarFactura={false}
@@ -539,7 +549,7 @@ export default function ListaOrdenesCompra() {
         titulo="Órdenes de Compra con factura"
         acento="bg-emerald-500"
         ordenes={conFactura}
-        otGroupMap={otGroupMap} factMap={factMap} factByOCMap={factByOCMap} greMap={greMap} tipoCambio={tipoCambio}
+        otGroupMap={otGroupMap} factMap={factMap} factByOCMap={factByOCMap} greMap={greMap} tipoCambio={tipoCambio} puedeVerPrecios={puedeVerPrecios}
         onSelect={setOrdenSeleccionada}
         subirDocumento={subirDocumento}
         vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de compra con factura"}
@@ -549,7 +559,7 @@ export default function ListaOrdenesCompra() {
         titulo="Órdenes de Compra cerradas"
         acento="bg-gray-500"
         ordenes={cerradas}
-        otGroupMap={otGroupMap} factMap={factMap} factByOCMap={factByOCMap} greMap={greMap} tipoCambio={tipoCambio}
+        otGroupMap={otGroupMap} factMap={factMap} factByOCMap={factByOCMap} greMap={greMap} tipoCambio={tipoCambio} puedeVerPrecios={puedeVerPrecios}
         onSelect={setOrdenSeleccionada}
         subirDocumento={subirDocumento}
         vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de compra cerradas"}

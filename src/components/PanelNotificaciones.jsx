@@ -5,7 +5,7 @@ const formatoFecha = (fecha) =>
     timeStyle: "short",
   });
 
-const ROL_LABEL = { admin: "Admin", tecnico: "Técnico", almacenero: "Almacenero", asistente: "Administración", supervisor: "Supervisor", jefatura: "Jefatura", facturacion: "Facturación", planner: "Planner" };
+const ROL_LABEL = { admin: "Admin", tecnico: "Técnico", tecnico_prueba: "Técnico de Prueba", tecnico_intervencion: "Técnico de Intervención", almacenero: "Almacenero", asistente: "Administración", supervisor: "Supervisor", jefatura: "Jefatura", facturacion: "Facturación", planner: "Planner" };
 
 export default function PanelNotificaciones({ notificaciones, onClose }) {
   return (

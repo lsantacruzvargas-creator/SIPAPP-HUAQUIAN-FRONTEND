@@ -185,13 +185,13 @@ function FilaItem({ requerimiento, item, puedeAtender, onActualizado }) {
               </p>
               <p className="text-xs text-gray-400 truncate">{resumenCompra(item)}</p>
               {item.materialAsociado && (
-                <p className="text-xs text-blue-600 mt-0.5">Vinculado a: {item.materialAsociado.codigo} — {item.materialAsociado.nombre}</p>
+                <p className="text-xs text-blue-600 mt-0.5">Vinculado a: {item.materialAsociado.sku} — {item.materialAsociado.nombre}</p>
               )}
             </>
           ) : (
             <>
               <p className="text-sm font-medium text-gray-800">{item.material?.nombre}</p>
-              <p className="text-xs text-gray-400 font-mono">{item.material?.codigo} — cantidad: {item.cantidad} {item.material?.unidad}</p>
+              <p className="text-xs text-gray-400 font-mono">{item.material?.sku} — cantidad: {item.cantidad} {item.material?.unidad}</p>
             </>
           )}
         </div>

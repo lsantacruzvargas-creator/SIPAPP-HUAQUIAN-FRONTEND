@@ -5,6 +5,7 @@ import DetalleDocumento from "../components/DetalleDocumento";
 import ModalImportarExcel, { COLS_COT_OT } from "../components/ModalImportarExcel";
 import ModalNuevaOT from "../components/ModalNuevaOT";
 import ModalNuevaCotizacion from "../components/ModalNuevaCotizacion";
+import { DotChip, badgeGeneral, dotGeneral } from "../components/detalleShared";
 import * as XLSX from "xlsx";
 
 const MESES = [
@@ -62,7 +63,7 @@ const totalesDuales = (c, tipoCambio) => {
 const diasDesdeInforme = (c) =>
   c.fechaInformeEnviado ? Math.floor((Date.now() - new Date(c.fechaInformeEnviado).getTime()) / 86400000) : null;
 
-function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, tipoCambio, mostrarDiasInforme, puedeVerPrecios }) {
+function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, tipoCambio, mostrarDiasInforme, puedeVerPrecios, mostrarEstadoServicio, otsPorCot }) {
   return (
     <div className="mb-6">
       <div className="flex items-center gap-2 mb-3">
@@ -76,10 +77,11 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
           <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-200">
             <tr>
               <th className={`${TH} text-left`}>N° Cotización</th>
-              <th className={`${TH} text-center`}>Fecha recibida</th>
+              {mostrarEstadoServicio && <th className={`${TH} text-left`}>N° OT</th>}
+              {mostrarEstadoServicio && <th className={`${TH} text-center`}>Fecha de salida</th>}
+              {mostrarEstadoServicio && <th className={`${TH} text-center`}>Estado de servicio</th>}
               <th className={`${TH} text-left`}>Empresa</th>
               <th className={`${TH} text-left`}>Planta</th>
-              <th className={`${TH} text-left`}>Encargado</th>
               <th className={`${TH} text-left`}>Descripción</th>
               {puedeVerPrecios && <th className={`${TH} text-right`}>Total sin IGV (S/)</th>}
               {puedeVerPrecios && <th className={`${TH} text-right`}>Total sin IGV (US$)</th>}
@@ -92,11 +94,13 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
           <tbody className="divide-y divide-gray-100">
             {cotizaciones.length === 0 ? (
               <tr>
-                <td colSpan={(mostrarDiasInforme ? 12 : 11) - (puedeVerPrecios ? 0 : 2)} className="px-4 py-8 text-center text-gray-400">{vacioMsg}</td>
+                <td colSpan={7 + (puedeVerPrecios ? 2 : 0) + (mostrarDiasInforme ? 1 : 0) + (mostrarEstadoServicio ? 3 : 0)} className="px-4 py-8 text-center text-gray-400">{vacioMsg}</td>
               </tr>
             ) : (
               cotizaciones.map((c) => {
                 const { pen, usd } = totalesDuales(c, tipoCambio);
+                // Solo se usa (y se busca) en la tabla de Pendientes de OC.
+                const otPrincipal = mostrarEstadoServicio ? otsPorCot.get(c._id)?.[0] : null;
                 return (
                 <tr
                   key={c._id}
@@ -119,14 +123,27 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-3.5 text-center text-gray-500 whitespace-nowrap">
-                    {c.fechaRecibida ? new Date(c.fechaRecibida).toLocaleDateString("es-PE") : <span className="text-gray-300">—</span>}
-                  </td>
+                  {mostrarEstadoServicio && (
+                    <td className="px-4 py-3.5 text-gray-600 whitespace-nowrap">
+                      {numerosOT(otsPorCot.get(c._id)) || <span className="text-gray-300">—</span>}
+                    </td>
+                  )}
+                  {mostrarEstadoServicio && (
+                    <td className="px-4 py-3.5 text-center text-gray-500 whitespace-nowrap">
+                      {otPrincipal?.fechaSalida ? new Date(otPrincipal.fechaSalida).toLocaleDateString("es-PE") : <span className="text-gray-300">—</span>}
+                    </td>
+                  )}
+                  {mostrarEstadoServicio && (
+                    <td className="px-4 py-3.5 text-center">
+                      {otPrincipal
+                        ? <DotChip chip={badgeGeneral(otPrincipal.estadoGeneral)} dot={dotGeneral(otPrincipal.estadoGeneral)}>{otPrincipal.estadoGeneral}</DotChip>
+                        : <span className="text-gray-300">—</span>}
+                    </td>
+                  )}
                   <td className="px-4 py-3.5 text-gray-700">
                     {c.empresa?.razonSocial || <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-4 py-3.5 text-gray-600">{c.planta || <span className="text-gray-300">—</span>}</td>
-                  <td className="px-4 py-3.5 text-gray-600">{c.encargado || <span className="text-gray-300">—</span>}</td>
                   <td className="px-4 py-3.5 text-gray-700">{c.titulo}</td>
                   {puedeVerPrecios && (
                     <td className="px-4 py-3.5 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap">
@@ -500,6 +517,8 @@ export default function ListaCotizaciones() {
           vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin cotizaciones pendientes"}
           tipoCambio={tipoCambio}
           puedeVerPrecios={puedeVerPrecios}
+          mostrarEstadoServicio
+          otsPorCot={otsPorCot}
           mostrarDiasInforme
         />
       )}

@@ -21,7 +21,7 @@ export default function SelectorMateriales({ onSelect, onClose }) {
   }, []);
 
   const filtrados = lista.filter((m) => !q ||
-    [m.nombre, m.codigo, m.ubicacion?.nombre].some((v) => v?.toLowerCase().includes(q.toLowerCase())));
+    [m.nombre, m.sku, m.codigo, m.ubicacion?.nombre].some((v) => v?.toLowerCase().includes(q.toLowerCase())));
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
@@ -41,7 +41,7 @@ export default function SelectorMateriales({ onSelect, onClose }) {
               <button key={m._id} onClick={() => onSelect(m)}
                 className="w-full text-left px-4 py-3 rounded-xl hover:bg-blue-50 border border-transparent hover:border-blue-100 transition">
                 <div className="flex justify-between items-center gap-2">
-                  <span className="font-mono text-xs text-blue-600">{m.codigo}</span>
+                  <span className="font-mono text-xs text-blue-600">{m.sku}</span>
                   <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badgeStock(m)}`}>
                     {m.stock} {m.unidad}
                   </span>

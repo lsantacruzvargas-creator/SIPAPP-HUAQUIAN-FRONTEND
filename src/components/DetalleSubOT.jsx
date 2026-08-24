@@ -51,16 +51,17 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
   // Anular un documento queda reservado a Admin, Facturación y Jefatura.
   const puedeAnular = ["admin", "facturacion", "jefatura"].includes(rolActual);
   const puedeAprobarInforme = ["admin", "jefatura", "planner"].includes(rolActual);
+  const esTecnico = ["tecnico", "tecnico_prueba", "tecnico_intervencion"].includes(rolActual);
   // Tabla de Servicios Externos: la ven todos los roles menos técnico.
-  const puedeVerServicios = rolActual !== "tecnico";
+  const puedeVerServicios = !esTecnico;
   const cadenaCerrada = bloqueadoPorCadenaCerrada(ot.estadoCadena, rolActual);
   // Estado (Encargado Intervención) y Progreso (Encargado Prueba) — mismo
   // criterio que DetalleOrdenTrabajo.jsx: cards independientes del fieldset,
   // editables por el técnico cuyo nombre coincide con encargado/encargado2.
   const nombreActual = getUsuario()?.nombre;
   const coincideNombre = (a, b) => !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
-  const puedeEditarEstado = puedeEditarCampos || (rolActual === "tecnico" && coincideNombre(ot.encargado2, nombreActual));
-  const puedeEditarEstadoPrueba = puedeEditarCampos || (rolActual === "tecnico" && coincideNombre(ot.encargado, nombreActual));
+  const puedeEditarEstado = puedeEditarCampos || (esTecnico && coincideNombre(ot.encargado2, nombreActual));
+  const puedeEditarEstadoPrueba = puedeEditarCampos || (esTecnico && coincideNombre(ot.encargado, nombreActual));
   const [usuarios, setUsuarios] = useState([]);
   const [tecnicos, setTecnicos] = useState([]);
   const [informes, setInformes] = useState([]);
@@ -93,7 +94,7 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
     // Encargado Prueba / Encargado Intervención se eligen entre los
     // usuarios con login y rol "tecnico" (distinto de "Personal asignado")
     // — ver Fase 13.
-    fetchAuth("/usuarios/lista").then(r => r.ok && r.json()).then(u => setTecnicos((u || []).filter(x => x.rol === "tecnico")));
+    fetchAuth("/usuarios/lista").then(r => r.ok && r.json()).then(u => setTecnicos((u || []).filter(x => ["tecnico", "tecnico_prueba", "tecnico_intervencion"].includes(x.rol))));
     cargarRelaciones();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ot._id]);
@@ -341,7 +342,7 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
                 <label className="text-xs text-gray-500 block mb-1">Encargado Prueba</label>
                 <select name="encargado" value={form.encargado} onChange={handleChange} className={INP}>
                   <option value="">Sin asignar</option>
-                  {tecnicos.map(t => (
+                  {tecnicos.filter(t => t.rol === "tecnico_prueba").map(t => (
                     <option key={t._id} value={t.nombre}>{t.nombre}</option>
                   ))}
                 </select>
@@ -350,7 +351,7 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
                 <label className="text-xs text-gray-500 block mb-1">Encargado Intervención</label>
                 <select name="encargado2" value={form.encargado2} onChange={handleChange} className={INP}>
                   <option value="">Sin asignar</option>
-                  {tecnicos.map(t => (
+                  {tecnicos.filter(t => t.rol === "tecnico_intervencion").map(t => (
                     <option key={t._id} value={t.nombre}>{t.nombre}</option>
                   ))}
                 </select>

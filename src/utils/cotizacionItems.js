@@ -1,3 +1,5 @@
+export const UNIDADES = ["und", "kg", "g", "L", "mL", "m", "cm", "m²", "caja", "rollo", "par", "juego", "bolsa"];
+
 export const calcSubtotal = (item) =>
   parseFloat((item.cantidad * item.precio).toFixed(2));
 
@@ -8,6 +10,7 @@ export const INP_RO = "bg-transparent border-transparent text-sm px-2 py-1";
 export const itemVacioVenta = () => ({
   _key: Date.now() + Math.random(),
   descripcion: "",
+  unidad: "und",
   cantidad: 1,
   fechaEntrega: "",
   precio: 0,
@@ -18,6 +21,7 @@ export const itemVacioServicio = () => ({
   _key: Date.now() + Math.random(),
   descripcion: "",
   subItems: [],
+  unidad: "und",
   cantidad: 1,
   fechaEntrega: "",
   precio: 0,
@@ -31,6 +35,7 @@ export const itemDesdeDb = (item) => ({
     _subKey: Date.now() + Math.random(),
     texto,
   })),
+  unidad: item.unidad || "und",
   cantidad: item.cantidad,
   fechaEntrega: item.fechaEntrega
     ? new Date(item.fechaEntrega).toISOString().split("T")[0]

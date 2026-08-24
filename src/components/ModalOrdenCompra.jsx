@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { fetchAuth } from "../utils/fetchAuth";
+import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 
 const INP    = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 w-full";
 const INP_RO = "border border-gray-100 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500 w-full cursor-not-allowed";
@@ -11,6 +11,9 @@ function calcular(sub) {
 }
 
 export default function ModalOrdenCompra({ cotizacion, onClose, onCreada }) {
+  // Administración no ve/edita el monto — se hereda tal cual de la cotización
+  // (mismo criterio que ModalCrearOrdenCompra.jsx y Cotizaciones, Fase 16).
+  const esAsistente = getUsuario()?.rol === "asistente";
   const [monto, setMonto]               = useState(cotizacion.total ?? 0);
   const [numeroOrden, setNumeroOrden] = useState("");
   const [guardando, setGuardando] = useState(false);
@@ -20,7 +23,7 @@ export default function ModalOrdenCompra({ cotizacion, onClose, onCreada }) {
 
   const guardar = async () => {
     if (!numeroOrden.trim()) return setError("El número de orden de compra es obligatorio.");
-    if (!monto || Number(monto) <= 0) return setError("El monto es obligatorio.");
+    if (!esAsistente && (!monto || Number(monto) <= 0)) return setError("El monto es obligatorio.");
     setGuardando(true);
     setError("");
     const calc = calcular(Number(monto) / 1.18); // Guardamos el subtotal sin IGV
@@ -106,17 +109,20 @@ export default function ModalOrdenCompra({ cotizacion, onClose, onCreada }) {
             />
           </div>
 
-          <div>
-            <label className="text-xs text-gray-500 block mb-1">Monto (S/)</label>
-            <input
-              type="number"
-              value={Number(monto/1.18).toFixed(2)}
-              onChange={(e) => setMonto(e.target.value)}
-              className={INP}
-              min="0"
-              step="0.1"
-            />
-          </div>
+          {!esAsistente && (
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Monto (S/)</label>
+              <input
+                type="number"
+                value={Number(monto/1.18).toFixed(2)}
+                onChange={(e) => setMonto(e.target.value)}
+                disabled={esAsistente}
+                className={INP}
+                min="0"
+                step="0.1"
+              />
+            </div>
+          )}
 
           {exito && (
             <div className="bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg px-4 py-3">
