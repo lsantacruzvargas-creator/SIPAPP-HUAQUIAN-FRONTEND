@@ -4,8 +4,10 @@ const path = require("path");
 
 autoUpdater.autoDownload = false;
 
-// TODO: dominio real de Huaquian pendiente — reemplazar cuando exista.
-const LOGIN_URL = "https://huaquian.com/#/login";
+// huaquian-sac.com (apex, sin "www") no tiene registro DNS configurado — solo
+// resuelve el subdominio www. (verificado: apex da "Could not resolve host",
+// www. responde 200 vía Cloudflare, mismo frontend que sipapp-huaquian-frontend.pages.dev).
+const LOGIN_URL = "https://www.huaquian-sac.com/#/login";
 
 let mainWindow;
 
