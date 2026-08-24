@@ -25,7 +25,7 @@
   },
   "name": "sipapp-huaquian",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -34,10 +34,9 @@
     "preview": "vite preview",
     "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
     "electron:build": "npm run build && npx electron-builder",
-    "release:patch": "npm version patch --no-git-tag-version && npm run build && npx electron-builder --publish always && npm run release:push",
-    "release:minor": "npm version minor --no-git-tag-version && npm run build && npx electron-builder --publish always && npm run release:push",
-    "release:major": "npm version major --no-git-tag-version && npm run build && npx electron-builder --publish always && npm run release:push",
-    "release:push": "git add -A && git commit -m v%npm_package_version% && git push"
+    "release:patch": "npm version patch && git push --follow-tags && npm run build && npx electron-builder --publish always",
+    "release:minor": "npm version minor && git push --follow-tags && npm run build && npx electron-builder --publish always",
+    "release:major": "npm version major && git push --follow-tags && npm run build && npx electron-builder --publish always"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.0",
