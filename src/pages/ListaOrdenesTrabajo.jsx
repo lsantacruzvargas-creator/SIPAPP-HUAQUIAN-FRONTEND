@@ -162,6 +162,9 @@ export default function ListaOrdenesTrabajo() {
   // Filtro de grupo: qué bloque de tablas se muestra — Prueba, Intervención,
   // o ambos. "Cerradas" queda siempre visible, es ortogonal a ambos tracks.
   const [grupo, setGrupo] = useState("todos");
+  // Solo para la vista simplificada (planner/asistente): qué tabla de las 5
+  // categorías se muestra — el resto de roles no usa este filtro.
+  const [filtroEstadoPlanner, setFiltroEstadoPlanner] = useState("todos");
 
   const cargar = () =>
     Promise.all([
@@ -314,6 +317,9 @@ export default function ListaOrdenesTrabajo() {
   const plannerCompletadas = asignadasPlanner.filter((o) => !o.informesAprobados && esTrackListo(o));
   const plannerEnProgreso  = asignadasPlanner.filter((o) => !esTrackListo(o));
   const hayFiltro = Object.values(filtros).some(Boolean);
+  // Con qué categoría se queda la vista simplificada — "todos" o fuera de
+  // esa vista no filtra nada (todas las tablas se muestran igual que antes).
+  const mostrarPlanner = (clave) => !esVistaSimplificada || filtroEstadoPlanner === "todos" || filtroEstadoPlanner === clave;
 
   // Mismas columnas que TablaOTs (ver el nuevo orden ahí) — una hoja por
   // cada tabla visible.
@@ -406,15 +412,18 @@ export default function ListaOrdenesTrabajo() {
           </select>
         )}        
 
-        {/* <select name="estado" value={filtros.estado} onChange={handleFiltro} className={SELECT}>
-          <option value="">Todo estado</option>
-          <option value="pendiente">Pendiente</option>
-          <option value="en progreso">En progreso</option>
-          <option value="completado">Completado</option>
-          <option value="entregado">Entregado</option>
-        </select> */}
+        {esVistaSimplificada && (
+          <select value={filtroEstadoPlanner} onChange={(e) => setFiltroEstadoPlanner(e.target.value)} className={SELECT}>
+            <option value="todos">Todo estado</option>
+            <option value="noAsignada">No asignada</option>
+            <option value="enProgreso">En progreso</option>
+            <option value="completada">Completada</option>
+            <option value="entregada">Entregada</option>
+            <option value="cerrada">Cerrada</option>
+          </select>
+        )}
 
-        
+
 
         <select name="ano" value={filtros.ano} onChange={handleFiltro} className={SELECT}>
           <option value="">Todos los años</option>
@@ -493,37 +502,45 @@ export default function ListaOrdenesTrabajo() {
 
       {esVistaSimplificada ? (
         <>
-          <TablaOTs
-            titulo="Órdenes no asignadas"
-            acento="bg-red-500"
-            ordenes={noAsignadas}
-            onSelect={setSeleccionada}
-            vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes por asignar"}
-          />
+          {mostrarPlanner("noAsignada") && (
+            <TablaOTs
+              titulo="Órdenes no asignadas"
+              acento="bg-red-500"
+              ordenes={noAsignadas}
+              onSelect={setSeleccionada}
+              vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes por asignar"}
+            />
+          )}
 
-          <TablaOTs
-            titulo="Órdenes en progreso"
-            acento="bg-blue-500"
-            ordenes={plannerEnProgreso}
-            onSelect={setSeleccionada}
-            vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes en progreso"}
-          />
+          {mostrarPlanner("enProgreso") && (
+            <TablaOTs
+              titulo="Órdenes en progreso"
+              acento="bg-blue-500"
+              ordenes={plannerEnProgreso}
+              onSelect={setSeleccionada}
+              vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes en progreso"}
+            />
+          )}
 
-          <TablaOTs
-            titulo="Órdenes completadas"
-            acento="bg-green-500"
-            ordenes={plannerCompletadas}
-            onSelect={setSeleccionada}
-            vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes completadas"}
-          />
+          {mostrarPlanner("completada") && (
+            <TablaOTs
+              titulo="Órdenes completadas"
+              acento="bg-green-500"
+              ordenes={plannerCompletadas}
+              onSelect={setSeleccionada}
+              vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes completadas"}
+            />
+          )}
 
-          <TablaOTs
-            titulo="Órdenes entregadas"
-            acento="bg-teal-500"
-            ordenes={plannerEntregadas}
-            onSelect={setSeleccionada}
-            vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes entregadas"}
-          />
+          {mostrarPlanner("entregada") && (
+            <TablaOTs
+              titulo="Órdenes entregadas"
+              acento="bg-teal-500"
+              ordenes={plannerEntregadas}
+              onSelect={setSeleccionada}
+              vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes entregadas"}
+            />
+          )}
         </>
       ) : !esTecnicoIntervencion && grupo !== "intervencion" && (
         <>
@@ -601,13 +618,15 @@ export default function ListaOrdenesTrabajo() {
         </>
       )}
 
-      <TablaOTs
-        titulo="Órdenes cerradas"
-        acento="bg-gray-500"
-        ordenes={cerradas}
-        onSelect={setSeleccionada}
-        vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes cerradas"}
-      />
+      {mostrarPlanner("cerrada") && (
+        <TablaOTs
+          titulo="Órdenes cerradas"
+          acento="bg-gray-500"
+          ordenes={cerradas}
+          onSelect={setSeleccionada}
+          vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes cerradas"}
+        />
+      )}
     </div>
 
     {seleccionada && (
