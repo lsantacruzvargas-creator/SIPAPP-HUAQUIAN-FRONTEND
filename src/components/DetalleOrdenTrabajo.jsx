@@ -673,7 +673,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
                   Sub-Órdenes ({subOTs.length})
                 </p>
-                {!ot.anulado && !cadenaCerrada && (
+                {!ot.anulado && !cadenaCerrada && !esTecnico && (
                   <button type="button" onClick={() => setCrearSubOTOpen(true)}
                     className="text-xs text-blue-600 hover:text-blue-800 underline">
                     + Crear Sub-OT

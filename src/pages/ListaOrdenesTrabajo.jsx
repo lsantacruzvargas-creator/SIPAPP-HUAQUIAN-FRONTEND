@@ -311,8 +311,15 @@ export default function ListaOrdenesTrabajo() {
       if (califica(o, campoEncargado) && buckets[o[campoEstado]]) {
         buckets[o[campoEstado]].push({ ...o, subOTs: porEstado[o[campoEstado]] || [] });
         delete porEstado[o[campoEstado]];
+        Object.entries(porEstado).forEach(([estado, subs]) => buckets[estado].push({ ...o, subOTs: subs }));
+      } else if (esTecnicoRol) {
+        // Para técnico, si el padre no le pertenece (no calificó), la OT
+        // padre no debe aparecer como contexto — cada sub-OT suya se lista
+        // como su propia fila, sola, sin el padre encima.
+        Object.values(porEstado).flat().forEach((s) => buckets[s[campoEstado]].push({ ...s, subOTs: [] }));
+      } else {
+        Object.entries(porEstado).forEach(([estado, subs]) => buckets[estado].push({ ...o, subOTs: subs }));
       }
-      Object.entries(porEstado).forEach(([estado, subs]) => buckets[estado].push({ ...o, subOTs: subs }));
     });
     return buckets;
   };

@@ -18,8 +18,13 @@ export default function ModalRequerimiento({ ot, onClose, onCreado }) {
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
 
+  // "Solicitado por" lista solo a los técnicos de prueba/intervención (no
+  // el registro general de Personal ni la cuenta legado "tecnico") — son
+  // quienes de verdad piden material contra una OT.
   useEffect(() => {
-    fetchAuth("/personal/lista").then((r) => r.ok && r.json()).then((d) => setPersonal(d || []));
+    fetchAuth("/usuarios/lista").then((r) => r.ok && r.json()).then((d) =>
+      setPersonal((d || []).filter((u) => ["tecnico_prueba", "tecnico_intervencion"].includes(u.rol)))
+    );
   }, []);
 
   const personaSel = personal.find((p) => p._id === personalId);
