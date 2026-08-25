@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import DetalleDocumento from "../components/DetalleDocumento";
 import ModalNuevaOT from "../components/ModalNuevaOT";
+import ModalImportarExcel, { COLS_OT } from "../components/ModalImportarExcel";
 import { DotChip, badgeOT, dotOT, badgeInformes, dotInformes, badgeGeneral, dotGeneral } from "../components/detalleShared";
 import * as XLSX from "xlsx";
 
@@ -157,6 +158,7 @@ export default function ListaOrdenesTrabajo() {
   const [sortBy, setSortBy] = useState("numeroOT");
   const [seleccionada, setSeleccionada] = useState(null);
   const [crearOTOpen, setCrearOTOpen] = useState(false);
+  const [importarOpen, setImportarOpen] = useState(false);
   // Filtro de grupo: qué bloque de tablas se muestra — Prueba, Intervención,
   // o ambos. "Cerradas" queda siempre visible, es ortogonal a ambos tracks.
   const [grupo, setGrupo] = useState("todos");
@@ -364,6 +366,14 @@ export default function ListaOrdenesTrabajo() {
           >
             Exportar Excel
           </button>
+          {rolActual === "admin" && (
+            <button
+              onClick={() => setImportarOpen(true)}
+              className="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition"
+            >
+              Importar OTs
+            </button>
+          )}
           {!esTecnicoRol && (
             <button
               onClick={() => setCrearOTOpen(true)}
@@ -465,6 +475,20 @@ export default function ListaOrdenesTrabajo() {
             </button>
           ))}
         </div>
+      )}
+
+      {/* Una OT sin ningún técnico asignado (p.ej. recién importada del Excel)
+          no cae en la tabla de Prueba ni en la de Intervención abajo —
+          ambas exigen encargado/encargado2. Sin esta tabla quedaría
+          invisible para admin y roles no-técnico/no-planner. */}
+      {!esVistaSimplificada && !esTecnicoRol && (
+        <TablaOTs
+          titulo="Órdenes no asignadas"
+          acento="bg-red-500"
+          ordenes={noAsignadas}
+          onSelect={setSeleccionada}
+          vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes por asignar"}
+        />
       )}
 
       {esVistaSimplificada ? (
@@ -603,6 +627,24 @@ export default function ListaOrdenesTrabajo() {
       <ModalNuevaOT
         onClose={() => setCrearOTOpen(false)}
         onCreada={() => { setCrearOTOpen(false); cargar(); }}
+      />
+    )}
+
+    {importarOpen && (
+      <ModalImportarExcel
+        tipo="Órdenes de Trabajo"
+        columnas={COLS_OT}
+        endpoint="/ordenes-trabajo/importar"
+        color="blue"
+        nombreColeccion="todas las Órdenes de Trabajo"
+        instrucciones={
+          <>1. Descarga la plantilla, rellena tus datos y súbela. La <strong>Empresa</strong> se busca por
+          Razón Social (debe existir ya registrada). <strong>Estado de la orden</strong>: No asignado, En proceso,
+          Terminado o Entregado — sin un técnico asignado, la OT se sigue viendo como "No asignado" en las tablas
+          hasta que alguien lo asigne a mano.</>
+        }
+        onClose={() => setImportarOpen(false)}
+        onImportado={cargar}
       />
     )}
     </>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { fetchAuth } from "../utils/fetchAuth";
+import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import ModalImportarExcel, { COLS_MATERIALES } from "../components/ModalImportarExcel";
 
 const INP =
@@ -202,7 +202,8 @@ function SeccionMateriales() {
     .filter((m) =>
       m.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
       m.sku?.toLowerCase().includes(busqueda.toLowerCase()) ||
-      m.codigo?.toLowerCase().includes(busqueda.toLowerCase())
+      m.codigo?.toLowerCase().includes(busqueda.toLowerCase()) ||
+      m.descripcion?.toLowerCase().includes(busqueda.toLowerCase())
     );
 
   const badgeStock = (m) => {
@@ -220,10 +221,12 @@ function SeccionMateriales() {
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
             Nuevo material (SKU)
           </p>
-          <button type="button" onClick={() => setImportarOpen(true)}
-            className="text-xs border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition font-medium">
-            ↑ Importar inventario (Excel)
-          </button>
+          {getUsuario()?.rol === "admin" && (
+            <button type="button" onClick={() => setImportarOpen(true)}
+              className="text-xs border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition font-medium">
+              ↑ Importar inventario (Excel)
+            </button>
+          )}
         </div>
         {/* Orden del formulario: Tipo Componente → Categoría → Código → Título/Descripción */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -296,7 +299,7 @@ function SeccionMateriales() {
       <div className="flex items-center gap-4">
         <input
           value={busqueda} onChange={(e) => setBusqueda(e.target.value)}
-          className={`flex-1 ${INP}`} placeholder="Buscar por título, SKU o código…" />
+          className={`flex-1 ${INP}`} placeholder="Buscar por SKU, título o descripción…" />
         <label className="flex items-center gap-1.5 text-xs text-gray-500 whitespace-nowrap">
           <input type="checkbox" checked={mostrarInactivos} onChange={(e) => setMostrarInactivos(e.target.checked)} />
           Mostrar inactivos
@@ -362,6 +365,7 @@ function SeccionMateriales() {
           columnas={COLS_MATERIALES}
           endpoint="/materiales/importar"
           color="blue"
+          nombreColeccion="todos los Materiales (SKU) y sus movimientos de almacén"
           instrucciones={
             <>1. Descarga la plantilla, rellena tus datos y súbela. El <strong>SKU</strong> lo
             genera el sistema automáticamente — no va en el Excel. <strong>Tipo Componente</strong>,{" "}

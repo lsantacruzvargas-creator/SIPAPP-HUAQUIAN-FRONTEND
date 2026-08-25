@@ -356,8 +356,10 @@ export default function ListaCotizaciones() {
   // cuentan como "pendientes" acá aunque tampoco tengan OC.
   const pendientes = filtradas.filter((c) => !c._esOT && !esCerrada(c) && !tieneOC(c));
   const conOC = filtradas.filter((c) => !esCerrada(c) && tieneOC(c));
-  // Cotizaciones (no pseudo-filas de OT) sin ninguna OT relacionada.
-  const sinOT = filtradas.filter((c) => !c._esOT && !otsPorCot.get(c._id)?.length);
+  // Cotizaciones (no pseudo-filas de OT) sin ninguna OT relacionada —
+  // "Cerradas" tiene prioridad: una cotización cerrada y sin OT solo debe
+  // vivir en esa tabla, no duplicarse acá.
+  const sinOT = filtradas.filter((c) => !c._esOT && !esCerrada(c) && !otsPorCot.get(c._id)?.length);
   const hayFiltro = Object.values(filtros).some(Boolean);
   // Si hay una búsqueda de texto activa, no dejar que el selector de "vista"
   // esconda una tabla donde SÍ cae el resultado (ej. buscar un N° OT que
@@ -420,12 +422,14 @@ export default function ListaCotizaciones() {
           >
             Exportar Excel
           </button>
-          <button
-            onClick={() => setImportarCotizacionesOpen(true)}
-            className="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition"
-          >
-            Importar Cotizaciones
-          </button>
+          {getUsuario()?.rol === "admin" && (
+            <button
+              onClick={() => setImportarCotizacionesOpen(true)}
+              className="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition"
+            >
+              Importar Cotizaciones
+            </button>
+          )}
           <button
             onClick={() => setNuevaOTOpen(true)}
             className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-700 transition"
@@ -572,11 +576,14 @@ export default function ListaCotizaciones() {
         columnas={COLS_COTIZACIONES}
         endpoint="/cadena/importar-cotizaciones"
         color="blue"
+        nombreColeccion="todas las Cotizaciones"
         instrucciones={
           <>1. Descarga la plantilla, rellena tus datos y súbela. La <strong>Empresa</strong> se busca por
-          Razón Social (debe existir ya registrada). Si el <strong>N° OT</strong> ya existe, la cotización se
+          Razón Social; si no existe, se crea sola (sin RUC). Si el <strong>N° OT</strong> ya existe, la cotización se
           relaciona a esa OT en vez de crear una nueva. <strong>Estado</strong>: Precotizado (falta aprobación),
-          Enviado, o Facturado (cierra la cadena completa de esa fila).</>
+          Enviado, o Facturado. <strong>Estado factura</strong> (opcional, texto libre): si vale "Facturado" cierra
+          la cadena completa (Cotización/OT/OC) de esa fila, cualquier otro texto la deja abierta; si se deja
+          vacío, se usa el mismo criterio sobre la columna Estado.</>
         }
         onClose={() => setImportarCotizacionesOpen(false)}
         onImportado={cargar}

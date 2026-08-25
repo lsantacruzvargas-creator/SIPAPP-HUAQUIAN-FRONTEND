@@ -82,8 +82,9 @@ export const COLS_MATERIALES = [
   { key: "descripcion",    label: "Descripción" },
   { key: "tipoComponente", label: "Tipo Componente" },
   { key: "categoria",      label: "Categoría" },
-  { key: "centroCosto",    label: "Centro de costo", requerido: true },
+  { key: "centroCosto",    label: "Centro de costo" },
   { key: "stock",          label: "Stock inicial", tipo: "numero" },
+  { key: "costoUnitario",  label: "Costo por unidad", tipo: "numero" },
   { key: "ubicacion",      label: "Ubicación" },
 ];
 
@@ -97,6 +98,24 @@ export const COLS_COTIZACIONES = [
   { key: "numeroOT",         label: "OT" },
   { key: "estado",           label: "Estado" },
   { key: "numeroOrdenCompra", label: "OC" },
+  { key: "estadoFactura",    label: "Estado factura" },
+];
+
+// Una fila crea una OT suelta (sin Cotización). La Empresa se busca por
+// Razón Social (debe existir ya). "Estado de la orden" mapea directo al
+// enum de estado (Encargado Intervención) — "No asignado" deja la OT sin
+// técnico asignado (queda pendiente); las otras 3 opciones guardan el
+// avance real, aunque sin un técnico asignado la tabla la siga mostrando
+// como "No asignado" hasta que alguien lo asigne a mano.
+export const COLS_OT = [
+  { key: "numeroOT",             label: "OT" },
+  { key: "razonSocial",          label: "Empresa", requerido: true },
+  { key: "descripcion",          label: "Descripción", requerido: true },
+  { key: "fechaIngreso",         label: "Fecha ingreso", tipo: "fecha" },
+  { key: "guia",                 label: "Guía" },
+  { key: "categorizacionTaller", label: "Categorización taller" },
+  { key: "estadoOrden",          label: "Estado de la orden" },
+  { key: "observaciones",        label: "Observación" },
 ];
 
 const LABELS_DETALLE = {
@@ -130,13 +149,20 @@ const INSTRUCCIONES_DEFAULT = (
   total y detracción automáticamente. La empresa se ubica por <strong>RUC</strong> (se crea si no existe).</>
 );
 
-export default function ModalImportarExcel({ tipo, columnas, endpoint, color = "blue", instrucciones, onClose, onImportado }) {
+const TEXTO_CONFIRMACION = "ELIMINAR TODO";
+
+export default function ModalImportarExcel({ tipo, columnas, endpoint, color = "blue", instrucciones, nombreColeccion, onClose, onImportado }) {
   const [paso, setPaso]       = useState("subir"); // subir | preview | resultado
   const [filas, setFilas]     = useState([]);      // { datos, errores[] }
   const [nombreArch, setArch] = useState("");
   const [importando, setImp]  = useState(false);
   const [resultado, setRes]   = useState(null);
   const [errorGlobal, setErrG] = useState("");
+  // Modo de carga: "agregar" (default, no toca lo existente) o "reemplazar"
+  // (borra TODA la colección antes de cargar el Excel — irreversible).
+  const [modo, setModo] = useState("agregar");
+  const [textoConfirmacion, setTextoConfirmacion] = useState("");
+  const reemplazarListo = modo === "reemplazar" && textoConfirmacion.trim().toUpperCase() === TEXTO_CONFIRMACION;
 
   const c = {
     blue:    { btn: "bg-blue-600 hover:bg-blue-700",       soft: "bg-blue-50 text-blue-700",       ring: "focus:ring-blue-300" },
@@ -199,11 +225,12 @@ export default function ModalImportarExcel({ tipo, columnas, endpoint, color = "
   const validas = filas.filter(f => f.errores.length === 0);
 
   const confirmar = async () => {
+    if (modo === "reemplazar" && !reemplazarListo) return;
     setImp(true);
     const res = await fetchAuth(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filas: validas.map(f => f.datos) }),
+      body: JSON.stringify({ filas: validas.map(f => f.datos), reemplazar: modo === "reemplazar" }),
     });
     if (res.ok) {
       const data = await res.json();
@@ -241,8 +268,41 @@ export default function ModalImportarExcel({ tipo, columnas, endpoint, color = "
                 </button>
               </div>
 
-              <label className="block border-2 border-dashed border-gray-200 rounded-xl p-8 text-center cursor-pointer hover:border-gray-300 transition">
+              <div className="rounded-xl border border-gray-100 p-4 space-y-3">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">¿Qué hacer con lo ya existente?</p>
+                <div className="flex gap-3">
+                  <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                    <input type="radio" name="modo" checked={modo === "agregar"} onChange={() => { setModo("agregar"); setTextoConfirmacion(""); }} />
+                    Agregar a lo existente
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                    <input type="radio" name="modo" checked={modo === "reemplazar"} onChange={() => setModo("reemplazar")} />
+                    Reemplazar todo
+                  </label>
+                </div>
+                {modo === "reemplazar" && (
+                  <div className="rounded-lg bg-red-50 border border-red-200 p-3 space-y-2">
+                    <p className="text-xs text-red-700">
+                      ⚠ Esto va a <strong>borrar {nombreColeccion || `todo ${tipo}`} ya existente</strong> antes
+                      de cargar el Excel — es irreversible. Para confirmar, escribe <strong>{TEXTO_CONFIRMACION}</strong> abajo.
+                    </p>
+                    <input
+                      value={textoConfirmacion}
+                      onChange={(e) => setTextoConfirmacion(e.target.value)}
+                      placeholder={TEXTO_CONFIRMACION}
+                      className="w-full border border-red-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <label className={`block border-2 border-dashed rounded-xl p-8 text-center transition ${
+                modo === "reemplazar" && !reemplazarListo
+                  ? "border-gray-100 cursor-not-allowed opacity-50"
+                  : "border-gray-200 cursor-pointer hover:border-gray-300"
+              }`}>
                 <input type="file" accept=".xlsx,.xls" className="hidden"
+                  disabled={modo === "reemplazar" && !reemplazarListo}
                   onChange={(e) => { if (e.target.files[0]) leerArchivo(e.target.files[0]); e.target.value = ""; }} />
                 <p className="text-sm text-gray-500">
                   <span className={`font-semibold ${c.soft.split(" ")[1]}`}>Haz clic para subir</span> tu archivo Excel
@@ -257,6 +317,13 @@ export default function ModalImportarExcel({ tipo, columnas, endpoint, color = "
           {/* PASO 2 — preview */}
           {paso === "preview" && (
             <div className="space-y-4">
+              {modo === "reemplazar" && (
+                <div className="rounded-lg bg-red-50 border border-red-200 p-3">
+                  <p className="text-xs text-red-700">
+                    ⚠ Al importar se borrará {nombreColeccion || `todo ${tipo}`} ya existente antes de cargar estas filas.
+                  </p>
+                </div>
+              )}
               <div className="flex items-center gap-3 text-sm">
                 <span className="text-gray-500 truncate">{nombreArch}</span>
                 <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${c.soft}`}>{validas.length} válidas</span>
@@ -373,9 +440,15 @@ export default function ModalImportarExcel({ tipo, columnas, endpoint, color = "
               className="text-sm border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 transition">
               Atrás
             </button>
-            <button onClick={confirmar} disabled={importando || validas.length === 0}
-              className={`text-sm text-white px-5 py-2 rounded-lg disabled:opacity-50 transition font-medium ${c.btn}`}>
-              {importando ? "Importando…" : `Importar ${validas.length} ${validas.length === 1 ? "fila" : "filas"}`}
+            <button onClick={confirmar} disabled={importando || validas.length === 0 || (modo === "reemplazar" && !reemplazarListo)}
+              className={`text-sm text-white px-5 py-2 rounded-lg disabled:opacity-50 transition font-medium ${
+                modo === "reemplazar" ? "bg-red-600 hover:bg-red-700" : c.btn
+              }`}>
+              {importando
+                ? "Importando…"
+                : modo === "reemplazar"
+                  ? `Borrar todo e importar ${validas.length} ${validas.length === 1 ? "fila" : "filas"}`
+                  : `Importar ${validas.length} ${validas.length === 1 ? "fila" : "filas"}`}
             </button>
           </>)}
           {paso === "resultado" && (

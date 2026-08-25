@@ -99,8 +99,8 @@ function TablaOC({
                   onClick={() => onSelect(o)}>
                   <td className="px-4 py-3.5 font-semibold text-gray-800 whitespace-nowrap">{o.cotizacion?.numeroCotizacion || <span className="text-gray-300">—</span>}</td>
                   <td className="px-4 py-3.5 font-semibold text-gray-800 whitespace-nowrap">{otPadre?.numeroOT || <span className="text-gray-300 font-sans">Sin OT</span>}</td>
-                  <td className="px-4 py-3.5 font-semibold text-gray-800 whitespace-nowrap">
-                    <div className="flex items-center gap-1.5">
+                  <td className="px-4 py-3.5 font-semibold text-gray-800 max-w-[220px]">
+                    <div className="flex items-center gap-1.5 flex-wrap break-words">
                       {o.numeroOrden || <span className="text-gray-300">—</span>}
                       {o.anulado && (
                         <span title={o.motivoAnulacion} className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 uppercase">
