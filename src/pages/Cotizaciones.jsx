@@ -1,5 +1,5 @@
 import { useState, useEffect, Fragment } from "react";
-import { fetchAuth } from "../utils/fetchAuth";
+import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import { exportarCotizacionPdf } from "../utils/cotizacionPdf";
 import {
   calcSubtotal,
@@ -506,10 +506,12 @@ export default function Cotizaciones() {
             </button>
           ) : (
             <>
-              <button type="button" onClick={() => exportarCotizacionPdf(guardado)}
-                className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition">
-                Exportar PDF
-              </button>
+              {getUsuario()?.rol !== "asistente" && (
+                <button type="button" onClick={() => exportarCotizacionPdf(guardado)}
+                  className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition">
+                  Exportar PDF
+                </button>
+              )}
               <button type="button" onClick={nueva}
                 className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-700 transition">
                 Nueva cotización

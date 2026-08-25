@@ -49,7 +49,7 @@ function HomeRedirect() {
   const token = sessionStorage.getItem("token");
   const usuario = JSON.parse(sessionStorage.getItem("usuario") || "null");
   if (!token || !usuario) return <Navigate to="/login" replace />;
-  if (["tecnico", "tecnico_prueba", "tecnico_intervencion", "supervisor", "planner"].includes(usuario.rol)) return <Navigate to="/ordenes-trabajo" replace />;
+  if (["tecnico", "tecnico_prueba", "tecnico_intervencion", "supervisor", "planner", "asistente"].includes(usuario.rol)) return <Navigate to="/ordenes-trabajo" replace />;
   if (usuario.rol === "jefatura") return <Navigate to="/aprobaciones" replace />;
   if (usuario.rol === "facturacion") return <Navigate to="/facturas" replace />;
   if (usuario.rol === "almacenero") return <Navigate to="/almacen" replace />;
@@ -68,7 +68,7 @@ export default function App() {
       <Route
         path="/dashboard"
         element={
-          <ProtectedRoute roles={["admin", "asistente", "jefatura"]}>
+          <ProtectedRoute roles={["admin", "jefatura"]}>
             <Layout><Dashboard /></Layout>
           </ProtectedRoute>
         }

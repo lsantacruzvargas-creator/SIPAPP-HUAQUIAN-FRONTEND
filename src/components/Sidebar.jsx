@@ -144,13 +144,13 @@ export default function Sidebar() {
   // Matriz de roles (confirmada explícitamente por el usuario):
   // - tecnico: solo OTs + Inventario.
   // - almacenero: Almacén, Inventario, Requerimientos, Tipo de Cambio, Guías.
-  // - asistente: sin cambios (mantiene su acceso "comercial" ya existente).
+  // - asistente: acceso "comercial" salvo Dashboard, oculto a pedido del usuario.
   // - planner: solo OTs, Cotizaciones e Inventario.
   // - facturacion: solo Facturas, Fact. Electrónica, Guías y Tipo de Cambio.
   // - jefatura: todo excepto Usuarios.
   // - admin: todo, incluyendo Usuarios.
   const NAV_ITEMS = [
-    { to: "/dashboard", label: "Dashboard", Icon: IconHome, show: esComercial || esJefatura },
+    { to: "/dashboard", label: "Dashboard", Icon: IconHome, show: esAdmin || esJefatura },
     { to: "/ordenes-trabajo", label: "Orden de Trabajo", Icon: IconClipboard, show: esComercial || esTecnico || esSupervisor || esPlanner || esJefatura },
     { to: "/cotizaciones", label: "Cotizaciones", Icon: IconDocument, show: esComercial || esPlanner || esJefatura },
     { to: "/ordenes-compra", label: "Órdenes de Compra", Icon: IconCart, show: esComercial || esFacturacion || esJefatura },

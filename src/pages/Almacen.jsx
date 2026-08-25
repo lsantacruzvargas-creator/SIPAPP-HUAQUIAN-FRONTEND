@@ -886,6 +886,7 @@ function ModalEgreso({ materiales, onClose, onGuardado }) {
   const [precioAuto, setPrecioAuto] = useState(0);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
+  const [busquedaMaterial, setBusquedaMaterial] = useState("");
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -895,6 +896,21 @@ function ModalEgreso({ materiales, onClose, onGuardado }) {
       .then((r) => r.ok ? r.json() : [])
       .then(setLotes);
   }, [form.material]);
+
+  const q = busquedaMaterial.trim().toLowerCase();
+  const materialesFiltrados = q
+    ? materiales.filter((m) =>
+        m.sku?.toLowerCase().includes(q) ||
+        m.nombre?.toLowerCase().includes(q) ||
+        m.ubicacion?.nombre?.toLowerCase().includes(q)
+      )
+    : materiales;
+  // si el material ya seleccionado queda fuera del filtro, se mantiene visible
+  // para no dejar el <select> apuntando a un value sin <option> en el DOM
+  const materialSeleccionado = materiales.find((m) => m._id === form.material);
+  if (materialSeleccionado && !materialesFiltrados.some((m) => m._id === materialSeleccionado._id)) {
+    materialesFiltrados.unshift(materialSeleccionado);
+  }
 
   const seleccionarLote = (lote) => {
     setForm((prev) => ({ ...prev, loteOrigen: lote.lote }));
@@ -935,9 +951,11 @@ function ModalEgreso({ materiales, onClose, onGuardado }) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
               <label className="text-xs text-gray-500 block mb-1">Material *</label>
+              <input type="text" value={busquedaMaterial} onChange={(e) => setBusquedaMaterial(e.target.value)}
+                placeholder="Buscar por SKU, nombre o ubicación…" className={`w-full mb-2 ${INP}`} />
               <select name="material" value={form.material} onChange={handleChange} className={`w-full ${INP}`}>
                 <option value="">Seleccionar material…</option>
-                {materiales.map((m) => (
+                {materialesFiltrados.map((m) => (
                   <option key={m._id} value={m._id}>{m.sku} — {m.nombre} (stock: {m.stock} {m.unidad})</option>
                 ))}
               </select>

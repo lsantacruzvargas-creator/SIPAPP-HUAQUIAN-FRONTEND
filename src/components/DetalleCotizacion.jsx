@@ -405,10 +405,12 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
               )}
               <Chip className="mt-0.5 bg-white/20 text-white">{cot.tipo}</Chip>
             </div>
-            <button onClick={() => exportarCotizacionPdf(datosParaPdf())}
-              className="bg-white/15 text-white text-sm px-4 py-2 rounded-lg hover:bg-white/25 transition font-medium shrink-0">
-              Exportar PDF
-            </button>
+            {rolActual !== "asistente" && (
+              <button onClick={() => exportarCotizacionPdf(datosParaPdf())}
+                className="bg-white/15 text-white text-sm px-4 py-2 rounded-lg hover:bg-white/25 transition font-medium shrink-0">
+                Exportar PDF
+              </button>
+            )}
             {!cot.anulado && !cadenaCerrada && puedeAnular && <BotonAnular onAnular={anular} />}
             {!cot.anulado && !cot.enviado && !cadenaCerrada && puedeEditar && (
               <button onClick={guardar} disabled={guardando}

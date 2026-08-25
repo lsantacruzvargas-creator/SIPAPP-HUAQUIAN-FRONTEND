@@ -334,5 +334,5 @@ export const exportarCotizacionPdf = async (cotizacion) => {
     doc.addImage(marcasFooter, "PNG", (PAGE_W - w) / 2, y, w, h);
   }
 
-  doc.save(`${cotizacion.codigo}.pdf`);
+  doc.save(`Cotización N° ${cotizacion.numeroCotizacion || cotizacion.codigo}.pdf`);
 };

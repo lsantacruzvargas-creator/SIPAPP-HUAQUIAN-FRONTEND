@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { fetchAuth } from "../utils/fetchAuth";
+import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import { exportarCotizacionPdf } from "../utils/cotizacionPdf";
 import ModalCrearOT from "./ModalCrearOT";
 import ModalOrdenCompra from "./ModalOrdenCompra";
@@ -458,13 +458,15 @@ export default function ModalCotizacion({ cotizacion: inicial, onClose, onSaved 
             {otCreada && cot.tipo === "servicio" && (
               <span className="text-xs text-emerald-600 font-medium">✓ OT creada</span>
             )}
-            <button
-              type="button"
-              onClick={() => exportarCotizacionPdf(cot)}
-              className="text-sm border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition"
-            >
-              Exportar PDF
-            </button>
+            {getUsuario()?.rol !== "asistente" && (
+              <button
+                type="button"
+                onClick={() => exportarCotizacionPdf(cot)}
+                className="text-sm border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition"
+              >
+                Exportar PDF
+              </button>
+            )}
             {!editando && (
               <>
                 <button
