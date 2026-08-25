@@ -1,0 +1,26 @@
+{
+  "name": "SIPApp Huaquian",
+  "short_name": "SIPApp",
+  "description": "ERP Huaquian — cotizaciones, órdenes de trabajo, órdenes de compra, facturación y almacén.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#ffffff",
+  "theme_color": "#111827",
+  "lang": "es",
+  "icons": [
+    {
+      "src": "/assets/logos/huaquian_icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/logos/huaquian_icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

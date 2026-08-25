@@ -11,3 +11,11 @@ createRoot(document.getElementById("root")).render(
     </HashRouter>
   </StrictMode>
 );
+
+// Requisito de Chrome/Android para considerar el sitio instalable como app
+// (ver public/sw.js) — no aplica dentro del wrapper de Electron.
+if ("serviceWorker" in navigator && !navigator.userAgent.toLowerCase().includes("electron")) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+  });
+}
