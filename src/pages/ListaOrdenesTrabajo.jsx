@@ -313,20 +313,20 @@ export default function ListaOrdenesTrabajo() {
   const plannerEnProgreso  = asignadasPlanner.filter((o) => !esTrackListo(o));
   const hayFiltro = Object.values(filtros).some(Boolean);
 
-  // Mismas columnas que TablaOTs — una hoja por cada tabla visible.
+  // Mismas columnas que TablaOTs (ver el nuevo orden ahí) — una hoja por
+  // cada tabla visible.
   const filaOT = (o) => ({
     "N° OT":          o.numeroOT || "—",
     "Sub-OTs":        o.subOTs?.map((s) => s.numeroOT).join(", ") || "—",
     "N° Cotización":  o.cotizacion?.numeroCotizacion || "—",
-    "Fecha recibida": o.fechaRecibida ? new Date(o.fechaRecibida).toLocaleDateString("es-PE") : "—",
+    "Servicio":       o.estadoGeneral || "—",
     "Empresa":        o.empresa?.razonSocial || "—",
-    "Planta":         o.planta || "—",
-    "Encargado":      o.encargado || "—",
     "Descripción":    o.titulo || "—",
     "Prueba":         o.estadoPrueba || "—",
-    "Estado":         o.estado || "—",
-    "Estado Informes": o.estadoInformes || "—",
-    "OT":             o.estadoGeneral || "—",
+    "Técnico de prueba":        o.encargado || "—",
+    "Intervención":             o.estado || "—",
+    "Técnico de intervención":  o.encargado2 || "—",
+    "Estado Informes":          o.estadoInformes || "—",
   });
 
   const exportarExcel = () => {
@@ -364,12 +364,14 @@ export default function ListaOrdenesTrabajo() {
           >
             Exportar Excel
           </button>
-          <button
-            onClick={() => setCrearOTOpen(true)}
-            className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-700 transition"
-          >
-            + Crear Orden de Trabajo
-          </button>
+          {!esTecnicoRol && (
+            <button
+              onClick={() => setCrearOTOpen(true)}
+              className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-700 transition"
+            >
+              + Crear Orden de Trabajo
+            </button>
+          )}
         </div>
       </div>
 

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { fetchAuth } from "../utils/fetchAuth";
+import ModalImportarExcel, { COLS_MATERIALES } from "../components/ModalImportarExcel";
 
 const INP =
   "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white";
@@ -133,6 +134,7 @@ function SeccionMateriales() {
   const [busqueda, setBusqueda] = useState("");
   const [mostrarInactivos, setMostrarInactivos] = useState(false);
   const [error, setError] = useState("");
+  const [importarOpen, setImportarOpen] = useState(false);
 
   const cargar = useCallback(async () => {
     const [rm, ru, rt, rc] = await Promise.all([
@@ -214,9 +216,15 @@ function SeccionMateriales() {
       {/* Formulario — solo creación: un SKU ya creado es inmutable, la única
           acción posterior es activarlo/desactivarlo desde la tabla. */}
       <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">
-          Nuevo material (SKU)
-        </p>
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            Nuevo material (SKU)
+          </p>
+          <button type="button" onClick={() => setImportarOpen(true)}
+            className="text-xs border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition font-medium">
+            ↑ Importar inventario (Excel)
+          </button>
+        </div>
         {/* Orden del formulario: Tipo Componente → Categoría → Código → Título/Descripción */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
@@ -347,6 +355,22 @@ function SeccionMateriales() {
         </table>
         </div>
       </div>
+
+      {importarOpen && (
+        <ModalImportarExcel
+          tipo="Materiales"
+          columnas={COLS_MATERIALES}
+          endpoint="/materiales/importar"
+          color="blue"
+          instrucciones={
+            <>1. Descarga la plantilla, rellena tus datos y súbela. El <strong>SKU</strong> lo
+            genera el sistema automáticamente — no va en el Excel. <strong>Tipo Componente</strong>,{" "}
+            <strong>Categoría</strong> y <strong>Ubicación</strong> se crean solos si no existen todavía.</>
+          }
+          onClose={() => setImportarOpen(false)}
+          onImportado={cargar}
+        />
+      )}
     </div>
   );
 }

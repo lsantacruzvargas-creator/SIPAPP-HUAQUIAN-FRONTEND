@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import DetalleDocumento from "../components/DetalleDocumento";
-import ModalImportarExcel, { COLS_COT_OT } from "../components/ModalImportarExcel";
+import ModalImportarExcel, { COLS_COT_OT, COLS_COTIZACIONES } from "../components/ModalImportarExcel";
 import ModalNuevaOT from "../components/ModalNuevaOT";
 import ModalNuevaCotizacion from "../components/ModalNuevaCotizacion";
 import { DotChip, badgeGeneral, dotGeneral } from "../components/detalleShared";
@@ -206,6 +206,7 @@ export default function ListaCotizaciones() {
   });
   const [seleccionada, setSeleccionada] = useState(null);
   const [importarOpen, setImportarOpen] = useState(false);
+  const [importarCotizacionesOpen, setImportarCotizacionesOpen] = useState(false);
   const [nuevaOTOpen, setNuevaOTOpen] = useState(false);
   const [nuevaCotizacionOpen, setNuevaCotizacionOpen] = useState(false);
   const [otsPorCot, setOtsPorCot] = useState(new Map());
@@ -420,6 +421,12 @@ export default function ListaCotizaciones() {
             Exportar Excel
           </button>
           <button
+            onClick={() => setImportarCotizacionesOpen(true)}
+            className="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition"
+          >
+            Importar Cotizaciones
+          </button>
+          <button
             onClick={() => setNuevaOTOpen(true)}
             className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-700 transition"
           >
@@ -555,6 +562,23 @@ export default function ListaCotizaciones() {
         endpoint="/cadena/importar-cotizacion-ot"
         color="blue"
         onClose={() => setImportarOpen(false)}
+        onImportado={cargar}
+      />
+    )}
+
+    {importarCotizacionesOpen && (
+      <ModalImportarExcel
+        tipo="Cotizaciones"
+        columnas={COLS_COTIZACIONES}
+        endpoint="/cadena/importar-cotizaciones"
+        color="blue"
+        instrucciones={
+          <>1. Descarga la plantilla, rellena tus datos y súbela. La <strong>Empresa</strong> se busca por
+          Razón Social (debe existir ya registrada). Si el <strong>N° OT</strong> ya existe, la cotización se
+          relaciona a esa OT en vez de crear una nueva. <strong>Estado</strong>: Precotizado (falta aprobación),
+          Enviado, o Facturado (cierra la cadena completa de esa fila).</>
+        }
+        onClose={() => setImportarCotizacionesOpen(false)}
         onImportado={cargar}
       />
     )}

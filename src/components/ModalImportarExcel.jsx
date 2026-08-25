@@ -71,11 +71,43 @@ export const COLS_COT_OT = [
   { key: "numeroGuiaRemision", label: "Guía de salida" },
 ];
 
+// Una fila crea un SKU de Material (el código lo autogenera el sistema —
+// no va en el Excel). Tipo Componente / Categoría / Ubicación se resuelven
+// por nombre y se crean solos si no existen todavía. Si trae Stock inicial,
+// se registra como un ingreso en Almacén (Material nunca guarda su propio
+// campo `stock`).
+export const COLS_MATERIALES = [
+  { key: "codigo",         label: "Código" },
+  { key: "titulo",         label: "Título", requerido: true },
+  { key: "descripcion",    label: "Descripción" },
+  { key: "tipoComponente", label: "Tipo Componente" },
+  { key: "categoria",      label: "Categoría" },
+  { key: "centroCosto",    label: "Centro de costo", requerido: true },
+  { key: "stock",          label: "Stock inicial", tipo: "numero" },
+  { key: "ubicacion",      label: "Ubicación" },
+];
+
+// Una fila crea una Cotización — y opcionalmente OT/OC. La Empresa se busca
+// por Razón Social (debe existir ya, no se crea sola). Si el N° OT ya existe,
+// la Cotización se RELACIONA a esa OT en vez de crear una duplicada.
+export const COLS_COTIZACIONES = [
+  { key: "numeroCotizacion", label: "N° Cotización" },
+  { key: "razonSocial",      label: "Empresa", requerido: true },
+  { key: "descripcion",      label: "Título/Descripción", requerido: true },
+  { key: "numeroOT",         label: "OT" },
+  { key: "estado",           label: "Estado" },
+  { key: "numeroOrdenCompra", label: "OC" },
+];
+
 const LABELS_DETALLE = {
   cotizaciones: "cotizaciones",
   ot:           "órdenes de trabajo",
+  otRelacionadas: "OT ya existentes relacionadas",
   oc:           "órdenes de compra",
   facturas:     "facturas",
+  tiposComponente: "tipos de componente nuevos",
+  categorias:      "categorías nuevas",
+  ubicaciones:     "ubicaciones nuevas",
 };
 
 function parseFecha(v) {
@@ -93,7 +125,12 @@ function parseFecha(v) {
   return isNaN(dt) ? null : dt.toISOString();
 }
 
-export default function ModalImportarExcel({ tipo, columnas, endpoint, color = "blue", onClose, onImportado }) {
+const INSTRUCCIONES_DEFAULT = (
+  <>1. Descarga la plantilla, rellena tus datos y súbela. El <strong>Subtotal</strong> genera el IGV,
+  total y detracción automáticamente. La empresa se ubica por <strong>RUC</strong> (se crea si no existe).</>
+);
+
+export default function ModalImportarExcel({ tipo, columnas, endpoint, color = "blue", instrucciones, onClose, onImportado }) {
   const [paso, setPaso]       = useState("subir"); // subir | preview | resultado
   const [filas, setFilas]     = useState([]);      // { datos, errores[] }
   const [nombreArch, setArch] = useState("");
@@ -196,8 +233,7 @@ export default function ModalImportarExcel({ tipo, columnas, endpoint, color = "
             <div className="space-y-5">
               <div className="rounded-xl bg-gray-50 border border-gray-100 p-4 space-y-3">
                 <p className="text-sm text-gray-600">
-                  1. Descarga la plantilla, rellena tus datos y súbela. El <strong>Subtotal</strong> genera el IGV,
-                  total y detracción automáticamente. La empresa se ubica por <strong>RUC</strong> (se crea si no existe).
+                  {instrucciones || INSTRUCCIONES_DEFAULT}
                 </p>
                 <button onClick={descargarPlantilla}
                   className={`text-sm ${c.soft} px-4 py-2 rounded-lg font-medium hover:opacity-80 transition`}>
@@ -286,10 +322,12 @@ export default function ModalImportarExcel({ tipo, columnas, endpoint, color = "
                   <p className="text-2xl font-bold text-gray-800">{resultado.omitidas}</p>
                   <p className="text-xs text-gray-500">omitidas (duplicadas)</p>
                 </div>
-                <div className="rounded-xl bg-gray-50 p-4 text-center">
-                  <p className="text-2xl font-bold text-gray-800">{resultado.empresasCreadas}</p>
-                  <p className="text-xs text-gray-500">empresas nuevas</p>
-                </div>
+                {resultado.empresasCreadas != null && (
+                  <div className="rounded-xl bg-gray-50 p-4 text-center">
+                    <p className="text-2xl font-bold text-gray-800">{resultado.empresasCreadas}</p>
+                    <p className="text-xs text-gray-500">empresas nuevas</p>
+                  </div>
+                )}
                 <div className="rounded-xl bg-gray-50 p-4 text-center">
                   <p className="text-2xl font-bold text-gray-800">
                     {resultado.ocCreadas ?? resultado.errores.length}
