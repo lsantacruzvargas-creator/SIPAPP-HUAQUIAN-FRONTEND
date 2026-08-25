@@ -165,6 +165,10 @@ export default function ListaOrdenesTrabajo() {
   // Solo para la vista simplificada (planner/asistente): qué tabla de las 5
   // categorías se muestra — el resto de roles no usa este filtro.
   const [filtroEstadoPlanner, setFiltroEstadoPlanner] = useState("todos");
+  // Mismo filtro pero para técnico (tecnico/tecnico_prueba/tecnico_intervencion)
+  // — sus tablas van por Pendiente/En progreso/Completada/Entregada/Cerrada,
+  // separadas en Prueba e Intervención, pero el filtro aplica igual a ambas.
+  const [filtroEstadoTecnico, setFiltroEstadoTecnico] = useState("todos");
 
   const cargar = () =>
     Promise.all([
@@ -280,32 +284,64 @@ export default function ListaOrdenesTrabajo() {
   const esCerrada = (o) => o.estadoCadena === "cerrado";
   const abiertas = filtradas.filter((o) => !esCerrada(o));
 
-  // Una OT solo vive en la sección de Prueba/Intervención si ese track tiene
-  // técnico asignado — si no, va exclusivamente a "Órdenes no asignadas"
-  // (estadoGeneral, ver Backend/src/utils/estadoGeneralOT.js). Para técnico,
-  // además debe ser SU nombre el que coincide (no el de un compañero
-  // asignado al otro track de la misma OT) — mismo criterio que `esAsignado`.
-  const pruebaBase = esTecnicoRol
-    ? abiertas.filter((o) => coincideNombre(o.encargado, nombreActual))
-    : abiertas.filter((o) => o.encargado?.trim());
-  const intervencionBase = esTecnicoRol
-    ? abiertas.filter((o) => coincideNombre(o.encargado2, nombreActual))
-    : abiertas.filter((o) => o.encargado2?.trim());
-  const noAsignadas = abiertas.filter((o) => o.estadoGeneral === "no asignado");
+  // Una OT/sub-OT "califica" para un track (Prueba=encargado,
+  // Intervención=encargado2) si tiene alguien asignado — para técnico,
+  // además debe ser SU nombre (no el de un compañero asignado al otro
+  // track), mismo criterio que `esAsignado`.
+  const califica = (doc, campo) =>
+    esTecnicoRol ? coincideNombre(doc[campo], nombreActual) : !!doc[campo]?.trim();
+
+  // Agrupa por las 4 tablas de estado de un track. Una OT padre puede tener
+  // sub-OTs en estados distintos (o asignadas a técnicos distintos) — cada
+  // combinación de estado aparece en su propia tabla, repitiendo la fila
+  // padre como contexto pero con solo las sub-OTs de ese estado puntual. Sin
+  // esto, reasignar/avanzar una sub-OT nunca se reflejaba si la OT padre no
+  // tenía ella misma un encargado en ese track (bug reportado: la vista de
+  // técnico solo miraba el encargado del padre, ignorando sus sub-OTs).
+  const agruparPorEstado = (campoEncargado, campoEstado) => {
+    const buckets = { pendiente: [], "en progreso": [], completado: [], entregado: [] };
+    abiertas.forEach((o) => {
+      const porEstado = {};
+      (o.subOTs || []).forEach((s) => {
+        if (!califica(s, campoEncargado) || !buckets[s[campoEstado]]) return;
+        (porEstado[s[campoEstado]] ??= []).push(s);
+      });
+      // Si el padre también califica, se fusiona con las sub-OTs de su
+      // mismo estado (evita una fila duplicada cuando coinciden).
+      if (califica(o, campoEncargado) && buckets[o[campoEstado]]) {
+        buckets[o[campoEstado]].push({ ...o, subOTs: porEstado[o[campoEstado]] || [] });
+        delete porEstado[o[campoEstado]];
+      }
+      Object.entries(porEstado).forEach(([estado, subs]) => buckets[estado].push({ ...o, subOTs: subs }));
+    });
+    return buckets;
+  };
 
   // Intervención (campo `estado`, el de siempre — ver Fase 13: Encargado
   // Intervención es quien lo controla).
-  const pendientes = intervencionBase.filter((o) => o.estado === "pendiente");
-  const enProgreso = intervencionBase.filter((o) => o.estado === "en progreso");
-  const completadas = intervencionBase.filter((o) => o.estado === "completado");
-  const entregadas = intervencionBase.filter((o) => o.estado === "entregado");
-  // Prueba (campo `estadoPrueba`, propiedad del Encargado Prueba — mismas 4
-  // categorías, mismo criterio de "se mueve solo, sin duplicarse" por ser un
-  // simple filtro sobre un enum de valor único).
-  const pruebaPendientes = pruebaBase.filter((o) => o.estadoPrueba === "pendiente");
-  const pruebaEnProgreso = pruebaBase.filter((o) => o.estadoPrueba === "en progreso");
-  const pruebaCompletadas = pruebaBase.filter((o) => o.estadoPrueba === "completado");
-  const pruebaEntregadas = pruebaBase.filter((o) => o.estadoPrueba === "entregado");
+  const bucketsIntervencion = agruparPorEstado("encargado2", "estado");
+  const pendientes = bucketsIntervencion.pendiente;
+  const enProgreso = bucketsIntervencion["en progreso"];
+  const completadas = bucketsIntervencion.completado;
+  const entregadas = bucketsIntervencion.entregado;
+  // Prueba (campo `estadoPrueba`, propiedad del Encargado Prueba — mismas 4 categorías).
+  const bucketsPrueba = agruparPorEstado("encargado", "estadoPrueba");
+  const pruebaPendientes = bucketsPrueba.pendiente;
+  const pruebaEnProgreso = bucketsPrueba["en progreso"];
+  const pruebaCompletadas = bucketsPrueba.completado;
+  const pruebaEntregadas = bucketsPrueba.entregado;
+
+  // "No asignado" (estadoGeneral, ver Backend/src/utils/estadoGeneralOT.js)
+  // — mismo criterio de duplicar por sub-OT: la OT padre puede tener técnico
+  // asignado mientras una sub-OT suya sigue sin nadie (o al revés).
+  const noAsignadas = [];
+  abiertas.forEach((o) => {
+    const subsSinAsignar = (o.subOTs || []).filter((s) => s.estadoGeneral === "no asignado");
+    if (o.estadoGeneral === "no asignado" || subsSinAsignar.length) {
+      noAsignadas.push({ ...o, subOTs: subsSinAsignar });
+    }
+  });
+
   const cerradas = filtradas.filter((o) => esCerrada(o));
 
   // Vista simplificada del planner: un solo set de 4 grupos en vez del split
@@ -320,6 +356,9 @@ export default function ListaOrdenesTrabajo() {
   // Con qué categoría se queda la vista simplificada — "todos" o fuera de
   // esa vista no filtra nada (todas las tablas se muestran igual que antes).
   const mostrarPlanner = (clave) => !esVistaSimplificada || filtroEstadoPlanner === "todos" || filtroEstadoPlanner === clave;
+  // Igual que `mostrarPlanner` pero para técnico — aplica a las tablas de
+  // ambos tracks (Prueba e Intervención) por igual.
+  const mostrarTecnico = (clave) => !esTecnicoRol || filtroEstadoTecnico === "todos" || filtroEstadoTecnico === clave;
 
   // Mismas columnas que TablaOTs (ver el nuevo orden ahí) — una hoja por
   // cada tabla visible.
@@ -416,6 +455,17 @@ export default function ListaOrdenesTrabajo() {
           <select value={filtroEstadoPlanner} onChange={(e) => setFiltroEstadoPlanner(e.target.value)} className={SELECT}>
             <option value="todos">Todo estado</option>
             <option value="noAsignada">No asignada</option>
+            <option value="enProgreso">En progreso</option>
+            <option value="completada">Completada</option>
+            <option value="entregada">Entregada</option>
+            <option value="cerrada">Cerrada</option>
+          </select>
+        )}
+
+        {esTecnicoRol && (
+          <select value={filtroEstadoTecnico} onChange={(e) => setFiltroEstadoTecnico(e.target.value)} className={SELECT}>
+            <option value="todos">Todo estado</option>
+            <option value="pendiente">Pendiente</option>
             <option value="enProgreso">En progreso</option>
             <option value="completada">Completada</option>
             <option value="entregada">Entregada</option>
@@ -546,37 +596,45 @@ export default function ListaOrdenesTrabajo() {
         <>
           <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 mt-2">Órdenes de Prueba</h3>
 
-          <TablaOTs
-            titulo="Órdenes de prueba pendientes"
-            acento="bg-amber-500"
-            ordenes={pruebaPendientes}
-            onSelect={setSeleccionada}
-            vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de prueba pendientes"}
-          />
+          {mostrarTecnico("pendiente") && (
+            <TablaOTs
+              titulo="Órdenes de prueba pendientes"
+              acento="bg-amber-500"
+              ordenes={pruebaPendientes}
+              onSelect={setSeleccionada}
+              vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de prueba pendientes"}
+            />
+          )}
 
-          <TablaOTs
-            titulo="Órdenes de prueba en progreso"
-            acento="bg-blue-500"
-            ordenes={pruebaEnProgreso}
-            onSelect={setSeleccionada}
-            vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de prueba en progreso"}
-          />
+          {mostrarTecnico("enProgreso") && (
+            <TablaOTs
+              titulo="Órdenes de prueba en progreso"
+              acento="bg-blue-500"
+              ordenes={pruebaEnProgreso}
+              onSelect={setSeleccionada}
+              vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de prueba en progreso"}
+            />
+          )}
 
-          <TablaOTs
-            titulo="Órdenes de prueba completadas"
-            acento="bg-green-500"
-            ordenes={pruebaCompletadas}
-            onSelect={setSeleccionada}
-            vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de prueba completadas"}
-          />
+          {mostrarTecnico("completada") && (
+            <TablaOTs
+              titulo="Órdenes de prueba completadas"
+              acento="bg-green-500"
+              ordenes={pruebaCompletadas}
+              onSelect={setSeleccionada}
+              vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de prueba completadas"}
+            />
+          )}
 
-          <TablaOTs
-            titulo="Órdenes de prueba entregadas a Intervención"
-            acento="bg-teal-500"
-            ordenes={pruebaEntregadas}
-            onSelect={setSeleccionada}
-            vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de prueba entregadas a Intervención"}
-          />
+          {mostrarTecnico("entregada") && (
+            <TablaOTs
+              titulo="Órdenes de prueba entregadas a Intervención"
+              acento="bg-teal-500"
+              ordenes={pruebaEntregadas}
+              onSelect={setSeleccionada}
+              vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de prueba entregadas a Intervención"}
+            />
+          )}
         </>
       )}
 
@@ -584,41 +642,49 @@ export default function ListaOrdenesTrabajo() {
         <>
           <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 mt-6">Órdenes de Intervención</h3>
 
-          <TablaOTs
-            titulo="Órdenes de intervención pendientes"
-            acento="bg-amber-500"
-            ordenes={pendientes}
-            onSelect={setSeleccionada}
-            vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de intervención pendientes"}
-          />
+          {mostrarTecnico("pendiente") && (
+            <TablaOTs
+              titulo="Órdenes de intervención pendientes"
+              acento="bg-amber-500"
+              ordenes={pendientes}
+              onSelect={setSeleccionada}
+              vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de intervención pendientes"}
+            />
+          )}
 
-          <TablaOTs
-            titulo="Órdenes de intervención en progreso"
-            acento="bg-blue-500"
-            ordenes={enProgreso}
-            onSelect={setSeleccionada}
-            vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de intervención en progreso"}
-          />
+          {mostrarTecnico("enProgreso") && (
+            <TablaOTs
+              titulo="Órdenes de intervención en progreso"
+              acento="bg-blue-500"
+              ordenes={enProgreso}
+              onSelect={setSeleccionada}
+              vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de intervención en progreso"}
+            />
+          )}
 
-          <TablaOTs
-            titulo="Órdenes de intervención completadas"
-            acento="bg-green-500"
-            ordenes={completadas}
-            onSelect={setSeleccionada}
-            vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de intervención completadas"}
-          />
+          {mostrarTecnico("completada") && (
+            <TablaOTs
+              titulo="Órdenes de intervención completadas"
+              acento="bg-green-500"
+              ordenes={completadas}
+              onSelect={setSeleccionada}
+              vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de intervención completadas"}
+            />
+          )}
 
-          <TablaOTs
-            titulo="Órdenes de intervención entregadas"
-            acento="bg-teal-500"
-            ordenes={entregadas}
-            onSelect={setSeleccionada}
-            vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de intervención entregadas"}
-          />
+          {mostrarTecnico("entregada") && (
+            <TablaOTs
+              titulo="Órdenes de intervención entregadas"
+              acento="bg-teal-500"
+              ordenes={entregadas}
+              onSelect={setSeleccionada}
+              vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de intervención entregadas"}
+            />
+          )}
         </>
       )}
 
-      {mostrarPlanner("cerrada") && (
+      {mostrarPlanner("cerrada") && mostrarTecnico("cerrada") && (
         <TablaOTs
           titulo="Órdenes cerradas"
           acento="bg-gray-500"
