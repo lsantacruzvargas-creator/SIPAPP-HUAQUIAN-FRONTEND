@@ -7,7 +7,7 @@ import ModalRequerimiento from "./ModalRequerimiento";
 import TablaServiciosExternos from "./TablaServiciosExternos";
 import { Chip, BotonAnular, BannerAnulado, bloqueadoPorCadenaCerrada } from "./detalleShared";
 
-const CATEGORIAS_TALLER = ["REPARACION", "MANTENIMIENTO PREVENTIVO", "MANTENIMIENTO CORRECTIVO", "GARANTIA"];
+const CATEGORIAS_SERVICIO = ["SOPORTE", "DEVOLUCION", "DIAGNOSTICO", "GARANTIA", "MANTENIMIENTO", "REPARACION", "PRESTAMO", "SUMINISTRO", "MANTENIMIENTO EN PLANTA"];
 
 const INP = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 w-full transition";
 
@@ -320,10 +320,10 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-xs text-gray-500 block mb-1">Categorización en taller</label>
+                <label className="text-xs text-gray-500 block mb-1">Categorización de servicio</label>
                 <select name="categorizacionTaller" value={form.categorizacionTaller} onChange={handleChange} className={INP}>
                   <option value="">Sin categorizar</option>
-                  {CATEGORIAS_TALLER.map(c => <option key={c} value={c}>{c}</option>)}
+                  {CATEGORIAS_SERVICIO.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
               <div>

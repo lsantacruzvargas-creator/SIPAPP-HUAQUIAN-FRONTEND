@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import ModalImportarExcel, { COLS_MATERIALES } from "../components/ModalImportarExcel";
+import * as XLSX from "xlsx";
 
 const INP =
   "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white";
@@ -130,6 +131,7 @@ function SeccionMateriales() {
   const [tiposComponente, setTiposComponente] = useState([]);
   const [categoriasComponente, setCategoriasComponente] = useState([]);
   const [form, setForm] = useState(FORM_MATERIAL_VACIO);
+  const [editando, setEditando] = useState(null);
   const [guardando, setGuardando] = useState(false);
   const [busqueda, setBusqueda] = useState("");
   const [mostrarInactivos, setMostrarInactivos] = useState(false);
@@ -166,8 +168,6 @@ function SeccionMateriales() {
     (c) => (c.tipoComponente?._id || c.tipoComponente) === form.tipoComponente
   );
 
-  // Un SKU es inmutable una vez creado (ver PUT /materiales/:id en backend) —
-  // lo único que se puede cambiar después es `activo`, con este toggle.
   const cambiarActivo = async (m, activo) => {
     const r = await fetchAuth(`/materiales/${m._id}`, {
       method: "PUT",
@@ -177,24 +177,72 @@ function SeccionMateriales() {
     if (r.ok) await cargar();
   };
 
+  const iniciarEdicion = (m) => {
+    setEditando(m._id);
+    setForm({
+      tipoComponente: m.tipoComponente?._id || "",
+      categoria: m.categoria?._id || "",
+      codigo: m.codigo || "",
+      nombre: m.nombre || "",
+      descripcion: m.descripcion || "",
+      unidad: m.unidad || "und",
+      stockMinimo: m.stockMinimo ?? 0,
+      ubicacion: m.ubicacion?._id || "",
+      tipoMaterial: m.tipoMaterial || "",
+    });
+    setError("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const cancelar = () => {
+    setEditando(null);
+    setForm(FORM_MATERIAL_VACIO);
+    setError("");
+  };
+
   const guardar = async () => {
     if (!form.nombre.trim()) return;
     if (!form.tipoMaterial) { setError("Selecciona si es Repuesto o Consumible."); return; }
     setError("");
     setGuardando(true);
-    const r = await fetchAuth("/materiales", {
-      method: "POST",
+    const metodo = editando ? "PUT" : "POST";
+    const url = editando ? `/materiales/${editando}` : "/materiales";
+    const r = await fetchAuth(url, {
+      method: metodo,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
     });
     if (r.ok) {
       await cargar();
-      setForm(FORM_MATERIAL_VACIO);
+      cancelar();
     } else {
       const d = await r.json().catch(() => ({}));
       setError(d.mensaje || "Error al guardar el material.");
     }
     setGuardando(false);
+  };
+
+  // Mismas columnas de la tabla — una fila por material.
+  const filaMaterial = (m) => ({
+    "SKU":            m.sku || "—",
+    "Código":         m.codigo || "—",
+    "Título":         m.nombre || "—",
+    "Descripción":    m.descripcion || "—",
+    "Tipo Componente": m.tipoComponente?.nombre || "—",
+    "Categoría":      m.categoria?.nombre || "—",
+    "Unidad":         m.unidad || "—",
+    "Stock":          m.stock ?? 0,
+    "Stock mínimo":   m.stockMinimo ?? 0,
+    "Ubicación":      m.ubicacion?.nombre || "—",
+    "Centro de costo": m.tipoMaterial || "—",
+    "Activo":         m.activo ? "Sí" : "No",
+  });
+
+  const exportarExcel = () => {
+    const ws = XLSX.utils.json_to_sheet(filtrados.map(filaMaterial));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Materiales (SKU)");
+    XLSX.writeFile(wb, "materiales-sku.xlsx");
   };
 
   const filtrados = lista
@@ -214,12 +262,12 @@ function SeccionMateriales() {
 
   return (
     <div className="space-y-6">
-      {/* Formulario — solo creación: un SKU ya creado es inmutable, la única
-          acción posterior es activarlo/desactivarlo desde la tabla. */}
+      {/* Formulario de creación/edición — el SKU (código auto-generado, ej.
+          MAT-0001) nunca se edita, solo los datos descriptivos del material. */}
       <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-            Nuevo material (SKU)
+            {editando ? "Editar material (SKU)" : "Nuevo material (SKU)"}
           </p>
           {getUsuario()?.rol === "admin" && (
             <button type="button" onClick={() => setImportarOpen(true)}
@@ -288,9 +336,15 @@ function SeccionMateriales() {
         </div>
         {error && <p className="text-xs text-red-500 mt-3">{error}</p>}
         <div className="flex gap-2 mt-4">
+          {editando && (
+            <button onClick={cancelar}
+              className="text-sm border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 transition">
+              Cancelar
+            </button>
+          )}
           <button onClick={guardar} disabled={guardando || !form.nombre.trim() || !form.tipoMaterial}
             className="text-sm bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition font-medium">
-            {guardando ? "Guardando…" : "Crear material"}
+            {guardando ? "Guardando…" : editando ? "Actualizar" : "Crear material"}
           </button>
         </div>
       </div>
@@ -304,6 +358,10 @@ function SeccionMateriales() {
           <input type="checkbox" checked={mostrarInactivos} onChange={(e) => setMostrarInactivos(e.target.checked)} />
           Mostrar inactivos
         </label>
+        <button onClick={exportarExcel}
+          className="text-sm border border-gray-300 text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-50 transition whitespace-nowrap">
+          Exportar Excel
+        </button>
       </div>
 
       {/* Tabla — ancha al 80vw (se sale del contenedor max-w-6xl de la página) */}
@@ -321,11 +379,12 @@ function SeccionMateriales() {
               <th className="text-center px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Stock</th>
               <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Ubicación</th>
               <th className="text-center px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Activo</th>
+              <th className="px-5 py-3"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {filtrados.length === 0 && (
-              <tr><td colSpan={9} className="text-center py-10 text-gray-300 text-sm">Sin materiales</td></tr>
+              <tr><td colSpan={10} className="text-center py-10 text-gray-300 text-sm">Sin materiales</td></tr>
             )}
             {filtrados.map((m) => (
               <tr key={m._id} className={`hover:bg-gray-50/50 transition ${!m.activo ? "opacity-50" : ""}`}>
@@ -351,6 +410,10 @@ function SeccionMateriales() {
                 <td className="px-5 py-3 text-center">
                   <input type="checkbox" checked={m.activo}
                     onChange={(e) => cambiarActivo(m, e.target.checked)} />
+                </td>
+                <td className="px-5 py-3 text-right">
+                  <button onClick={() => iniciarEdicion(m)}
+                    className="text-xs text-blue-500 hover:text-blue-700 transition">Editar</button>
                 </td>
               </tr>
             ))}
@@ -730,9 +793,9 @@ function SeccionComponentes() {
 
 // ─── Modal Ingreso ──────────────────────────────────────────────────────────
 
-function ModalIngreso({ materiales, onClose, onGuardado }) {
+function ModalIngreso({ materiales, materialInicial, onClose, onGuardado }) {
   const [form, setForm] = useState({
-    material: "",
+    material: materialInicial?._id || "",
     cantidad: "",
     precioUnitario: "",
     lote: "",
@@ -770,6 +833,8 @@ function ModalIngreso({ materiales, onClose, onGuardado }) {
       setError("Material, cantidad y precio son obligatorios.");
       return;
     }
+    const mat = materiales.find((m) => m._id === form.material);
+    if (!window.confirm(`¿Confirmas el ingreso de ${form.cantidad} ${mat?.unidad || ""} de "${mat?.nombre || "este material"}"?`)) return;
     setGuardando(true);
     const r = await fetchAuth("/movimientos-almacen", {
       method: "POST",
@@ -887,6 +952,7 @@ function ModalEgreso({ materiales, onClose, onGuardado }) {
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
   const [busquedaMaterial, setBusquedaMaterial] = useState("");
+  const [listaAbierta, setListaAbierta] = useState(false);
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -898,19 +964,30 @@ function ModalEgreso({ materiales, onClose, onGuardado }) {
   }, [form.material]);
 
   const q = busquedaMaterial.trim().toLowerCase();
+  // Solo se arma la lista de resultados si hay texto — con 6000+ materiales
+  // no tiene sentido mostrar nada hasta que el usuario empiece a escribir.
   const materialesFiltrados = q
     ? materiales.filter((m) =>
         m.sku?.toLowerCase().includes(q) ||
         m.nombre?.toLowerCase().includes(q) ||
         m.ubicacion?.nombre?.toLowerCase().includes(q)
-      )
-    : materiales;
-  // si el material ya seleccionado queda fuera del filtro, se mantiene visible
-  // para no dejar el <select> apuntando a un value sin <option> en el DOM
-  const materialSeleccionado = materiales.find((m) => m._id === form.material);
-  if (materialSeleccionado && !materialesFiltrados.some((m) => m._id === materialSeleccionado._id)) {
-    materialesFiltrados.unshift(materialSeleccionado);
-  }
+      ).slice(0, 50)
+    : [];
+
+  const seleccionarMaterial = (m) => {
+    setForm((prev) => ({ ...prev, material: m._id }));
+    setBusquedaMaterial(`${m.sku} — ${m.nombre}`);
+    setListaAbierta(false);
+  };
+
+  const cambiarBusqueda = (e) => {
+    setBusquedaMaterial(e.target.value);
+    setListaAbierta(true);
+    // Cualquier edición del texto invalida la selección anterior — hay que
+    // volver a elegir un material de la lista para que `form.material` se
+    // llene de nuevo.
+    if (form.material) setForm((prev) => ({ ...prev, material: "" }));
+  };
 
   const seleccionarLote = (lote) => {
     setForm((prev) => ({ ...prev, loteOrigen: lote.lote }));
@@ -922,6 +999,8 @@ function ModalEgreso({ materiales, onClose, onGuardado }) {
       setError("Material y cantidad son obligatorios.");
       return;
     }
+    const mat = materiales.find((m) => m._id === form.material);
+    if (!window.confirm(`¿Confirmas el egreso de ${form.cantidad} ${mat?.unidad || ""} de "${mat?.nombre || "este material"}"?`)) return;
     setGuardando(true);
     const r = await fetchAuth("/movimientos-almacen", {
       method: "POST",
@@ -949,16 +1028,29 @@ function ModalEgreso({ materiales, onClose, onGuardado }) {
           {error && <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="md:col-span-2">
+            <div className="md:col-span-2 relative">
               <label className="text-xs text-gray-500 block mb-1">Material *</label>
-              <input type="text" value={busquedaMaterial} onChange={(e) => setBusquedaMaterial(e.target.value)}
-                placeholder="Buscar por SKU, nombre o ubicación…" className={`w-full mb-2 ${INP}`} />
-              <select name="material" value={form.material} onChange={handleChange} className={`w-full ${INP}`}>
-                <option value="">Seleccionar material…</option>
-                {materialesFiltrados.map((m) => (
-                  <option key={m._id} value={m._id}>{m.sku} — {m.nombre} (stock: {m.stock} {m.unidad})</option>
-                ))}
-              </select>
+              <input type="text" value={busquedaMaterial} onChange={cambiarBusqueda}
+                onFocus={() => setListaAbierta(true)}
+                onBlur={() => setListaAbierta(false)}
+                placeholder="Buscar por SKU, nombre o ubicación…" className={`w-full ${INP}`}
+                autoComplete="off" />
+              {listaAbierta && q && (
+                <div className="absolute z-10 mt-1 w-full max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+                  {materialesFiltrados.length === 0 ? (
+                    <p className="px-3 py-2 text-sm text-gray-400">Sin resultados</p>
+                  ) : (
+                    materialesFiltrados.map((m) => (
+                      <button type="button" key={m._id}
+                        onMouseDown={() => seleccionarMaterial(m)}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition border-b border-gray-50 last:border-0">
+                        <span className="font-mono text-xs text-blue-600">{m.sku}</span> — {m.nombre}
+                        <span className="text-xs text-gray-400"> (stock: {m.stock} {m.unidad})</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
 
             {lotes.length > 0 && (
@@ -1060,6 +1152,33 @@ function SeccionMovimientos() {
   const fmt = (n) => Number(n || 0).toFixed(2);
   const fmtFecha = (d) => d ? new Date(d).toLocaleDateString("es-PE", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "—";
 
+  // Mismas columnas de la tabla — una fila por movimiento.
+  const filaMovimiento = (mv) => ({
+    "Código":            mv.codigo || "—",
+    "Tipo":              mv.tipo === "ingreso" ? "Ingreso" : "Egreso",
+    "Material":          mv.material?.nombre || "—",
+    "SKU":               mv.material?.sku || "—",
+    "Cantidad":          mv.cantidad,
+    "Precio Unitario":   Number(mv.precioUnitario || 0),
+    "Total":             Number((mv.cantidad || 0) * (mv.precioUnitario || 0)),
+    "Lote / Origen":     mv.tipo === "ingreso" ? (mv.lote || "—") : (mv.loteOrigen || "—"),
+    "Detalle":           mv.tipo === "ingreso"
+      ? [mv.proveedor, mv.guiaProveedor ? `G: ${mv.guiaProveedor}` : "", mv.ordenCompra ? `OC: ${mv.ordenCompra}` : ""].filter(Boolean).join(" ") || "—"
+      : (mv.notas || "—"),
+    "OT":                mv.ordenTrabajo?.codigo || "—",
+    "RQ":                mv.requerimiento?.codigo || "—",
+    "Cant. Requerida":   mv.cantidadRequerida ?? "—",
+    "Cant. Atendida":    mv.requerimiento ? mv.cantidad : "—",
+    "Fecha":             fmtFecha(mv.fecha),
+  });
+
+  const exportarExcel = () => {
+    const ws = XLSX.utils.json_to_sheet(movimientos.map(filaMovimiento));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Movimientos");
+    XLSX.writeFile(wb, "movimientos-almacen.xlsx");
+  };
+
   return (
     <div className="space-y-5">
       {/* Acciones y filtros */}
@@ -1083,10 +1202,15 @@ function SeccionMovimientos() {
           <option value="">Todos los materiales</option>
           {materiales.map((m) => <option key={m._id} value={m._id}>{m.nombre}</option>)}
         </select>
+
+        <button onClick={exportarExcel}
+          className="text-sm border border-gray-300 text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-50 transition ml-auto">
+          Exportar Excel
+        </button>
       </div>
 
-      {/* Tabla */}
-      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+      {/* Tabla — ancha al 90vw (se sale del contenedor max-w-6xl de la página) */}
+      <div className="relative left-1/2 -ml-[45vw] w-[90vw] max-w-[90vw] bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-100">
@@ -1163,6 +1287,108 @@ function SeccionMovimientos() {
   );
 }
 
+// ─── Sección Alerta de Stock ────────────────────────────────────────────────
+// Materiales activos cuyo stock (calculado por agregación de movimientos, ver
+// GET /materiales) ya cayó al mínimo o por debajo — mismo criterio que el
+// badge ámbar/rojo de la tabla de Materiales, pero como bandeja aparte para
+// que el almacenero vea de un vistazo qué reponer.
+
+function SeccionAlertaStock() {
+  const [lista, setLista] = useState([]);
+  const [materialIngreso, setMaterialIngreso] = useState(null);
+
+  const cargar = useCallback(async () => {
+    const r = await fetchAuth("/materiales");
+    if (r.ok) setLista(await r.json());
+  }, []);
+
+  useEffect(() => { cargar(); }, [cargar]);
+
+  const enAlerta = lista
+    .filter((m) => m.stock <= m.stockMinimo)
+    .sort((a, b) => (a.stock <= 0 ? -1 : 0) - (b.stock <= 0 ? -1 : 0) || a.nombre.localeCompare(b.nombre));
+
+  const badgeStock = (m) => (m.stock <= 0 ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700");
+
+  const filaAlerta = (m) => ({
+    "SKU": m.sku,
+    "Título": m.nombre,
+    "Categoría": m.categoria?.nombre || "—",
+    "Stock actual": m.stock,
+    "Stock mínimo": m.stockMinimo,
+    "Unidad": m.unidad,
+    "Ubicación": m.ubicacion?.nombre || "—",
+  });
+
+  const exportarExcel = () => {
+    const ws = XLSX.utils.json_to_sheet(enAlerta.map(filaAlerta));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Alerta de Stock");
+    XLSX.writeFile(wb, "alerta-stock.xlsx");
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              Materiales por debajo del stock mínimo
+            </p>
+            <span className="text-xs text-gray-400">{enAlerta.length} SKU{enAlerta.length !== 1 ? "s" : ""}</span>
+          </div>
+          <button onClick={exportarExcel}
+            className="text-xs border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition font-medium">
+            ↓ Exportar Excel
+          </button>
+        </div>
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 border-b border-gray-100">
+            <tr>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">SKU</th>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Título</th>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Categoría</th>
+              <th className="text-center px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Stock actual</th>
+              <th className="text-center px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Stock mínimo</th>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Ubicación</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {enAlerta.length === 0 && (
+              <tr><td colSpan={6} className="text-center py-10 text-gray-300 text-sm">Sin alertas — todo el stock está por encima de su mínimo</td></tr>
+            )}
+            {enAlerta.map((m) => (
+              <tr key={m._id} onClick={() => setMaterialIngreso(m)}
+                title="Clic para generar un ingreso de este material"
+                className="hover:bg-gray-50/50 transition cursor-pointer">
+                <td className="px-5 py-3 font-mono text-xs text-gray-500">{m.sku}</td>
+                <td className="px-5 py-3 font-medium text-gray-800">{m.nombre}</td>
+                <td className="px-5 py-3 text-gray-500">{m.categoria?.nombre || <span className="text-gray-300">—</span>}</td>
+                <td className="px-5 py-3 text-center">
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${badgeStock(m)}`}>
+                    {m.stock} {m.unidad}
+                  </span>
+                </td>
+                <td className="px-5 py-3 text-center text-gray-600">{m.stockMinimo} {m.unidad}</td>
+                <td className="px-5 py-3 text-gray-500">{m.ubicacion?.nombre || "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {materialIngreso && (
+        <ModalIngreso
+          materiales={lista}
+          materialInicial={materialIngreso}
+          onClose={() => setMaterialIngreso(null)}
+          onGuardado={() => { setMaterialIngreso(null); cargar(); }}
+        />
+      )}
+    </div>
+  );
+}
+
 // ─── Página principal ────────────────────────────────────────────────────────
 
 const TABS = [
@@ -1171,6 +1397,7 @@ const TABS = [
   { id: "movimientos", label: "Movimientos" },
   { id: "componentes", label: "Tipos de Componente" },
   { id: "categorias", label: "Categorías de compra" },
+  { id: "alertas", label: "Alerta de Stock" },
 ];
 
 export default function Almacen() {
@@ -1205,6 +1432,7 @@ export default function Almacen() {
       {tab === "movimientos" && <SeccionMovimientos />}
       {tab === "componentes" && <SeccionComponentes />}
       {tab === "categorias" && <SeccionCategorias />}
+      {tab === "alertas" && <SeccionAlertaStock />}
     </div>
   );
 }

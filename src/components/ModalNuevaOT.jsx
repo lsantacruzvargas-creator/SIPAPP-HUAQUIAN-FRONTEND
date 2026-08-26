@@ -3,7 +3,7 @@ import { fetchAuth } from "../utils/fetchAuth";
 import SelectorEmpresas from "./SelectorEmpresas";
 
 const INP    = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 w-full";
-const CATEGORIAS_TALLER = ["REPARACION", "MANTENIMIENTO PREVENTIVO", "MANTENIMIENTO CORRECTIVO", "GARANTIA"];
+const CATEGORIAS_SERVICIO = ["SOPORTE", "DEVOLUCION", "DIAGNOSTICO", "GARANTIA", "MANTENIMIENTO", "REPARACION", "PRESTAMO", "SUMINISTRO", "MANTENIMIENTO EN PLANTA"];
 
 const FORM_VACIO = {
   numeroOT: "",
@@ -13,7 +13,7 @@ const FORM_VACIO = {
   planta: "",
   titulo: "",
   condicion: "",
-  categorizacionTaller: "MANTENIMIENTO PREVENTIVO",
+  categorizacionTaller: "",
   micLinea: "",
   backup: "",
   entregadoPor: "",
@@ -181,10 +181,10 @@ export default function ModalNuevaOT({ onClose, onCreada }) {
 
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="text-xs text-gray-500 block mb-1">Categorización en taller</label>
+              <label className="text-xs text-gray-500 block mb-1">Categorización de servicio</label>
               <select name="categorizacionTaller" value={form.categorizacionTaller} onChange={handleChange} className={INP}>
                 <option value="">Seleccionar categoría…</option>
-                {CATEGORIAS_TALLER.map((c) => <option key={c} value={c}>{c}</option>)}
+                {CATEGORIAS_SERVICIO.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div>

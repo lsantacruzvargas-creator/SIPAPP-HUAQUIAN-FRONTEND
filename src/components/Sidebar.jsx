@@ -6,7 +6,7 @@ import PanelNotificaciones from "./PanelNotificaciones";
 
 // "asistente" es el valor de rol real (DB/JWT/permisos) — solo se renombra
 // la etiqueta visible a "Administración", nunca el valor almacenado.
-const ROL_LABEL = { admin: "Admin", tecnico: "Técnico", tecnico_prueba: "Técnico de Prueba", tecnico_intervencion: "Técnico de Intervención", almacenero: "Almacenero", asistente: "Administración", supervisor: "Supervisor", jefatura: "Jefatura", facturacion: "Facturación", planner: "Planner" };
+const ROL_LABEL = { admin: "Admin", tecnico: "Técnico", tecnico_prueba: "Técnico de Prueba", tecnico_intervencion: "Técnico de Intervención", almacenero: "Almacenero", asistente: "Administración", supervisor: "Supervisor", jefatura: "Jefatura", facturacion: "Facturación", planner: "Planner", coordinadora: "Coordinadora" };
 
 const TEMAS = [
   { id: "claro",  icon: "☀️", title: "Tema claro" },
@@ -105,6 +105,8 @@ export default function Sidebar() {
   const esFacturacion = usuario?.rol === "facturacion";
   const esPlanner    = usuario?.rol === "planner";
   const esComercial  = ["admin", "asistente"].includes(usuario?.rol);
+  const esCoordinadora = usuario?.rol === "coordinadora";
+  const esAsistente  = usuario?.rol === "asistente";
 
   const ir = (path) => { navigate(path); setAbierto(false); };
   const inicial = usuario?.nombre?.charAt(0)?.toUpperCase() || "?";
@@ -149,20 +151,25 @@ export default function Sidebar() {
   // - facturacion: solo Facturas, Fact. Electrónica, Guías y Tipo de Cambio.
   // - jefatura: todo excepto Usuarios.
   // - admin: todo, incluyendo Usuarios.
+  // - coordinadora (nuevo rol): Almacén (nivel almacenero), Inventario,
+  //   OTs (nivel admin), Cotizaciones y Órdenes de Compra de solo lectura
+  //   (sin precios/montos) — ver detalle de permisos en cada página/ruta.
   const NAV_ITEMS = [
     { to: "/dashboard", label: "Dashboard", Icon: IconHome, show: esAdmin || esJefatura },
-    { to: "/ordenes-trabajo", label: "Orden de Trabajo", Icon: IconClipboard, show: esComercial || esTecnico || esSupervisor || esPlanner || esJefatura },
-    { to: "/cotizaciones", label: "Cotizaciones", Icon: IconDocument, show: esComercial || esPlanner || esJefatura },
-    { to: "/ordenes-compra", label: "Órdenes de Compra", Icon: IconCart, show: esComercial || esFacturacion || esJefatura },
+    { to: "/ordenes-trabajo", label: "Orden de Trabajo", Icon: IconClipboard, show: esComercial || esTecnico || esSupervisor || esPlanner || esJefatura || esCoordinadora },
+    { to: "/cotizaciones", label: "Cotizaciones", Icon: IconDocument, show: esComercial || esPlanner || esJefatura || esCoordinadora },
+    { to: "/ordenes-compra", label: "Órdenes de Compra", Icon: IconCart, show: esComercial || esFacturacion || esJefatura || esCoordinadora },
     { to: "/facturas", label: "Facturas", Icon: IconReceipt, show: esAdmin || esFacturacion || esJefatura },
     { to: "/reportes", label: "Reportes", Icon: IconChartBar, show: esAdmin || esFacturacion || esJefatura },
-    { to: "/facturacion-electronica", label: "Fact. Electrónica", Icon: IconBolt, show: esComercial || esFacturacion || esJefatura },
-    { to: "/facturacion-electronica/guias", label: "Guías", Icon: IconTruck, show: esAdmin || esFacturacion || esAlmacenero || esJefatura },
+    // Administración (asistente) no ve "Fact. Electrónica" — en su lugar
+    // tiene "Guías" directamente (a pedido del usuario, reemplaza esa vista).
+    { to: "/facturacion-electronica", label: "Fact. Electrónica", Icon: IconBolt, show: esAdmin || esFacturacion || esJefatura },
+    { to: "/facturacion-electronica/guias", label: "Guías", Icon: IconTruck, show: esAdmin || esFacturacion || esAlmacenero || esJefatura || esPlanner || esCoordinadora || esAsistente },
     { to: "/tipo-cambio", label: "Tipo de Cambio", Icon: IconExchange, show: esAdmin || esFacturacion || esAlmacenero || esJefatura },
     { to: "/empresas", label: "Empresas", Icon: IconBuilding, show: esComercial || esJefatura || esAlmacenero || esPlanner },
-    { to: "/catalogo-servicios", label: "Catálogo", Icon: IconTag, show: esAdmin || esJefatura },
-    { to: "/almacen", label: "Almacén", Icon: IconArchive, show: esAdmin || esAlmacenero || esJefatura },
-    { to: "/inventario", label: "Inventario", Icon: IconBoxes, show: esAdmin || esAlmacenero || esTecnico || esPlanner || esJefatura },
+    { to: "/catalogo-servicios", label: "Catálogo", Icon: IconTag, show: esAdmin || esJefatura || esCoordinadora },
+    { to: "/almacen", label: "Almacén", Icon: IconArchive, show: esAdmin || esAlmacenero || esJefatura || esCoordinadora },
+    { to: "/inventario", label: "Inventario", Icon: IconBoxes, show: esAdmin || esAlmacenero || esTecnico || esPlanner || esJefatura || esCoordinadora },
     { to: "/requerimientos", label: "Requerimientos", Icon: IconClipboardList, show: esAdmin || esAlmacenero || esJefatura },
     { to: "/aprobaciones", label: "Aprobaciones", Icon: IconCheckCircle, show: esAdmin || esJefatura },
     { to: "/usuarios", label: "Usuarios", Icon: IconUsers, show: esAdmin },

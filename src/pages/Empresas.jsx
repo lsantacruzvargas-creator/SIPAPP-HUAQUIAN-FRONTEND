@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { fetchAuth } from "../utils/fetchAuth";
+import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import ModalEmpresa from "../components/ModalEmpresa";
 
 export default function Empresas() {
@@ -7,9 +7,24 @@ export default function Empresas() {
   const [filtro, setFiltro] = useState("");
   const [modal, setModal] = useState(false);
   const [editando, setEditando] = useState(null);
+  const [eliminandoId, setEliminandoId] = useState(null);
+  const esAdmin = getUsuario()?.rol === "admin";
 
   const cargar = () =>
     fetchAuth("/empresas").then((res) => res.ok && res.json().then(setEmpresas));
+
+  const eliminar = async (empresa) => {
+    if (!window.confirm(`¿Eliminar la empresa "${empresa.razonSocial}"? Esta acción no se puede deshacer.`)) return;
+    setEliminandoId(empresa._id);
+    const r = await fetchAuth(`/empresas/${empresa._id}`, { method: "DELETE" });
+    if (r.ok) {
+      await cargar();
+    } else {
+      const d = await r.json().catch(() => ({}));
+      window.alert(d.mensaje || "Error al eliminar la empresa.");
+    }
+    setEliminandoId(null);
+  };
 
   useEffect(() => { cargar(); }, []);
 
@@ -79,13 +94,22 @@ export default function Empresas() {
                   <td className="px-4 py-3">{e.ruc}</td>
                   <td className="px-4 py-3">{e.plantas?.[0]?.contactoTelefono || "—"}</td>
                   <td className="px-4 py-3">{e.plantas?.[0]?.contactoCorreo || "—"}</td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3 text-right space-x-3">
                     <button
                       onClick={() => abrirEditar(e)}
                       className="text-blue-600 hover:underline text-xs"
                     >
                       Editar
                     </button>
+                    {esAdmin && (
+                      <button
+                        onClick={() => eliminar(e)}
+                        disabled={eliminandoId === e._id}
+                        className="text-red-500 hover:underline text-xs disabled:opacity-50"
+                      >
+                        {eliminandoId === e._id ? "Eliminando…" : "Eliminar"}
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))

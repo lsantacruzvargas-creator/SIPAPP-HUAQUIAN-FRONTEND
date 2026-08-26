@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { fetchAuth } from "../utils/fetchAuth";
 
-const ROLES = ["admin", "tecnico", "tecnico_prueba", "tecnico_intervencion", "almacenero", "asistente", "supervisor", "jefatura", "facturacion", "planner"];
+const ROLES = ["admin", "tecnico", "tecnico_prueba", "tecnico_intervencion", "almacenero", "asistente", "supervisor", "jefatura", "facturacion", "planner", "coordinadora"];
 // "asistente" es el valor de rol real (DB/JWT/permisos) — solo se renombra
 // la etiqueta visible a "Administración", nunca el valor almacenado.
 const ROL_LABEL = { asistente: "Administración", tecnico_prueba: "Técnico de Prueba", tecnico_intervencion: "Técnico de Intervención" };
@@ -18,6 +18,7 @@ const badgeRol = (rol) => {
   if (rol === "jefatura")    return "bg-sky-50 text-sky-700";
   if (rol === "facturacion") return "bg-emerald-50 text-emerald-700";
   if (rol === "planner")     return "bg-fuchsia-50 text-fuchsia-700";
+  if (rol === "coordinadora") return "bg-rose-50 text-rose-700";
   return "bg-gray-100 text-gray-500";
 };
 

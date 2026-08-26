@@ -190,7 +190,7 @@ export default function TablaItemsCotizacion({
                         </div>
                       ) : (
                         <input type="checkbox" checked={seleccionados.has(idx)}
-                          onChange={() => onToggleSeleccion?.(idx)} disabled={disabled}
+                          onChange={() => onToggleSeleccion?.(idx)} disabled={generando}
                           className="w-4 h-4 rounded border-gray-300 text-sky-600 focus:ring-sky-400" />
                       )}
                     </td>

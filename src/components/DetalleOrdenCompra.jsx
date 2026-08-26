@@ -53,6 +53,9 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
   const puedeAnular = ["admin", "facturacion", "jefatura"].includes(rolActual);
   const cadenaCerrada = bloqueadoPorCadenaCerrada(orden.estadoCadena, rolActual);
   const puedeConfirmarHesActa = ["admin", "asistente", "facturacion", "jefatura"].includes(rolActual);
+  // Montos/cálculos ocultos para Administración y Coordinadora — ninguno de
+  // los dos ve/edita precios en OC (ver mismo criterio en ListaOrdenesCompra.jsx).
+  const puedeVerPrecios = !["asistente", "coordinadora"].includes(rolActual);
   // Generar factura es libre (ya no exige confirmar HES/Acta antes) y queda
   // exclusivo para Facturación y Jefatura — Admin ya no puede (mismo gate en
   // el backend, POST /facturas puedeCrear en routes/facturas.js).
@@ -211,7 +214,7 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
             </div>
             <div className="flex items-center gap-4">
               <div className="text-right">
-                {rolActual !== "asistente" && (
+                {puedeVerPrecios && (
                   <>
                     <p className="text-[10px] text-white/60 uppercase tracking-widest leading-none">Total a pagar</p>
                     <p className="text-lg font-bold leading-tight">{money(calc.totalAPagar)}</p>
@@ -375,13 +378,13 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
               </div>
             </div>
 
-            {/* Cálculos — ocultos para Administración, que no ve/edita montos */}
-            {rolActual !== "asistente" && (
+            {/* Cálculos — ocultos para Administración y Coordinadora, que no ven/editan montos */}
+            {puedeVerPrecios && (
               <div className="rounded-xl bg-gradient-to-br from-gray-50 to-blue-50/40 border border-gray-100 p-4 space-y-4">
                 <div>
                   <label className="text-xs text-gray-500 block mb-1">Subtotal sin IGV</label>
                   <input type="number" name="subtotal" value={form.subtotal} onChange={handleChange}
-                    disabled={rolActual === "asistente"}
+                    disabled={!puedeVerPrecios}
                     step="0.01" min="0" placeholder="0.00" className={`${INP} text-lg font-semibold`} />
                 </div>
                 <div className="grid grid-cols-3 gap-3 text-sm">

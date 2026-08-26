@@ -20,7 +20,7 @@ const INP = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-n
 const RO = "bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 text-sm text-gray-600 w-full";
 
 const ESTADOS = ["pendiente", "en progreso", "completado", "entregado"];
-const CATEGORIAS_TALLER = ["REPARACION", "MANTENIMIENTO PREVENTIVO", "MANTENIMIENTO CORRECTIVO", "GARANTIA"];
+const CATEGORIAS_SERVICIO = ["SOPORTE", "DEVOLUCION", "DIAGNOSTICO", "GARANTIA", "MANTENIMIENTO", "REPARACION", "PRESTAMO", "SUMINISTRO", "MANTENIMIENTO EN PLANTA"];
 
 const colorEstado = (e, activo) => {
   if (!activo) return "bg-gray-100 text-gray-500 hover:bg-gray-200";
@@ -62,7 +62,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
   // Supervisor edita los campos de la OT y los Informes Técnicos, pero no
   // puede anularla. Igual que técnico, supervisor no ve el resto de la
   // cadena (Cotización/OC/Factura).
-  const puedeEditarCampos = ["admin", "supervisor", "planner"].includes(rolActual);
+  const puedeEditarCampos = ["admin", "supervisor", "planner", "coordinadora"].includes(rolActual);
   // Anular un documento queda reservado a Admin, Facturación y Jefatura.
   const puedeAnular = ["admin", "facturacion", "jefatura"].includes(rolActual);
   const esTecnico = ["tecnico", "tecnico_prueba", "tecnico_intervencion"].includes(rolActual);
@@ -567,10 +567,10 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-xs text-gray-500 block mb-1">Categorización en taller</label>
+                <label className="text-xs text-gray-500 block mb-1">Categorización de servicio</label>
                 <select name="categorizacionTaller" value={form.categorizacionTaller} onChange={handleChange} className={INP}>
                   <option value="">Seleccionar categoría…</option>
-                  {CATEGORIAS_TALLER.map((c) => <option key={c} value={c}>{c}</option>)}
+                  {CATEGORIAS_SERVICIO.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
               <div>
@@ -735,7 +735,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
                 onCrear={!ot.anulado ? abrirGenerarGRE : undefined} crearLabel="GRE" />
             )}
 
-            {!esVistaLimitada && (
+            {!esVistaLimitada && rolActual !== "coordinadora" && (
               <>
                 <TarjetaRelacion tipo="oc" codigo={oc?.codigo} numero={oc?.numeroOrden} vacio={!oc}
                   onClick={oc ? () => onNavegar?.({ tipo: "oc", data: oc, extra: factura }) : undefined}

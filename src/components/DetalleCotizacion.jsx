@@ -76,8 +76,13 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   // ni Asistente ni Planner, aunque puedan editar/ver el resto de la cotización.
   const puedeVerPrecios = ["admin", "facturacion", "jefatura"].includes(rolActual);
   const puedeAprobar = ["admin", "jefatura"].includes(rolActual);
-  const puedeEnviar = ["admin", "asistente"].includes(rolActual);
+  const puedeEnviar = ["admin", "asistente", "jefatura"].includes(rolActual);
   const puedeConfirmarInformeEnviado = ["admin", "asistente", "facturacion", "jefatura"].includes(rolActual);
+  // Generar OT desde un ítem es un set más amplio que `puedeEditar`: incluye
+  // Planner y Coordinadora, que no editan el resto de la cotización — y a
+  // diferencia de `puedeEditar`, sí se permite con la cotización ya
+  // enviada/aprobada (mismo criterio que el backend, ver puedeGenerarOTDesdeItem).
+  const puedeGenerarOT = ["admin", "asistente", "facturacion", "jefatura", "planner", "coordinadora"].includes(rolActual);
   // Asistente solo puede enviar cotizaciones ya aprobadas — Admin conserva
   // la potestad de enviar sin esperar la aprobación (ver mismo criterio en
   // el backend, PATCH /cotizaciones/:id/enviar).
@@ -146,7 +151,11 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   // exactamente con lo ya guardado antes de generar OT por índice.
   const generarOTSeleccionados = async () => {
     setGenerandoOT(true);
-    const guardada = await guardarCotizacion();
+    // Solo hace falta persistir cambios pendientes primero si el rol puede
+    // editar ítems (admin/asistente/facturación/jefatura) — Planner y
+    // Coordinadora ven los ítems de solo lectura, así que nunca hay nada
+    // pendiente que guardar y `cot` ya refleja exactamente lo persistido.
+    const guardada = puedeEditar ? await guardarCotizacion() : cot;
     if (!guardada) { setGenerandoOT(false); return; }
     const indices = [...seleccionados].sort((a, b) => a - b);
     let ultimaCot = guardada;
@@ -405,7 +414,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
               )}
               <Chip className="mt-0.5 bg-white/20 text-white">{cot.tipo}</Chip>
             </div>
-            {rolActual !== "asistente" && (
+            {!["asistente", "coordinadora", "planner"].includes(rolActual) && (
               <button onClick={() => exportarCotizacionPdf(datosParaPdf())}
                 className="bg-white/15 text-white text-sm px-4 py-2 rounded-lg hover:bg-white/25 transition font-medium shrink-0">
                 Exportar PDF
@@ -522,7 +531,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
 
             {!cot.anulado && cot.enviado && (
               <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                Cotización enviada — de solo lectura. {puedeEnviar ? "Desmárcala como enviada (arriba) para poder editarla." : "Solo Admin o Administración pueden retirarla del estado enviado."}
+                Cotización enviada — de solo lectura. {puedeEnviar ? "Desmárcala como enviada (arriba) para poder editarla." : "Solo Admin, Administración o Jefatura pueden retirarla del estado enviado."}
               </p>
             )}
 
@@ -832,19 +841,23 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
               )}
             </TarjetaRelacion>
 
-            <TarjetaRelacion tipo="oc" codigo={oc?.codigo} numero={oc?.numeroOrden} vacio={!oc}
-              onClick={oc ? () => onNavegar?.({ tipo: "oc", data: oc, extra: factura }) : undefined}
-              onCrear={!oc && !cot.anulado && cot.aprobado && cot.enviado ? () => setCrearOCOpen(true) : undefined} crearLabel="OC">
-              {oc?.monto > 0 && <p className="text-xs text-gray-500">{money(oc.monto)}</p>}
-            </TarjetaRelacion>
+            {rolActual !== "coordinadora" && (
+              <TarjetaRelacion tipo="oc" codigo={oc?.codigo} numero={oc?.numeroOrden} vacio={!oc}
+                onClick={oc ? () => onNavegar?.({ tipo: "oc", data: oc, extra: factura }) : undefined}
+                onCrear={!oc && !cot.anulado && cot.aprobado && cot.enviado ? () => setCrearOCOpen(true) : undefined} crearLabel="OC">
+                {oc?.monto > 0 && <p className="text-xs text-gray-500">{money(oc.monto)}</p>}
+              </TarjetaRelacion>
+            )}
 
-            <TarjetaRelacion tipo="factura" codigo={factura?.codigo} numero={factura?.numeroFactura} vacio={!factura}
-              onClick={factura ? () => onNavegar?.({ tipo: "factura", data: factura }) : undefined}>
-              {(factura?.totalAPagar || factura?.total) > 0 && (
-                <p className="text-xs text-gray-500">{money(factura.totalAPagar ?? factura.total)}</p>
-              )}
-              {factura?.estadoPago && <Chip className={badgePago(factura.estadoPago)}>{factura.estadoPago}</Chip>}
-            </TarjetaRelacion>
+            {rolActual !== "coordinadora" && (
+              <TarjetaRelacion tipo="factura" codigo={factura?.codigo} numero={factura?.numeroFactura} vacio={!factura}
+                onClick={factura ? () => onNavegar?.({ tipo: "factura", data: factura }) : undefined}>
+                {(factura?.totalAPagar || factura?.total) > 0 && (
+                  <p className="text-xs text-gray-500">{money(factura.totalAPagar ?? factura.total)}</p>
+                )}
+                {factura?.estadoPago && <Chip className={badgePago(factura.estadoPago)}>{factura.estadoPago}</Chip>}
+              </TarjetaRelacion>
+            )}
           </section>
         </div>
 
@@ -858,7 +871,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
             disabled={cot.anulado || cot.enviado}
             intentoGuardar={intentoGuardar}
             totalesMostrados={totalesMostrados}
-            seleccionables={form.tipo === "servicio" && puedeEditar && !cot.anulado && !cot.enviado}
+            seleccionables={form.tipo === "servicio" && puedeGenerarOT && !cot.anulado}
             seleccionados={seleccionados}
             onToggleSeleccion={toggleSeleccion}
             onGenerarOT={generarOTSeleccionados}

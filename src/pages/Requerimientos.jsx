@@ -145,6 +145,28 @@ function PanelDevolucion({ requerimientoId, item, onClose, onListo }) {
   );
 }
 
+// Ubicación / Stock actual / Cantidad solicitada, visibles de un vistazo —
+// el stock se colorea en rojo cuando no alcanza para cubrir lo pedido
+// (respuesta a que antes quedaba enterrado en una línea de texto gris chica).
+function BadgesMaterial({ material, cantidad }) {
+  if (!material) return null;
+  const stock = material.stock ?? 0;
+  const alcanza = stock >= cantidad;
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 mt-1">
+      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700">
+        Ubicación: {material.ubicacion?.nombre || "Sin ubicación"}
+      </span>
+      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${alcanza ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+        Stock: {stock} {material.unidad}
+      </span>
+      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
+        Solicitado: {cantidad} {material.unidad}
+      </span>
+    </div>
+  );
+}
+
 // ─── Fila de un ítem dentro de un requerimiento ─────────────────────────────
 
 function FilaItem({ requerimiento, item, puedeAtender, onActualizado }) {
@@ -185,13 +207,17 @@ function FilaItem({ requerimiento, item, puedeAtender, onActualizado }) {
               </p>
               <p className="text-xs text-gray-400 truncate">{resumenCompra(item)}</p>
               {item.materialAsociado && (
-                <p className="text-xs text-blue-600 mt-0.5">Vinculado a: {item.materialAsociado.sku} — {item.materialAsociado.nombre}</p>
+                <>
+                  <p className="text-xs text-blue-600 mt-0.5">Vinculado a: {item.materialAsociado.sku} — {item.materialAsociado.nombre}</p>
+                  <BadgesMaterial material={item.materialAsociado} cantidad={item.cantidad} />
+                </>
               )}
             </>
           ) : (
             <>
               <p className="text-sm font-medium text-gray-800">{item.material?.nombre}</p>
-              <p className="text-xs text-gray-400 font-mono">{item.material?.sku} — cantidad: {item.cantidad} {item.material?.unidad}</p>
+              <p className="text-xs text-gray-400 font-mono">{item.material?.sku}</p>
+              <BadgesMaterial material={item.material} cantidad={item.cantidad} />
             </>
           )}
         </div>

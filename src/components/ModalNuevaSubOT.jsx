@@ -3,7 +3,7 @@ import { fetchAuth } from "../utils/fetchAuth";
 import { INP } from "../utils/cotizacionItems";
 
 const ESTADOS = ["pendiente", "en progreso", "completado", "entregado"];
-const CATEGORIAS_TALLER = ["REPARACION", "MANTENIMIENTO PREVENTIVO", "MANTENIMIENTO CORRECTIVO", "GARANTIA"];
+const CATEGORIAS_SERVICIO = ["SOPORTE", "DEVOLUCION", "DIAGNOSTICO", "GARANTIA", "MANTENIMIENTO", "REPARACION", "PRESTAMO", "SUMINISTRO", "MANTENIMIENTO EN PLANTA"];
 
 const colorEstado = (e, activo) => {
   if (!activo) return "bg-gray-100 text-gray-500 hover:bg-gray-200";
@@ -18,7 +18,7 @@ export default function ModalNuevaSubOT({ padre, onClose, onCreada }) {
     titulo: "", descripcion: "",
     // MIC/Línea, Backup y Entregado por se heredan del padre por defecto —
     // el técnico puede sobrescribirlos antes de crear si esta sub-OT difiere.
-    micLinea: padre.micLinea || "", backup: padre.backup || "", categorizacionTaller: "MANTENIMIENTO PREVENTIVO",
+    micLinea: padre.micLinea || "", backup: padre.backup || "", categorizacionTaller: "",
     personalAsignado: "", estado: "pendiente", observaciones: "", entregadoPor: padre.entregadoPor || "",
     fechaEntrega: "", numeroGuiaRemision: "",
     // Encargado Prueba / Encargado Intervención heredan del padre por
@@ -43,7 +43,7 @@ export default function ModalNuevaSubOT({ padre, onClose, onCreada }) {
 
   const guardar = async () => {
     if (!form.titulo.trim()) return setError("El título es obligatorio.");
-    if (!form.categorizacionTaller) return setError("La categorización en taller es obligatoria.");
+    if (!form.categorizacionTaller) return setError("La categorización de servicio es obligatoria.");
     setError(""); setGuardando(true);
 
     const body = { ...form };
@@ -103,10 +103,10 @@ export default function ModalNuevaSubOT({ padre, onClose, onCreada }) {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-xs text-gray-500 block mb-1">Categorización en taller *</label>
+              <label className="text-xs text-gray-500 block mb-1">Categorización de servicio *</label>
               <select name="categorizacionTaller" value={form.categorizacionTaller} onChange={handleChange} className={`w-full ${INP}`}>
                 <option value="">Seleccionar categoría…</option>
-                {CATEGORIAS_TALLER.map((c) => <option key={c} value={c}>{c}</option>)}
+                {CATEGORIAS_SERVICIO.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div hidden>

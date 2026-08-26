@@ -506,7 +506,7 @@ export default function Cotizaciones() {
             </button>
           ) : (
             <>
-              {getUsuario()?.rol !== "asistente" && (
+              {!["asistente", "coordinadora", "planner"].includes(getUsuario()?.rol) && (
                 <button type="button" onClick={() => exportarCotizacionPdf(guardado)}
                   className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition">
                   Exportar PDF

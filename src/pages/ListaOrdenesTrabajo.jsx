@@ -6,18 +6,15 @@ import ModalImportarExcel, { COLS_OT } from "../components/ModalImportarExcel";
 import { DotChip, badgeOT, dotOT, badgeInformes, dotInformes, badgeGeneral, dotGeneral } from "../components/detalleShared";
 import * as XLSX from "xlsx";
 
-const MESES = [
-  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
-];
-
-const FILTROS_VACIO = { ano: "", mes: "", estado: "", empresa: "", planta: "", busqueda: "" };
+const FILTROS_VACIO = { empresa: "", planta: "", busqueda: "", estadoInformes: "" };
 
 const SORTS = [
   { valor: "fecha",             label: "Más reciente" },
   { valor: "numeroOT",          label: "N° OT" },
   { valor: "numeroCotizacion",  label: "N° Cotización" },
 ];
+
+const ESTADOS_INFORMES = ["pendiente", "en progreso", "en espera de aprobación", "aprobado"];
 
 // Comparador descendente: numérico si ambos parsean como número, si no
 // localeCompare; los valores vacíos van al final.
@@ -191,10 +188,6 @@ export default function ListaOrdenesTrabajo() {
 
   useEffect(() => { cargar(); }, []);
 
-  const anos = [...new Set(ordenes.map((o) => new Date(o.createdAt).getFullYear()))].sort(
-    (a, b) => b - a
-  );
-
   // Las sub-OTs (ordenPadre != null) no aparecen como filas propias en
   // `ordenes` — se agrupan bajo `subOTs` de su padre y TablaOTs las renderiza
   // como filas propias justo debajo de la fila padre (ver flatMap ahí).
@@ -216,9 +209,11 @@ export default function ListaOrdenesTrabajo() {
   // uno más abajo (esTecnicoPrueba/esTecnicoIntervencion).
   const esTecnicoRol = ["tecnico", "tecnico_prueba", "tecnico_intervencion"].includes(rolActual);
   // Vista simplificada de 4 grupos (No asignadas/En progreso/Completadas/
-  // Entregadas), sin el split Prueba/Intervención — planner y Administración
-  // ("asistente" es el valor de rol real, ver Sidebar.jsx).
-  const esVistaSimplificada = ["planner", "asistente"].includes(rolActual);
+  // Entregadas), sin el split Prueba/Intervención — planner, Administración
+  // ("asistente" es el valor de rol real, ver Sidebar.jsx) y Jefatura (esta
+  // última solo en la vista de OTs, a pedido explícito del usuario — el
+  // resto de sus permisos no cambia).
+  const esVistaSimplificada = ["planner", "asistente", "jefatura"].includes(rolActual);
   const esTecnicoPrueba = rolActual === "tecnico_prueba";
   const esTecnicoIntervencion = rolActual === "tecnico_intervencion";
   const esAsignado = (o) => coincideNombre(o.encargado, nombreActual) || coincideNombre(o.encargado2, nombreActual);
@@ -248,14 +243,11 @@ export default function ListaOrdenesTrabajo() {
   const handleEmpresa = (e) => setFiltros({ ...filtros, empresa: e.target.value, planta: "" });
 
   const filtradas = conSubOTs.filter((o) => {
-    const fecha = new Date(o.createdAt);
     const q = filtros.busqueda.toLowerCase();
     return (
-      (!filtros.ano || fecha.getFullYear() === parseInt(filtros.ano)) &&
-      (!filtros.mes || fecha.getMonth() + 1 === parseInt(filtros.mes)) &&
-      (!filtros.estado || o.estado === filtros.estado) &&
       (!filtros.empresa || o.empresa?._id === filtros.empresa) &&
       (!filtros.planta || o.planta === filtros.planta) &&
+      (!filtros.estadoInformes || o.estadoInformes === filtros.estadoInformes) &&
       (!q ||
         o.titulo?.toLowerCase().includes(q) ||
         o.numeroOT?.toLowerCase().includes(q) ||
@@ -359,6 +351,21 @@ export default function ListaOrdenesTrabajo() {
   const plannerEntregadas  = asignadasPlanner.filter((o) => o.informesAprobados && esTrackListo(o));
   const plannerCompletadas = asignadasPlanner.filter((o) => !o.informesAprobados && esTrackListo(o));
   const plannerEnProgreso  = asignadasPlanner.filter((o) => !esTrackListo(o));
+
+  // Tabla "Todas las Órdenes de Trabajo": una sola lista global (sin separar
+  // por track ni por asignación) sobre la que responde el filtro de Estado —
+  // misma categorización que las 5 tablas de la vista simplificada, para que
+  // "Todo estado" muestre exactamente la unión de esas 5.
+  const categoriaGlobal = (o) => {
+    if (esCerrada(o)) return "cerrada";
+    if (o.estadoGeneral === "no asignado") return "noAsignada";
+    if (esTrackListo(o)) return o.informesAprobados ? "entregada" : "completada";
+    return "enProgreso";
+  };
+  const todasOTs = filtradas.filter(
+    (o) => filtroEstadoPlanner === "todos" || categoriaGlobal(o) === filtroEstadoPlanner
+  );
+
   const hayFiltro = Object.values(filtros).some(Boolean);
   // Con qué categoría se queda la vista simplificada — "todos" o fuera de
   // esa vista no filtra nada (todas las tablas se muestran igual que antes).
@@ -437,26 +444,14 @@ export default function ListaOrdenesTrabajo() {
         </div>
       </div>
 
-      {/* Filtros */}
+      {/* Filtros — orden: Ordenar, Estado, Empresa (+ Planta), búsqueda, Estado informes */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-5 flex flex-wrap gap-3 items-center">
 
-<select name="empresa" value={filtros.empresa} onChange={handleEmpresa} className={SELECT}>
-          <option value="">Toda empresa</option>
-          {empresasLista.map((e) => (
-            <option key={e._id} value={e._id}>
-              {e.alias ? `${e.alias} — ` : ""}{e.razonSocial}
-            </option>
+        <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className={SELECT}>
+          {SORTS.map(({ valor, label }) => (
+            <option key={valor} value={valor}>Ordenar: {label}</option>
           ))}
         </select>
-
-        {plantasLista.length > 0 && (
-          <select name="planta" value={filtros.planta} onChange={handleFiltro} className={SELECT}>
-            <option value="">Toda planta</option>
-            {plantasLista.map((p) => (
-              <option key={p} value={p}>{p}</option>
-            ))}
-          </select>
-        )}        
 
         {esVistaSimplificada && (
           <select value={filtroEstadoPlanner} onChange={(e) => setFiltroEstadoPlanner(e.target.value)} className={SELECT}>
@@ -480,21 +475,23 @@ export default function ListaOrdenesTrabajo() {
           </select>
         )}
 
-
-
-        <select name="ano" value={filtros.ano} onChange={handleFiltro} className={SELECT}>
-          <option value="">Todos los años</option>
-          {anos.map((a) => (
-            <option key={a} value={a}>{a}</option>
+        <select name="empresa" value={filtros.empresa} onChange={handleEmpresa} className={SELECT}>
+          <option value="">Toda empresa</option>
+          {empresasLista.map((e) => (
+            <option key={e._id} value={e._id}>
+              {e.alias ? `${e.alias} — ` : ""}{e.razonSocial}
+            </option>
           ))}
         </select>
 
-        <select name="mes" value={filtros.mes} onChange={handleFiltro} className={SELECT}>
-          <option value="">Todos los meses</option>
-          {MESES.map((m, i) => (
-            <option key={i + 1} value={i + 1}>{m}</option>
-          ))}
-        </select>
+        {plantasLista.length > 0 && (
+          <select name="planta" value={filtros.planta} onChange={handleFiltro} className={SELECT}>
+            <option value="">Toda planta</option>
+            {plantasLista.map((p) => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
+        )}
 
         <input
           name="busqueda"
@@ -504,9 +501,10 @@ export default function ListaOrdenesTrabajo() {
           className={`${SELECT} flex-1 min-w-52`}
         />
 
-        <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className={SELECT}>
-          {SORTS.map(({ valor, label }) => (
-            <option key={valor} value={valor}>Ordenar: {label}</option>
+        <select name="estadoInformes" value={filtros.estadoInformes} onChange={handleFiltro} className={SELECT}>
+          <option value="">Todo estado de informes</option>
+          {ESTADOS_INFORMES.map((e) => (
+            <option key={e} value={e} className="capitalize">{e}</option>
           ))}
         </select>
 
@@ -559,6 +557,17 @@ export default function ListaOrdenesTrabajo() {
 
       {esVistaSimplificada ? (
         <>
+          {/* Vista global: todas las OTs juntas (sin separar por asignación
+              ni track), respondiendo al mismo filtro de Estado de arriba —
+              "Todo estado" muestra la unión exacta de las 5 tablas de abajo. */}
+          <TablaOTs
+            titulo="Todas las Órdenes de Trabajo"
+            acento="bg-indigo-500"
+            ordenes={todasOTs}
+            onSelect={setSeleccionada}
+            vacioMsg={hayFiltro || filtroEstadoPlanner !== "todos" ? "Sin resultados para los filtros aplicados" : "Sin órdenes de trabajo"}
+          />
+
           {mostrarPlanner("noAsignada") && (
             <TablaOTs
               titulo="Órdenes no asignadas"

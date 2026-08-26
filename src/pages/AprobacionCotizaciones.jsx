@@ -119,6 +119,7 @@ export default function AprobacionCotizaciones() {
   const [cotizaciones, setCotizaciones] = useState([]);
   const [otGroupMap, setOtGroupMap] = useState({});
   const [seleccionada, setSeleccionada] = useState(null);
+  const [busqueda, setBusqueda] = useState("");
   const usuario = getUsuario();
   const puedeAprobar = ["admin", "jefatura"].includes(usuario?.rol);
   // Pedido explícito: jefatura ve, para cada cotización, la OT padre
@@ -157,16 +158,37 @@ export default function AprobacionCotizaciones() {
     }
   };
 
-  const pendientes = cotizaciones.filter((c) => !c.aprobado);
-  const aprobadas  = cotizaciones.filter((c) => c.aprobado);
+  // Busca por N° de cotización, N° de OT (padre o sub-OT, ver otGroupMap) o
+  // título — coincide con cualquiera de los tres, sin distinguir mayúsculas.
+  const coincideBusqueda = (c) => {
+    const q = busqueda.trim().toLowerCase();
+    if (!q) return true;
+    const grupo = otGroupMap[c.numeroDocumento];
+    const numerosOT = [grupo?.parent?.numeroOT, ...(grupo?.subs?.map((s) => s.numeroOT) || [])]
+      .filter(Boolean).join(" ").toLowerCase();
+    return (
+      c.numeroCotizacion?.toLowerCase().includes(q) ||
+      c.titulo?.toLowerCase().includes(q) ||
+      numerosOT.includes(q)
+    );
+  };
+
+  const pendientes = cotizaciones.filter((c) => !c.aprobado && coincideBusqueda(c));
+  const aprobadas  = cotizaciones.filter((c) => c.aprobado && coincideBusqueda(c));
 
   return (
     <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-between items-center mb-6 gap-4 flex-wrap">
         <div>
           <h2 className="text-xl font-semibold text-gray-800">Aprobación de Cotizaciones</h2>
           <span className="text-sm text-gray-400">{cotizaciones.length} cotización{cotizaciones.length !== 1 ? "es" : ""}</span>
         </div>
+        <input
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          placeholder="Buscar por N° cotización, N° OT o título…"
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 w-full max-w-xs"
+        />
       </div>
 
       <TablaCotizaciones

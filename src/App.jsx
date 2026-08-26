@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Sidebar from "./components/Sidebar";
+import AlertaGlobal from "./components/AlertaGlobal";
 import { SidebarProvider, useSidebar } from "./context/SidebarContext.jsx";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
@@ -30,6 +31,7 @@ function AppShell({ children }) {
   return (
     <>
       <Sidebar />
+      <AlertaGlobal />
       <main className={`min-h-screen transition-[margin] duration-200 ${colapsado ? "md:ml-[72px]" : "md:ml-60"}`}>
         {children}
       </main>
@@ -49,7 +51,7 @@ function HomeRedirect() {
   const token = sessionStorage.getItem("token");
   const usuario = JSON.parse(sessionStorage.getItem("usuario") || "null");
   if (!token || !usuario) return <Navigate to="/login" replace />;
-  if (["tecnico", "tecnico_prueba", "tecnico_intervencion", "supervisor", "planner", "asistente"].includes(usuario.rol)) return <Navigate to="/ordenes-trabajo" replace />;
+  if (["tecnico", "tecnico_prueba", "tecnico_intervencion", "supervisor", "planner", "asistente", "coordinadora"].includes(usuario.rol)) return <Navigate to="/ordenes-trabajo" replace />;
   if (usuario.rol === "jefatura") return <Navigate to="/aprobaciones" replace />;
   if (usuario.rol === "facturacion") return <Navigate to="/facturas" replace />;
   if (usuario.rol === "almacenero") return <Navigate to="/almacen" replace />;
@@ -84,7 +86,7 @@ export default function App() {
       <Route
         path="/cotizaciones"
         element={
-          <ProtectedRoute roles={["admin", "asistente", "jefatura", "planner"]}>
+          <ProtectedRoute roles={["admin", "asistente", "jefatura", "planner", "coordinadora"]}>
             <Layout><ListaCotizaciones /></Layout>
           </ProtectedRoute>
         }
@@ -101,7 +103,7 @@ export default function App() {
       <Route
         path="/ordenes-trabajo"
         element={
-          <ProtectedRoute roles={["admin", "tecnico", "tecnico_prueba", "tecnico_intervencion", "asistente", "supervisor", "planner", "jefatura"]}>
+          <ProtectedRoute roles={["admin", "tecnico", "tecnico_prueba", "tecnico_intervencion", "asistente", "supervisor", "planner", "jefatura", "coordinadora"]}>
             <Layout><ListaOrdenesTrabajo /></Layout>
           </ProtectedRoute>
         }
@@ -128,7 +130,7 @@ export default function App() {
       <Route
         path="/ordenes-compra"
         element={
-          <ProtectedRoute roles={["admin", "asistente", "facturacion", "jefatura"]}>
+          <ProtectedRoute roles={["admin", "asistente", "facturacion", "jefatura", "coordinadora"]}>
             <Layout><ListaOrdenesCompra /></Layout>
           </ProtectedRoute>
         }
@@ -155,7 +157,7 @@ export default function App() {
       <Route
         path="/catalogo-servicios"
         element={
-          <ProtectedRoute roles={["admin", "jefatura"]}>
+          <ProtectedRoute roles={["admin", "jefatura", "coordinadora"]}>
             <Layout><CatalogoServicios /></Layout>
           </ProtectedRoute>
         }
@@ -164,7 +166,7 @@ export default function App() {
       <Route
         path="/almacen"
         element={
-          <ProtectedRoute roles={["admin", "almacenero", "jefatura"]}>
+          <ProtectedRoute roles={["admin", "almacenero", "jefatura", "coordinadora"]}>
             <Layout><Almacen /></Layout>
           </ProtectedRoute>
         }
@@ -173,7 +175,7 @@ export default function App() {
       <Route
         path="/facturacion-electronica"
         element={
-          <ProtectedRoute roles={["admin", "asistente", "facturacion", "jefatura"]}>
+          <ProtectedRoute roles={["admin", "facturacion", "jefatura"]}>
             <Layout><ListaComprobantes /></Layout>
           </ProtectedRoute>
         }
@@ -181,7 +183,7 @@ export default function App() {
       <Route
         path="/facturacion-electronica/emitir"
         element={
-          <ProtectedRoute roles={["admin", "asistente", "facturacion", "jefatura"]}>
+          <ProtectedRoute roles={["admin", "facturacion", "jefatura"]}>
             <Layout><EmitirComprobante /></Layout>
           </ProtectedRoute>
         }
@@ -189,7 +191,7 @@ export default function App() {
       <Route
         path="/facturacion-electronica/guias"
         element={
-          <ProtectedRoute roles={["admin", "asistente", "facturacion", "almacenero", "jefatura", "planner"]}>
+          <ProtectedRoute roles={["admin", "asistente", "facturacion", "almacenero", "jefatura", "planner", "coordinadora"]}>
             <Layout><ListaGuias /></Layout>
           </ProtectedRoute>
         }
@@ -197,7 +199,7 @@ export default function App() {
       <Route
         path="/facturacion-electronica/guias/emitir"
         element={
-          <ProtectedRoute roles={["admin", "asistente", "facturacion", "almacenero", "jefatura", "planner"]}>
+          <ProtectedRoute roles={["admin", "asistente", "facturacion", "almacenero", "jefatura", "planner", "coordinadora"]}>
             <Layout><EmitirGuia /></Layout>
           </ProtectedRoute>
         }
@@ -215,7 +217,7 @@ export default function App() {
       <Route
         path="/inventario"
         element={
-          <ProtectedRoute roles={["admin", "almacenero", "tecnico", "tecnico_prueba", "tecnico_intervencion", "planner", "jefatura"]}>
+          <ProtectedRoute roles={["admin", "almacenero", "tecnico", "tecnico_prueba", "tecnico_intervencion", "planner", "jefatura", "coordinadora"]}>
             <Layout><Inventario /></Layout>
           </ProtectedRoute>
         }

@@ -113,7 +113,7 @@ export const COLS_OT = [
   { key: "descripcion",          label: "Descripción", requerido: true },
   { key: "fechaIngreso",         label: "Fecha ingreso", tipo: "fecha" },
   { key: "guia",                 label: "Guía" },
-  { key: "categorizacionTaller", label: "Categorización taller" },
+  { key: "categorizacionTaller", label: "Categorización de servicio" },
   { key: "estadoOrden",          label: "Estado de la orden" },
   { key: "observaciones",        label: "Observación" },
 ];
