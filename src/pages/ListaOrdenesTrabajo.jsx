@@ -38,6 +38,15 @@ const TH = "px-4 py-3 font-semibold text-gray-500 whitespace-nowrap";
 const pruebaLabel = (o) => (o.encargado?.trim() ? o.estadoPrueba : "No asignado");
 const intervencionLabel = (o) => (o.encargado2?.trim() ? o.estado : "No asignado");
 
+// Días transcurridos desde el ingreso del equipo (fechaRecibida) — las
+// sub-OTs no tienen su propia fechaRecibida (comparten el ingreso de la OT
+// padre), así que reciben la del padre como fallback.
+const diasDesdeRecibido = (fecha) => {
+  if (!fecha) return null;
+  const ms = Date.now() - new Date(fecha).getTime();
+  return Math.max(0, Math.floor(ms / 86400000));
+};
+
 function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg }) {
   return (
     <div className="mb-6">
@@ -61,12 +70,13 @@ function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg }) {
                 <th className={`${TH} text-center`}>Intervención</th>
                 <th className={`${TH} text-left`}>Técnico de intervención</th>
                 <th className={`${TH} text-center`}>Estado Informes</th>
+                <th className={`${TH} text-center`}>Días desde recibido</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {ordenes.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-4 py-8 text-center text-gray-400">{vacioMsg}</td>
+                  <td colSpan={11} className="px-4 py-8 text-center text-gray-400">{vacioMsg}</td>
                 </tr>
               ) : (
                 ordenes.flatMap((o) => [
@@ -106,6 +116,9 @@ function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg }) {
                     <td className="px-4 py-3.5 text-center">
                       <DotChip chip={badgeInformes(o.estadoInformes)} dot={dotInformes(o.estadoInformes)}>{o.estadoInformes}</DotChip>
                     </td>
+                    <td className="px-4 py-3.5 text-center text-gray-600 whitespace-nowrap">
+                      {diasDesdeRecibido(o.fechaRecibida) ?? <span className="text-gray-300">—</span>}
+                    </td>
                   </tr>,
                   ...(o.subOTs || []).map((s) => (
                     <tr
@@ -134,6 +147,9 @@ function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg }) {
                       <td className="px-4 py-3 text-gray-600">{s.encargado2 || <span className="text-gray-300">—</span>}</td>
                       <td className="px-4 py-3 text-center">
                         <DotChip chip={badgeInformes(s.estadoInformes)} dot={dotInformes(s.estadoInformes)}>{s.estadoInformes}</DotChip>
+                      </td>
+                      <td className="px-4 py-3 text-center text-gray-600 whitespace-nowrap">
+                        {diasDesdeRecibido(s.fechaRecibida ?? o.fechaRecibida) ?? <span className="text-gray-300">—</span>}
                       </td>
                     </tr>
                   )),
@@ -210,10 +226,10 @@ export default function ListaOrdenesTrabajo() {
   const esTecnicoRol = ["tecnico", "tecnico_prueba", "tecnico_intervencion"].includes(rolActual);
   // Vista simplificada de 4 grupos (No asignadas/En progreso/Completadas/
   // Entregadas), sin el split Prueba/Intervención — planner, Administración
-  // ("asistente" es el valor de rol real, ver Sidebar.jsx) y Jefatura (esta
-  // última solo en la vista de OTs, a pedido explícito del usuario — el
-  // resto de sus permisos no cambia).
-  const esVistaSimplificada = ["planner", "asistente", "jefatura"].includes(rolActual);
+  // ("asistente" es el valor de rol real, ver Sidebar.jsx), Jefatura y
+  // Coordinadora (estas dos últimas solo en la vista de OTs, a pedido
+  // explícito del usuario — el resto de sus permisos no cambia).
+  const esVistaSimplificada = ["planner", "asistente", "jefatura", "coordinadora"].includes(rolActual);
   const esTecnicoPrueba = rolActual === "tecnico_prueba";
   const esTecnicoIntervencion = rolActual === "tecnico_intervencion";
   const esAsignado = (o) => coincideNombre(o.encargado, nombreActual) || coincideNombre(o.encargado2, nombreActual);
@@ -388,6 +404,7 @@ export default function ListaOrdenesTrabajo() {
     "Intervención":             o.estado || "—",
     "Técnico de intervención":  o.encargado2 || "—",
     "Estado Informes":          o.estadoInformes || "—",
+    "Días desde recibido":      diasDesdeRecibido(o.fechaRecibida) ?? "—",
   });
 
   const exportarExcel = () => {

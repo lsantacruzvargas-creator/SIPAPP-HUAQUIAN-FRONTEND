@@ -155,7 +155,7 @@ export default function Sidebar() {
   //   OTs (nivel admin), Cotizaciones y Órdenes de Compra de solo lectura
   //   (sin precios/montos) — ver detalle de permisos en cada página/ruta.
   const NAV_ITEMS = [
-    { to: "/dashboard", label: "Dashboard", Icon: IconHome, show: esAdmin || esJefatura },
+    { to: "/dashboard", label: "Dashboard", Icon: IconHome, show: esAdmin || esJefatura || esPlanner || esCoordinadora || esAsistente },
     { to: "/ordenes-trabajo", label: "Orden de Trabajo", Icon: IconClipboard, show: esComercial || esTecnico || esSupervisor || esPlanner || esJefatura || esCoordinadora },
     { to: "/cotizaciones", label: "Cotizaciones", Icon: IconDocument, show: esComercial || esPlanner || esJefatura || esCoordinadora },
     { to: "/ordenes-compra", label: "Órdenes de Compra", Icon: IconCart, show: esComercial || esFacturacion || esJefatura || esCoordinadora },

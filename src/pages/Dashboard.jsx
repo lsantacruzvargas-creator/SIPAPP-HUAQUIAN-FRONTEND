@@ -186,6 +186,68 @@ function porFecha(arr, campoFecha, ano, mes) {
   });
 }
 
+// ── Dashboard de Planner / Coordinadora ──────────────────────────────────────
+// Vista específica pedida por el usuario — reemplaza por completo el
+// contenido del dashboard de admin/jefatura para estos dos roles (no se
+// combinan). Un track (Prueba o Intervención) se considera "listo" cuando
+// llegó a completado/entregado — mismo criterio que ya usa la vista
+// simplificada de OTs (ListaOrdenesTrabajo.jsx: esTrackListo/categoriaGlobal).
+function DashboardPlanner({ ots, ocs }) {
+  const totalOTs = ots.length;
+  const esTrackListo = (o) =>
+    ["completado", "entregado"].includes(o.estado) || ["completado", "entregado"].includes(o.estadoPrueba);
+
+  const pendientes  = ots.filter((o) => o.estadoGeneral === "no asignado").length;
+  const enProgreso  = ots.filter((o) => o.estadoGeneral !== "no asignado" && !esTrackListo(o)).length;
+  const completadas = ots.filter((o) => esTrackListo(o) && !o.informesAprobados).length;
+  const entregadas  = ots.filter((o) => esTrackListo(o) && o.informesAprobados).length;
+
+  // "Completadas o entregadas" = cualquier OT cuyo track ya llegó al final,
+  // sin importar si el informe quedó aprobado o no — sobre ESE subconjunto
+  // se mide cuántas todavía no tienen informe / no tienen OC vinculada (un
+  // trabajo terminado sin su papeleo es la señal de alerta real; contar
+  // "sin informe" sobre el total mezclaría OTs que ni siquiera empezaron).
+  const completadasOEntregadas = ots.filter((o) => esTrackListo(o));
+  const conInforme = completadasOEntregadas.filter((o) => o.estadoInformes !== "pendiente").length;
+
+  const cotizacionesConOC = new Set(ocs.map((oc) => oc.cotizacion?._id).filter(Boolean));
+  const tieneOC = (o) => !!o.cotizacion && cotizacionesConOC.has(o.cotizacion._id || o.cotizacion);
+  const conOC = completadasOEntregadas.filter(tieneOC).length;
+
+  return (
+    <div className="p-6 space-y-8 max-w-6xl mx-auto">
+      <div>
+        <h2 className="text-xl font-bold text-gray-800">Panel de Órdenes de Trabajo</h2>
+        <p className="text-sm text-gray-400 mt-0.5">Indicadores de avance — {totalOTs} OTs en total</p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        <KpiCard label="OTs pendientes"   value={pendientes}  sub={`de ${totalOTs} OTs en total`} color="amber" />
+        <KpiCard label="OTs en progreso"  value={enProgreso}  sub={`de ${totalOTs} OTs en total`} color="blue"  />
+        <KpiCard label="OTs completadas"  value={completadas} sub={`de ${totalOTs} OTs en total`} color="green" />
+        <KpiCard label="OTs entregadas"   value={entregadas}  sub={`de ${totalOTs} OTs en total`} color="green" />
+      </div>
+
+      <div className="rounded-2xl border border-gray-100 bg-white shadow-sm p-5 flex flex-col gap-5">
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+          Papeleo pendiente en OTs ya completadas o entregadas
+        </p>
+        <FilaConversion
+          labelOrigen="OTs completadas o entregadas" labelDestino="Informe"
+          totalOrigen={completadasOEntregadas.length} enlazados={conInforme}
+          colorBarra="bg-sky-500" colorDestino="text-sky-700"
+        />
+        <div className="border-t border-gray-100" />
+        <FilaConversion
+          labelOrigen="OTs completadas o entregadas" labelDestino="OC"
+          totalOrigen={completadasOEntregadas.length} enlazados={conOC}
+          colorBarra="bg-violet-500" colorDestino="text-violet-700"
+        />
+      </div>
+    </div>
+  );
+}
+
 // ── Dashboard principal ──────────────────────────────────────────────────────
 export default function Dashboard() {
   const usuario = JSON.parse(sessionStorage.getItem("usuario") ?? "null");
@@ -267,6 +329,13 @@ export default function Dashboard() {
 
   if (cargando) {
     return <div className="p-8 text-sm text-gray-400">Cargando dashboard…</div>;
+  }
+
+  // Planner, Coordinadora y Administración ("asistente" es el valor de rol
+  // real, ver Sidebar.jsx) ven un panel completamente distinto (a pedido
+  // explícito del usuario) — nunca el dashboard de admin/jefatura de abajo.
+  if (["planner", "coordinadora", "asistente"].includes(usuario?.rol)) {
+    return <DashboardPlanner ots={ots} ocs={ocs} />;
   }
 
   return (
