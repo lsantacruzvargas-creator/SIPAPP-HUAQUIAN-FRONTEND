@@ -30,7 +30,13 @@ export default function Empresas() {
 
   const empresasFiltradas = empresas.filter((e) => {
     const q = filtro.toLowerCase();
-    return e.razonSocial.toLowerCase().includes(q) || e.ruc.includes(q);
+    // razonSocial siempre existe (requerido en el modelo), pero ruc no —
+    // muchas empresas importadas de OTs históricas no lo tienen (ver
+    // Backend/src/models/Empresa.js). Sin optional chaining, `e.ruc.includes`
+    // tira TypeError apenas hay una empresa sin RUC que no matchea por
+    // nombre, y filter() completo revienta silenciosamente (el input parece
+    // "no hacer nada").
+    return e.razonSocial?.toLowerCase().includes(q) || e.ruc?.toLowerCase().includes(q);
   });
 
   const abrirNuevo = () => {
