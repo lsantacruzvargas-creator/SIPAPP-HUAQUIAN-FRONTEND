@@ -392,8 +392,8 @@ export default function EmitirComprobante() {
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-ink">Emitir Comprobante</h2>
-        {resultado?.ok && <span className="font-mono text-sm text-ink-muted">{resultado.serie}</span>}
+        <h2 className="text-xl font-semibold text-gray-800">Emitir Comprobante</h2>
+        {resultado?.ok && <span className="font-mono text-sm text-gray-400">{resultado.serie}</span>}
       </div>
 
       {resultado?.estado === "ACEPTADO" && (
@@ -415,8 +415,8 @@ export default function EmitirComprobante() {
 
       <form onSubmit={(e) => e.preventDefault()}>
         {/* Selector tipo doc */}
-        <div className="bg-surface rounded-xl border border-line shadow-sm px-5 py-4 mb-5 flex items-center gap-4">
-          <span className="text-sm font-medium text-ink-soft">Tipo de comprobante:</span>
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-5 py-4 mb-5 flex items-center gap-4">
+          <span className="text-sm font-medium text-gray-500">Tipo de comprobante:</span>
           {[["01", "Factura"], ["03", "Boleta"], ["07", "Nota de Crédito"], ["08", "Nota de Débito"]].map(([v, label]) => (
             <button
               key={v} type="button" disabled={ro}
@@ -424,7 +424,7 @@ export default function EmitirComprobante() {
               className={`px-5 py-1.5 rounded-full text-sm font-medium transition ${
                 tipoDoc === v
                   ? "bg-gray-900 text-white"
-                  : "border border-line-strong text-ink-soft hover:border-line-strong hover:text-ink"
+                  : "border border-gray-300 text-gray-500 hover:border-gray-300 hover:text-gray-800"
               } disabled:cursor-not-allowed`}
             >
               {label}
@@ -433,20 +433,20 @@ export default function EmitirComprobante() {
         </div>
 
         {/* Cabecera */}
-        <div className="bg-surface rounded-xl border border-line shadow-sm p-6 mb-5">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mb-5">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-ink-soft mb-1">Empresa emisora</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Empresa emisora</label>
               <input value={`${NOMBRE_EMISOR} — RUC ${RUC_EMISOR}`} disabled
-                className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-ink-soft mb-1">Serie</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Serie</label>
               <input value={serie} disabled
-                className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-ink-soft mb-1">Moneda</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Moneda</label>
               <div className="flex gap-3">
                 {TIPO_MONEDA.map((m) => (
                   <button
@@ -455,7 +455,7 @@ export default function EmitirComprobante() {
                     className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
                       moneda === m.valor
                         ? "bg-gray-900 text-white"
-                        : "border border-line-strong text-ink-soft hover:border-line-strong hover:text-ink"
+                        : "border border-gray-300 text-gray-500 hover:border-gray-300 hover:text-gray-800"
                     } disabled:cursor-not-allowed`}
                   >
                     {m.valor}
@@ -467,7 +467,7 @@ export default function EmitirComprobante() {
             {!esNota ? (
               <>
                 <div>
-                  <label className="block text-xs font-medium text-ink-soft mb-1">Forma de pago</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Forma de pago</label>
                   <div className="flex gap-3">
                     {["Contado", "Credito"].map((v) => (
                       <button
@@ -476,7 +476,7 @@ export default function EmitirComprobante() {
                         className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
                           formaPago === v
                             ? "bg-gray-900 text-white"
-                            : "border border-line-strong text-ink-soft hover:border-line-strong hover:text-ink"
+                            : "border border-gray-300 text-gray-500 hover:border-gray-300 hover:text-gray-800"
                         } disabled:cursor-not-allowed`}
                       >
                         {v === "Contado" ? "Contado" : "Crédito"}
@@ -487,14 +487,14 @@ export default function EmitirComprobante() {
                 {formaPago === "Credito" && (
                   <div className="col-span-2 mt-2">
                     <div className="flex items-center justify-between mb-2">
-                      <label className="block text-xs font-medium text-ink-soft">Cuotas de pago<Oblig /></label>
-                      <span className="text-xs text-ink-muted">
+                      <label className="block text-xs font-medium text-gray-500">Cuotas de pago<Oblig /></label>
+                      <span className="text-xs text-gray-400">
                         Monto neto pendiente: {moneda} {totalGeneral.toFixed(2)}
                       </span>
                     </div>
-                    <div className="border border-line rounded-lg overflow-hidden">
+                    <div className="border border-gray-100 rounded-lg overflow-hidden">
                       <table className="w-full text-sm">
-                        <thead className="bg-surface-alt text-xs uppercase tracking-wide border-b border-line">
+                        <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b border-gray-100">
                           <tr>
                             <th className="px-3 py-2 text-left w-20">Cuota</th>
                             <th className="px-3 py-2 text-left">Monto<Oblig /></th>
@@ -505,7 +505,7 @@ export default function EmitirComprobante() {
                         <tbody className="divide-y divide-gray-100">
                           {cuotas.map((c, idx) => (
                             <tr key={c._key}>
-                              <td className="px-3 py-2 text-ink-muted">Cuota{String(idx + 1).padStart(3, "0")}</td>
+                              <td className="px-3 py-2 text-gray-400">Cuota{String(idx + 1).padStart(3, "0")}</td>
                               <td className="px-3 py-2">
                                 <input type="number" min="0" step="0.01" value={c.monto}
                                   onChange={(e) => handleCuota(c._key, "monto", e.target.value)}
@@ -528,9 +528,9 @@ export default function EmitirComprobante() {
                         </tbody>
                       </table>
                       {!ro && (
-                        <div className="px-3 py-2 border-t border-line bg-surface-alt/50 flex items-center justify-between">
+                        <div className="px-3 py-2 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between">
                           <button type="button" onClick={agregarCuota}
-                            className="text-sm text-ink-soft hover:text-ink transition">
+                            className="text-sm text-gray-500 hover:text-gray-800 transition">
                             + Agregar cuota
                           </button>
                           <span className={`text-xs font-medium ${Math.abs(sumaCuotas - totalGeneral) < 0.01 ? "text-green-600" : "text-red-500"}`}>
@@ -545,10 +545,10 @@ export default function EmitirComprobante() {
             ) : (
               <>
                 <div className="col-span-2">
-                  <label className="block text-xs font-medium text-ink-soft mb-1">Comprobante a modificar<Oblig /></label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Comprobante a modificar<Oblig /></label>
                   <select value={referencia.id} onChange={(e) => ligarComprobanteRef(e.target.value)}
                     disabled={ro || !rucEmisor} required
-                    className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft">
+                    className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500">
                     <option value="">— Seleccionar —</option>
                     {comprobantesRef.map((c) => (
                       <option key={c._id} value={c._id}>
@@ -558,9 +558,9 @@ export default function EmitirComprobante() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-ink-soft mb-1">Motivo<Oblig /></label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Motivo<Oblig /></label>
                   <select value={motivoCodigo} onChange={(e) => setMotivoCodigo(e.target.value)} disabled={ro} required
-                    className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft">
+                    className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500">
                     <option value="">— Seleccionar —</option>
                     {(tipoDoc === "07" ? MOTIVO_NC : MOTIVO_ND).map((m) => (
                       <option key={m.valor} value={m.valor}>{m.label}</option>
@@ -568,9 +568,9 @@ export default function EmitirComprobante() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-ink-soft mb-1">Descripción del motivo<Oblig /></label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Descripción del motivo<Oblig /></label>
                   <input value={motivoDescripcion} onChange={(e) => setMotivoDescripcion(e.target.value)} disabled={ro} required
-                    className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                    className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
                 </div>
               </>
             )}
@@ -578,39 +578,39 @@ export default function EmitirComprobante() {
         </div>
 
         {/* Receptor */}
-        <div className="bg-surface rounded-xl border border-line shadow-sm p-6 mb-5">
-          <p className="text-xs font-semibold text-ink-soft uppercase tracking-wide mb-3">Receptor</p>
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mb-5">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Receptor</p>
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-medium text-ink-soft mb-1">Tipo de documento</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Tipo de documento</label>
               <select name="schemeID" value={receptor.schemeID} onChange={handleReceptor}
                 disabled={ro || tipoDoc === "01"}
-                className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft">
+                className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500">
                 {TIPO_DOC_RECEPTOR.map((t) => (
                   <option key={t.valor} value={t.valor}>{t.label}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-ink-soft mb-1">
+              <label className="block text-xs font-medium text-gray-500 mb-1">
                 Número de documento<Oblig />
-                {buscandoDoc && <span className="ml-2 text-ink-muted font-normal">Consultando SUNAT…</span>}
+                {buscandoDoc && <span className="ml-2 text-gray-400 font-normal">Consultando SUNAT…</span>}
               </label>
               <input name="numDoc" value={receptor.numDoc} onChange={handleReceptor}
                 onBlur={(e) => buscarReceptorRuc(e.target.value)} disabled={ro} required
-                className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-ink-soft mb-1">Nombre / Razón social<Oblig /></label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Nombre / Razón social<Oblig /></label>
               <input name="nombre" value={receptor.nombre} onChange={handleReceptor} disabled={ro} required
-                className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
             </div>
           </div>
         </div>
 
         {/* Tipo de operación (bien o servicio) — decide la unidad válida para TODOS los ítems */}
-        <div className="bg-surface rounded-xl border border-line shadow-sm px-5 py-4 mb-5 flex items-center gap-4">
-          <span className="text-sm font-medium text-ink-soft">Este comprobante es por:</span>
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-5 py-4 mb-5 flex items-center gap-4">
+          <span className="text-sm font-medium text-gray-500">Este comprobante es por:</span>
           {TIPO_ITEM.map((t) => (
             <button
               key={t.valor} type="button" disabled={ro}
@@ -618,7 +618,7 @@ export default function EmitirComprobante() {
               className={`px-5 py-1.5 rounded-full text-sm font-medium transition ${
                 tipoBienServicio === t.valor
                   ? "bg-gray-900 text-white"
-                  : "border border-line-strong text-ink-soft hover:border-line-strong hover:text-ink"
+                  : "border border-gray-300 text-gray-500 hover:border-gray-300 hover:text-gray-800"
               } disabled:cursor-not-allowed`}
             >
               {t.label}
@@ -627,10 +627,10 @@ export default function EmitirComprobante() {
         </div>
 
         {/* Tabla de items */}
-        <div className="bg-surface rounded-xl border border-line shadow-sm overflow-hidden mb-5">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-5">
           <div className="overflow-x-auto">
             <table className="erp-table w-full text-sm min-w-[900px]">
-              <thead className="bg-surface-alt text-xs uppercase tracking-wide border-b-2 border-line">
+              <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-100">
                 <tr>
                   <th className="px-3 py-3 text-center w-8">#</th>
                   <th className="px-3 py-3 text-left">Descripción<Oblig /></th>
@@ -645,8 +645,8 @@ export default function EmitirComprobante() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {itemsCalc.map((item, idx) => (
-                  <tr key={item._key} className="hover:bg-surface-alt/50">
-                    <td className="px-3 py-2 text-center text-ink-muted">{idx + 1}</td>
+                  <tr key={item._key} className="hover:bg-gray-50/50">
+                    <td className="px-3 py-2 text-center text-gray-400">{idx + 1}</td>
                     <td className="px-3 py-2">
                       <input value={item.descripcion}
                         onChange={(e) => handleItem(item._key, "descripcion", e.target.value)}
@@ -687,7 +687,7 @@ export default function EmitirComprobante() {
                         disabled={ro}
                         className="w-full input-field w-auto" />
                     </td>
-                    <td className="px-3 py-2 text-right font-medium text-ink">
+                    <td className="px-3 py-2 text-right font-medium text-gray-800">
                       {item.total.toFixed(2)}
                     </td>
                     {!ro && (
@@ -698,24 +698,24 @@ export default function EmitirComprobante() {
                   </tr>
                 ))}
               </tbody>
-              <tfoot className="border-t-2 border-line bg-surface-alt">
+              <tfoot className="border-t-2 border-gray-100 bg-gray-50">
                 <tr>
-                  <td colSpan={7} className="px-4 py-2 text-right text-xs text-ink-soft">Descuentos</td>
+                  <td colSpan={7} className="px-4 py-2 text-right text-xs text-gray-500">Descuentos</td>
                   <td className="px-3 py-2 text-right font-medium">{totales.descuento.toFixed(2)}</td>
                   {!ro && <td />}
                 </tr>
                 <tr>
-                  <td colSpan={7} className="px-4 py-2 text-right text-xs text-ink-soft">Base imponible</td>
+                  <td colSpan={7} className="px-4 py-2 text-right text-xs text-gray-500">Base imponible</td>
                   <td className="px-3 py-2 text-right font-medium">{totales.base.toFixed(2)}</td>
                   {!ro && <td />}
                 </tr>
                 <tr>
-                  <td colSpan={7} className="px-4 py-2 text-right text-xs text-ink-soft">IGV</td>
+                  <td colSpan={7} className="px-4 py-2 text-right text-xs text-gray-500">IGV</td>
                   <td className="px-3 py-2 text-right font-medium">{totales.igv.toFixed(2)}</td>
                   {!ro && <td />}
                 </tr>
                 <tr>
-                  <td colSpan={7} className="px-4 py-2 text-right text-xs text-ink-soft">Otros cargos (no afectos a IGV)</td>
+                  <td colSpan={7} className="px-4 py-2 text-right text-xs text-gray-500">Otros cargos (no afectos a IGV)</td>
                   <td className="px-3 py-2 text-right">
                     {ro ? otrosCargosNum.toFixed(2) : (
                       <input type="number" min="0" step="0.01" value={otrosCargos}
@@ -727,7 +727,7 @@ export default function EmitirComprobante() {
                   {!ro && <td />}
                 </tr>
                 <tr>
-                  <td colSpan={7} className="px-4 py-2 text-right text-xs text-ink-soft">Monto de redondeo</td>
+                  <td colSpan={7} className="px-4 py-2 text-right text-xs text-gray-500">Monto de redondeo</td>
                   <td className="px-3 py-2 text-right">
                     {ro ? montoRedondeoNum.toFixed(2) : (
                       <input type="number" step="0.01" value={montoRedondeo}
@@ -739,17 +739,17 @@ export default function EmitirComprobante() {
                   {!ro && <td />}
                 </tr>
                 <tr>
-                  <td colSpan={7} className="px-4 py-2 text-right text-sm font-semibold text-ink">Total a pagar</td>
-                  <td className="px-3 py-2 text-right font-bold text-ink text-base">{moneda} {totalGeneral.toFixed(2)}</td>
+                  <td colSpan={7} className="px-4 py-2 text-right text-sm font-semibold text-gray-800">Total a pagar</td>
+                  <td className="px-3 py-2 text-right font-bold text-gray-800 text-base">{moneda} {totalGeneral.toFixed(2)}</td>
                   {!ro && <td />}
                 </tr>
               </tfoot>
             </table>
           </div>
           {!ro && (
-            <div className="px-4 py-3 border-t border-line">
+            <div className="px-4 py-3 border-t border-gray-100">
               <button type="button" onClick={agregarItem}
-                className="text-sm text-ink-soft hover:text-ink transition">
+                className="text-sm text-gray-500 hover:text-gray-800 transition">
                 + Agregar ítem
               </button>
             </div>
@@ -757,27 +757,27 @@ export default function EmitirComprobante() {
         </div>
 
         {/* Información adicional */}
-        <div className="bg-surface rounded-xl border border-line shadow-sm p-6 mb-5">
-          <p className="text-xs font-semibold text-ink-soft uppercase tracking-wide mb-3">Información adicional</p>
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mb-5">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Información adicional</p>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-ink-soft mb-1">Observaciones</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Observaciones</label>
               <textarea value={observaciones} onChange={(e) => setObservaciones(e.target.value)}
                 disabled={ro} rows={2}
-                className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-ink-soft mb-1">Información relacionada</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Información relacionada</label>
               <textarea value={informacionRelacionada} onChange={(e) => setInformacionRelacionada(e.target.value)}
                 disabled={ro} rows={2}
-                className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
             </div>
           </div>
 
           {!esNota && (
             <>
-              <div className="mt-4 pt-4 border-t border-line">
-                <label className="flex items-center gap-2 text-sm font-medium text-ink-soft mb-3">
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-500 mb-3">
                   <input type="checkbox" checked={detraccionAplica} disabled={ro}
                     onChange={(e) => setDetraccionAplica(e.target.checked)} />
                   Operación sujeta a detracción
@@ -785,7 +785,7 @@ export default function EmitirComprobante() {
                 {detraccionAplica && (
                   <div className="grid grid-cols-4 gap-4">
                     <div className="col-span-2">
-                      <label className="block text-xs font-medium text-ink-soft mb-1">Bien / servicio<Oblig /></label>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Bien / servicio<Oblig /></label>
                       <select value={detraccionCodigoBien} disabled={ro} required
                         onChange={(e) => {
                           const cod = e.target.value;
@@ -793,7 +793,7 @@ export default function EmitirComprobante() {
                           const b = DETRACCION_BIENES_SERVICIOS.find((x) => x.codigo === cod);
                           if (b?.porcentaje != null) setDetraccionPorcentaje(String(b.porcentaje));
                         }}
-                        className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft">
+                        className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500">
                         <option value="">— Seleccionar —</option>
                         {DETRACCION_BIENES_SERVICIOS.map((b) => (
                           <option key={b.codigo} value={b.codigo}>{b.codigo} — {b.descripcion}</option>
@@ -801,37 +801,37 @@ export default function EmitirComprobante() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-ink-soft mb-1">Porcentaje (%)<Oblig /></label>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Porcentaje (%)<Oblig /></label>
                       <input type="number" min="0" max="100" step="0.1" value={detraccionPorcentaje}
                         onChange={(e) => setDetraccionPorcentaje(e.target.value)} disabled={ro} required
-                        className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                        className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-ink-soft mb-1">Monto neto a depositar<Oblig /></label>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Monto neto a depositar<Oblig /></label>
                       <input type="number" min="0" step="0.01" value={detraccionMontoNeto}
                         onChange={(e) => setDetraccionMontoNeto(e.target.value)} disabled={ro} required
-                        className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                        className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
                     </div>
                     <div className="col-span-4">
-                      <label className="block text-xs font-medium text-ink-soft mb-1">Cuenta Banco de la Nación<Oblig /></label>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Cuenta Banco de la Nación<Oblig /></label>
                       <input value={detraccionCuentaBancaria}
                         onChange={(e) => setDetraccionCuentaBancaria(e.target.value)} disabled={ro} required
-                        className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                        className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
                     </div>
                   </div>
                 )}
               </div>
 
-              <div className="mt-4 pt-4 border-t border-line">
-                <label className="block text-xs font-medium text-ink-soft mb-1">N° Orden de Compra (opcional)</label>
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <label className="block text-xs font-medium text-gray-500 mb-1">N° Orden de Compra (opcional)</label>
                 <div className="flex gap-2">
                   <input value={numeroOrdenCompra}
                     onChange={(e) => { setNumeroOrdenCompra(e.target.value); setOrdenCompraId(""); }}
                     disabled={ro}
-                    className="flex-1 input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                    className="flex-1 input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
                   {!ro && (
                     <button type="button" onClick={abrirBuscadorOC}
-                      className="px-4 py-2 rounded-lg text-sm border border-line-strong text-ink-soft hover:text-ink transition">
+                      className="px-4 py-2 rounded-lg text-sm border border-gray-300 text-gray-500 hover:text-gray-800 transition">
                       Buscar
                     </button>
                   )}
@@ -865,9 +865,9 @@ export default function EmitirComprobante() {
 
       {confirmando && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-surface rounded-xl shadow-xl p-6 w-full max-w-sm">
-            <h3 className="font-semibold text-ink mb-2">¿Emitir comprobante?</h3>
-            <p className="text-sm text-ink-soft mb-4">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm">
+            <h3 className="font-semibold text-gray-800 mb-2">¿Emitir comprobante?</h3>
+            <p className="text-sm text-gray-500 mb-4">
               Se enviará a SUNAT a través del hub. Esta acción genera un correlativo nuevo aunque el comprobante sea rechazado.
             </p>
             {tipoDoc === "07" && (
@@ -878,7 +878,7 @@ export default function EmitirComprobante() {
             )}
             <div className="flex justify-end gap-3">
               <button onClick={() => setConfirmando(false)}
-                className="border border-line-strong text-ink px-4 py-2 rounded-lg text-sm hover:bg-surface-alt transition">
+                className="border border-gray-300 text-gray-800 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition">
                 Cancelar
               </button>
               <button onClick={async () => { setConfirmando(false); await emitir(); }}
@@ -893,24 +893,24 @@ export default function EmitirComprobante() {
 
       {mostrarBuscadorOC && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
-          <div className="bg-surface rounded-xl shadow-xl p-6 w-full max-w-2xl max-h-[80vh] flex flex-col">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-2xl max-h-[80vh] flex flex-col">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="font-semibold text-ink">Buscar Orden de Compra</h3>
-              <button type="button" onClick={() => setMostrarBuscadorOC(false)} className="text-ink-muted hover:text-ink">✕</button>
+              <h3 className="font-semibold text-gray-800">Buscar Orden de Compra</h3>
+              <button type="button" onClick={() => setMostrarBuscadorOC(false)} className="text-gray-400 hover:text-gray-800">✕</button>
             </div>
             <input value={filtroOC} onChange={(e) => setFiltroOC(e.target.value)}
               placeholder="Buscar por N° de orden, título o empresa..."
               className="w-full input-field w-auto mb-3" />
             <div className="overflow-y-auto flex-1 divide-y divide-gray-100">
-              {buscandoOC && <p className="text-sm text-ink-muted py-4 text-center">Cargando…</p>}
+              {buscandoOC && <p className="text-sm text-gray-400 py-4 text-center">Cargando…</p>}
               {!buscandoOC && ordenesCompraFiltradas.length === 0 && (
-                <p className="text-sm text-ink-muted py-4 text-center">Sin resultados.</p>
+                <p className="text-sm text-gray-400 py-4 text-center">Sin resultados.</p>
               )}
               {ordenesCompraFiltradas.map((o) => (
                 <button key={o._id} type="button" onClick={() => elegirOC(o)}
-                  className="w-full text-left px-3 py-2 hover:bg-surface-alt transition text-sm">
-                  <div className="font-medium text-ink">{o.numeroOrden || o.codigo} — {o.titulo}</div>
-                  <div className="text-xs text-ink-muted">{o.empresa?.razonSocial || "—"} · S/ {Number(o.monto).toFixed(2)}</div>
+                  className="w-full text-left px-3 py-2 hover:bg-gray-50 transition text-sm">
+                  <div className="font-medium text-gray-800">{o.numeroOrden || o.codigo} — {o.titulo}</div>
+                  <div className="text-xs text-gray-400">{o.empresa?.razonSocial || "—"} · S/ {Number(o.monto).toFixed(2)}</div>
                 </button>
               ))}
             </div>

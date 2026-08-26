@@ -61,7 +61,7 @@ function Ayuda({ texto }) {
   return (
     <span
       title={texto}
-      className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-line-strong text-ink-muted text-[10px] font-bold ml-1.5 cursor-help select-none align-middle"
+      className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-gray-300 text-gray-400 text-[10px] font-bold ml-1.5 cursor-help select-none align-middle"
     >
       ?
     </span>
@@ -429,8 +429,8 @@ export default function EmitirGuia() {
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-ink">Emitir Guía de Remisión</h2>
-        {resultado?.ok && <span className="font-mono text-sm text-ink-muted">{resultado.nombre}</span>}
+        <h2 className="text-xl font-semibold text-gray-800">Emitir Guía de Remisión</h2>
+        {resultado?.ok && <span className="font-mono text-sm text-gray-400">{resultado.nombre}</span>}
       </div>
 
       {prellenado && !resultado && (
@@ -451,8 +451,8 @@ export default function EmitirGuia() {
 
       <form onSubmit={(e) => e.preventDefault()}>
         {/* Tipo de guía */}
-        <div className="bg-surface rounded-xl border border-line shadow-sm px-5 py-4 mb-5 flex items-center gap-4">
-          <span className="text-sm font-medium text-ink-soft flex items-center">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-5 py-4 mb-5 flex items-center gap-4">
+          <span className="text-sm font-medium text-gray-500 flex items-center">
             Tipo de guía:
             <Ayuda texto="Remitente: el emisor es el dueño de la carga que traslada. Transportista: el emisor solo presta el servicio de transporte para la carga de otra empresa (remitente)." />
           </span>
@@ -463,7 +463,7 @@ export default function EmitirGuia() {
               className={`px-5 py-1.5 rounded-full text-sm font-medium transition ${
                 tipoGuia === t.valor
                   ? "bg-gray-900 text-white"
-                  : "border border-line-strong text-ink-soft hover:border-line-strong hover:text-ink"
+                  : "border border-gray-300 text-gray-500 hover:border-gray-300 hover:text-gray-800"
               } disabled:cursor-not-allowed`}
             >
               {t.label}
@@ -472,27 +472,27 @@ export default function EmitirGuia() {
         </div>
 
         {/* Cabecera */}
-        <div className="bg-surface rounded-xl border border-line shadow-sm p-6 mb-5">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mb-5">
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-medium text-ink-soft mb-1">Empresa emisora</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Empresa emisora</label>
               <input value={`${NOMBRE_EMISOR} — RUC ${RUC_EMISOR}`} disabled
-                className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-ink-soft mb-1">Serie</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Serie</label>
               <input value={serie} disabled
-                className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-ink-soft mb-1">Fecha de traslado<Oblig /></label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Fecha de traslado<Oblig /></label>
               <input type="date" value={fechaTraslado} onChange={(e) => setFechaTraslado(e.target.value)}
                 disabled={ro} required
-                className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-ink-soft mb-1 flex items-center">
+              <label className="block text-xs font-medium text-gray-500 mb-1 flex items-center">
                 Modalidad de traslado
                 <Ayuda texto="Público: el traslado lo realiza una empresa de transporte con RUC propio (se registra el transportista). Privado: el emisor traslada la carga con su propio vehículo y conductor." />
               </label>
@@ -504,7 +504,7 @@ export default function EmitirGuia() {
                     className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
                       modalidadTraslado === m.valor
                         ? "bg-gray-900 text-white"
-                        : "border border-line-strong text-ink-soft hover:border-line-strong hover:text-ink"
+                        : "border border-gray-300 text-gray-500 hover:border-gray-300 hover:text-gray-800"
                     } disabled:cursor-not-allowed`}
                   >
                     {m.label}
@@ -513,9 +513,9 @@ export default function EmitirGuia() {
               </div>
             </div>
             <div>
-              <label className="block text-xs font-medium text-ink-soft mb-1">Motivo de traslado</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Motivo de traslado</label>
               <select value={motivoTraslado} onChange={(e) => setMotivoTraslado(e.target.value)} disabled={ro}
-                className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft">
+                className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500">
                 {MOTIVO_TRASLADO.map((m) => (
                   <option key={m.valor} value={m.valor}>{m.label}</option>
                 ))}
@@ -523,45 +523,45 @@ export default function EmitirGuia() {
             </div>
             {motivoTraslado === "13" && (
               <div>
-                <label className="block text-xs font-medium text-ink-soft mb-1">Describe el motivo<Oblig /></label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Describe el motivo<Oblig /></label>
                 <input value={descripcionMotivo} onChange={(e) => setDescripcionMotivo(e.target.value)}
                   disabled={ro} required
-                  className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                  className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
               </div>
             )}
 
             <div>
-              <label className="block text-xs font-medium text-ink-soft mb-1">Peso bruto total<Oblig /></label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Peso bruto total<Oblig /></label>
               <input type="number" min="0" step="0.01" value={pesoBrutoTotal}
                 onChange={(e) => setPesoBrutoTotal(e.target.value)} disabled={ro} required
-                className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-ink-soft mb-1">Unidad de peso</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Unidad de peso</label>
               <select value={unidadPeso} onChange={(e) => setUnidadPeso(e.target.value)} disabled={ro}
-                className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft">
+                className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500">
                 {UNIDAD_PESO.map((u) => (
                   <option key={u.valor} value={u.valor}>{u.label}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-ink-soft mb-1">N.º de bultos (opcional)</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">N.º de bultos (opcional)</label>
               <input type="number" min="0" step="1" value={numeroBultos}
                 onChange={(e) => setNumeroBultos(e.target.value)} disabled={ro}
-                className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
             </div>
           </div>
         </div>
 
         {/* Ligar a comprobante */}
         {!ro && (
-          <div className="bg-surface rounded-xl border border-line shadow-sm p-6 mb-5">
-            <p className="text-xs font-semibold text-ink-soft uppercase tracking-wide mb-3">
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mb-5">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
               Ligar a factura/boleta ya emitida (opcional)
             </p>
             <select value={comprobanteId} onChange={(e) => ligarComprobante(e.target.value)} disabled={!rucEmisor}
-              className="w-full input-field disabled:bg-surface-alt disabled:text-ink-soft">
+              className="w-full input-field disabled:bg-gray-50 disabled:text-gray-500">
               <option value="">— Sin ligar (llenar destinatario e ítems manualmente) —</option>
               {comprobantes.map((c) => (
                 <option key={c._id} value={c._id}>
@@ -570,7 +570,7 @@ export default function EmitirGuia() {
               ))}
             </select>
             {comprobanteId && (
-              <p className="text-xs text-ink-muted mt-2">
+              <p className="text-xs text-gray-400 mt-2">
                 Destinatario e ítems se cargaron desde el comprobante seleccionado — puedes editarlos si es necesario.
               </p>
             )}
@@ -578,64 +578,64 @@ export default function EmitirGuia() {
         )}
 
         {/* Destinatario */}
-        <div className="bg-surface rounded-xl border border-line shadow-sm p-6 mb-5">
-          <p className="text-xs font-semibold text-ink-soft uppercase tracking-wide mb-3">Destinatario</p>
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mb-5">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Destinatario</p>
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-medium text-ink-soft mb-1">Tipo de documento</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Tipo de documento</label>
               <select name="schemeID" value={destinatario.schemeID} onChange={campoDestinatario} disabled={ro}
-                className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft">
+                className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500">
                 {TIPO_DOC_RECEPTOR.map((t) => (
                   <option key={t.valor} value={t.valor}>{t.label}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-ink-soft mb-1">
+              <label className="block text-xs font-medium text-gray-500 mb-1">
                 Número de documento<Oblig />
-                {buscandoDoc && <span className="ml-2 text-ink-muted font-normal">Consultando SUNAT…</span>}
+                {buscandoDoc && <span className="ml-2 text-gray-400 font-normal">Consultando SUNAT…</span>}
               </label>
               <input name="numDoc" value={destinatario.numDoc} onChange={campoDestinatario}
                 onBlur={(e) => destinatario.schemeID === "6" && buscarRuc(e.target.value, setDestinatario, "nombre", setPuntoLlegada)}
                 disabled={ro} required
-                className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-ink-soft mb-1">Nombre / Razón social<Oblig /></label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Nombre / Razón social<Oblig /></label>
               <input name="nombre" value={destinatario.nombre} onChange={campoDestinatario} disabled={ro} required
-                className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
             </div>
           </div>
         </div>
 
         {/* Remitente (solo guía de transportista) */}
         {tipoGuia === "TRANSPORTISTA" && (
-          <div className="bg-surface rounded-xl border border-line shadow-sm p-6 mb-5">
-            <p className="text-xs font-semibold text-ink-soft uppercase tracking-wide mb-3 flex items-center">
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mb-5">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center">
               Remitente (dueño de la carga)
               <Ayuda texto="Obligatorio cuando el emisor es el transportista: identifica a la empresa dueña de la mercadería que se traslada." />
             </p>
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="block text-xs font-medium text-ink-soft mb-1">Tipo de documento</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Tipo de documento</label>
                 <select name="schemeID" value={remitente.schemeID} onChange={campoRemitente} disabled={ro}
-                  className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft">
+                  className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500">
                   {TIPO_DOC_RECEPTOR.map((t) => (
                     <option key={t.valor} value={t.valor}>{t.label}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-ink-soft mb-1">Número de documento<Oblig /></label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Número de documento<Oblig /></label>
                 <input name="numDoc" value={remitente.numDoc} onChange={campoRemitente}
                   onBlur={(e) => remitente.schemeID === "6" && buscarRuc(e.target.value, setRemitente, "nombre", setPuntoPartida)}
                   disabled={ro} required
-                  className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                  className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-ink-soft mb-1">Nombre / Razón social<Oblig /></label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Nombre / Razón social<Oblig /></label>
                 <input name="nombre" value={remitente.nombre} onChange={campoRemitente} disabled={ro} required
-                  className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                  className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
               </div>
             </div>
           </div>
@@ -643,32 +643,32 @@ export default function EmitirGuia() {
 
         {/* Proveedor (solo motivo de traslado 02-Compra, 07-Recojo de bienes transformados u 13-Otros) */}
         {MOTIVOS_PROVEEDOR.includes(motivoTraslado) && (
-          <div className="bg-surface rounded-xl border border-line shadow-sm p-6 mb-5">
-            <p className="text-xs font-semibold text-ink-soft uppercase tracking-wide mb-3 flex items-center">
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mb-5">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center">
               Proveedor (opcional)
               <Ayuda texto="Solo aplica cuando el motivo de traslado es Compra, Recojo de bienes transformados u Otros." />
             </p>
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="block text-xs font-medium text-ink-soft mb-1">Tipo de documento</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Tipo de documento</label>
                 <select name="schemeID" value={proveedor.schemeID} onChange={campoProveedor} disabled={ro}
-                  className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft">
+                  className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500">
                   {TIPO_DOC_RECEPTOR.map((t) => (
                     <option key={t.valor} value={t.valor}>{t.label}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-ink-soft mb-1">Número de documento</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Número de documento</label>
                 <input name="numDoc" value={proveedor.numDoc} onChange={campoProveedor}
                   onBlur={(e) => proveedor.schemeID === "6" && buscarRuc(e.target.value, setProveedor, "nombre")}
                   disabled={ro}
-                  className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                  className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-ink-soft mb-1">Nombre / Razón social</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Nombre / Razón social</label>
                 <input name="nombre" value={proveedor.nombre} onChange={campoProveedor} disabled={ro}
-                  className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                  className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
               </div>
             </div>
           </div>
@@ -676,32 +676,32 @@ export default function EmitirGuia() {
 
         {/* Comprador (solo motivo de traslado 03-Venta con entrega a terceros u 13-Otros) */}
         {MOTIVOS_COMPRADOR.includes(motivoTraslado) && (
-          <div className="bg-surface rounded-xl border border-line shadow-sm p-6 mb-5">
-            <p className="text-xs font-semibold text-ink-soft uppercase tracking-wide mb-3 flex items-center">
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mb-5">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center">
               Comprador (opcional)
               <Ayuda texto="Solo aplica cuando el motivo de traslado es Venta con entrega a terceros u Otros. Omitirlo no bloquea la emisión — SUNAT lo trata como observación, no como error." />
             </p>
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="block text-xs font-medium text-ink-soft mb-1">Tipo de documento</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Tipo de documento</label>
                 <select name="schemeID" value={comprador.schemeID} onChange={campoComprador} disabled={ro}
-                  className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft">
+                  className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500">
                   {TIPO_DOC_RECEPTOR.map((t) => (
                     <option key={t.valor} value={t.valor}>{t.label}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-ink-soft mb-1">Número de documento</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Número de documento</label>
                 <input name="numDoc" value={comprador.numDoc} onChange={campoComprador}
                   onBlur={(e) => comprador.schemeID === "6" && buscarRuc(e.target.value, setComprador, "nombre")}
                   disabled={ro}
-                  className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                  className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-ink-soft mb-1">Nombre / Razón social</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Nombre / Razón social</label>
                 <input name="nombre" value={comprador.nombre} onChange={campoComprador} disabled={ro}
-                  className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                  className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
               </div>
             </div>
           </div>
@@ -709,36 +709,36 @@ export default function EmitirGuia() {
 
         {/* Pagador de flete y subcontratación (solo guía de transportista) */}
         {tipoGuia === "TRANSPORTISTA" && (
-          <div className="bg-surface rounded-xl border border-line shadow-sm p-6 mb-5">
-            <p className="text-xs font-semibold text-ink-soft uppercase tracking-wide mb-3">
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mb-5">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
               Pagador de flete y subcontratación (opcional)
             </p>
             <div className="grid grid-cols-4 gap-4 mb-4">
               <div>
-                <label className="block text-xs font-medium text-ink-soft mb-1">Tipo de documento</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Tipo de documento</label>
                 <select name="schemeID" value={pagadorFlete.schemeID} onChange={campoPagadorFlete} disabled={ro}
-                  className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft">
+                  className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500">
                   {TIPO_DOC_RECEPTOR.map((t) => (
                     <option key={t.valor} value={t.valor}>{t.label}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-ink-soft mb-1">Documento del pagador de flete</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Documento del pagador de flete</label>
                 <input name="numDoc" value={pagadorFlete.numDoc} onChange={campoPagadorFlete}
                   onBlur={(e) => pagadorFlete.schemeID === "6" && buscarRuc(e.target.value, setPagadorFlete, "nombre")}
                   disabled={ro}
-                  className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                  className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-ink-soft mb-1">Nombre / Razón social</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Nombre / Razón social</label>
                 <input name="nombre" value={pagadorFlete.nombre} onChange={campoPagadorFlete} disabled={ro}
-                  className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                  className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-ink-soft mb-1">Quién paga el flete</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Quién paga el flete</label>
                 <select value={indicadorPagadorFlete} onChange={(e) => setIndicadorPagadorFlete(e.target.value)}
-                  disabled={ro} className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft">
+                  disabled={ro} className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500">
                   <option value="">— No indicar —</option>
                   <option value="REMITENTE">Remitente</option>
                   <option value="SUBCONTRATADOR">Subcontratador</option>
@@ -746,7 +746,7 @@ export default function EmitirGuia() {
                 </select>
               </div>
             </div>
-            <label className="flex items-center gap-2 text-sm text-ink-soft mb-3">
+            <label className="flex items-center gap-2 text-sm text-gray-500 mb-3">
               <input type="checkbox" checked={transporteSubcontratado} disabled={ro}
                 onChange={(e) => setTransporteSubcontratado(e.target.checked)} />
               Transporte subcontratado
@@ -754,17 +754,17 @@ export default function EmitirGuia() {
             {transporteSubcontratado && (
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-ink-soft mb-1">RUC de la empresa subcontratada<Oblig /></label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">RUC de la empresa subcontratada<Oblig /></label>
                   <input name="ruc" value={empresaSubcontrata.ruc} onChange={campoEmpresaSubcontrata}
                     onBlur={(e) => buscarRuc(e.target.value, setEmpresaSubcontrata, "razonSocial")}
                     disabled={ro} required maxLength={11}
-                    className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                    className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-ink-soft mb-1">Razón social<Oblig /></label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Razón social<Oblig /></label>
                   <input name="razonSocial" value={empresaSubcontrata.razonSocial} onChange={campoEmpresaSubcontrata}
                     disabled={ro} required
-                    className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                    className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
                 </div>
               </div>
             )}
@@ -772,28 +772,28 @@ export default function EmitirGuia() {
         )}
 
         {/* Documentos relacionados (opcional) */}
-        <div className="bg-surface rounded-xl border border-line shadow-sm p-6 mb-5">
-          <p className="text-xs font-semibold text-ink-soft uppercase tracking-wide mb-3">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mb-5">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
             Documentos relacionados (opcional)
           </p>
           {documentosRelacionados.map((doc) => (
             <div key={doc._key} className="grid grid-cols-[1fr_1fr_auto] gap-4 items-end mb-3">
               <div>
-                <label className="block text-xs font-medium text-ink-soft mb-1">Tipo de documento</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Tipo de documento</label>
                 <select value={doc.tipoDoc} disabled={ro}
                   onChange={(e) => handleDocRelacionado(doc._key, "tipoDoc", e.target.value)}
-                  className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft">
+                  className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500">
                   {DOCUMENTO_RELACIONADO_GRE.map((t) => (
                     <option key={t.valor} value={t.valor}>{t.label}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-ink-soft mb-1">Número</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Número</label>
                 <input value={doc.numero} disabled={ro}
                   onChange={(e) => handleDocRelacionado(doc._key, "numero", e.target.value)}
                   placeholder="F001-00000003"
-                  className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                  className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
               </div>
               {!ro && (
                 <button type="button" onClick={() => eliminarDocRelacionado(doc._key)}
@@ -803,12 +803,12 @@ export default function EmitirGuia() {
           ))}
           {!ro && (
             <button type="button" onClick={agregarDocRelacionado}
-              className="text-sm text-ink-soft hover:text-ink transition">
+              className="text-sm text-gray-500 hover:text-gray-800 transition">
               + Agregar documento relacionado
             </button>
           )}
           {comprobanteId && (
-            <p className="text-xs text-ink-muted mt-2">
+            <p className="text-xs text-gray-400 mt-2">
               La factura/boleta ligada arriba se agrega automáticamente como documento relacionado —
               solo agrega aquí documentos adicionales (ej. Manifiesto de Carga, Liquidación de Compra).
             </p>
@@ -816,45 +816,45 @@ export default function EmitirGuia() {
         </div>
 
         {/* Puntos de partida y llegada */}
-        <div className="bg-surface rounded-xl border border-line shadow-sm p-6 mb-5">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mb-5">
           <div className="grid grid-cols-2 gap-6">
             <div>
-              <p className="text-xs font-semibold text-ink-soft uppercase tracking-wide mb-3">Punto de partida</p>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Punto de partida</p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-ink-soft mb-1 flex items-center">
+                  <label className="block text-xs font-medium text-gray-500 mb-1 flex items-center">
                     Ubigeo<Oblig />
                     <Ayuda texto="Código INEI de 6 dígitos (2 departamento + 2 provincia + 2 distrito), ej. 150101 = Lima / Lima / Lima." />
                   </label>
                   <input name="ubigeo" value={puntoPartida.ubigeo} onChange={campoPuntoPartida}
                     disabled={ro} required maxLength={6}
-                    className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                    className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-ink-soft mb-1">Dirección<Oblig /></label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Dirección<Oblig /></label>
                   <input name="direccion" value={puntoPartida.direccion} onChange={campoPuntoPartida}
                     disabled={ro} required
-                    className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                    className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
                 </div>
               </div>
             </div>
             <div>
-              <p className="text-xs font-semibold text-ink-soft uppercase tracking-wide mb-3">Punto de llegada</p>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Punto de llegada</p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-ink-soft mb-1 flex items-center">
+                  <label className="block text-xs font-medium text-gray-500 mb-1 flex items-center">
                     Ubigeo<Oblig />
                     <Ayuda texto="Código INEI de 6 dígitos (2 departamento + 2 provincia + 2 distrito), ej. 150101 = Lima / Lima / Lima." />
                   </label>
                   <input name="ubigeo" value={puntoLlegada.ubigeo} onChange={campoPuntoLlegada}
                     disabled={ro} required maxLength={6}
-                    className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                    className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-ink-soft mb-1">Dirección<Oblig /></label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Dirección<Oblig /></label>
                   <input name="direccion" value={puntoLlegada.direccion} onChange={campoPuntoLlegada}
                     disabled={ro} required
-                    className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                    className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
                 </div>
               </div>
             </div>
@@ -863,9 +863,9 @@ export default function EmitirGuia() {
 
         {/* Transporte: transportista (público) o vehículo+conductor (privado) */}
         {modalidadTraslado === "01" ? (
-          <div className="bg-surface rounded-xl border border-line shadow-sm p-6 mb-5">
-            <p className="text-xs font-semibold text-ink-soft uppercase tracking-wide mb-3">Transportista</p>
-            <label className="flex items-center gap-2 text-sm text-ink-soft mb-4">
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mb-5">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Transportista</p>
+            <label className="flex items-center gap-2 text-sm text-gray-500 mb-4">
               <input type="checkbox" checked={esM1L} disabled={ro}
                 onChange={(e) => setEsM1L(e.target.checked)} />
               Vehículo de categoría M1 o L (transporte ligero)
@@ -874,108 +874,108 @@ export default function EmitirGuia() {
             {esM1L ? (
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-ink-soft mb-1">Placa<Oblig /></label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Placa<Oblig /></label>
                   <input value={placaM1L} onChange={(e) => setPlacaM1L(e.target.value)}
                     disabled={ro} required
-                    className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                    className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-ink-soft mb-1">Fecha de entrega de bienes al transportista<Oblig /></label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Fecha de entrega de bienes al transportista<Oblig /></label>
                   <input type="date" value={fechaEntregaBienesTransportista}
                     onChange={(e) => setFechaEntregaBienesTransportista(e.target.value)}
                     disabled={ro} required
-                    className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                    className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
                 </div>
               </div>
             ) : (
               <>
                 <div className="grid grid-cols-2 gap-4 mb-4">
                   <div>
-                    <label className="block text-xs font-medium text-ink-soft mb-1">RUC<Oblig /></label>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">RUC<Oblig /></label>
                     <input name="ruc" value={transportista.ruc} onChange={campoTransportista}
                       onBlur={(e) => buscarRuc(e.target.value, setTransportista, "razonSocial")}
                       disabled={ro} required maxLength={11}
-                      className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                      className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-ink-soft mb-1">Razón social<Oblig /></label>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Razón social<Oblig /></label>
                     <input name="razonSocial" value={transportista.razonSocial} onChange={campoTransportista}
                       disabled={ro} required
-                      className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                      className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-medium text-ink-soft mb-1">Fecha de entrega de bienes al transportista<Oblig /></label>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Fecha de entrega de bienes al transportista<Oblig /></label>
                     <input type="date" value={fechaEntregaBienesTransportista}
                       onChange={(e) => setFechaEntregaBienesTransportista(e.target.value)}
                       disabled={ro} required
-                      className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                      className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-ink-soft mb-1">Registro MTC (opcional)</label>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Registro MTC (opcional)</label>
                     <input name="registroMTC" value={transportista.registroMTC} onChange={campoTransportista}
                       disabled={ro}
-                      className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                      className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
                   </div>
                 </div>
               </>
             )}
           </div>
         ) : (
-          <div className="bg-surface rounded-xl border border-line shadow-sm p-6 mb-5">
-            <p className="text-xs font-semibold text-ink-soft uppercase tracking-wide mb-3">Vehículo y conductor</p>
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mb-5">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Vehículo y conductor</p>
             <div className="grid grid-cols-3 gap-4 mb-4">
               <div>
-                <label className="block text-xs font-medium text-ink-soft mb-1">Placa<Oblig /></label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Placa<Oblig /></label>
                 <input name="placa" value={vehiculo.placa} onChange={campoVehiculo} disabled={ro} required
-                  className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                  className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-ink-soft mb-1">Tipo de documento del conductor</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Tipo de documento del conductor</label>
                 <select name="tipoDoc" value={conductor.tipoDoc} onChange={campoConductor} disabled={ro}
-                  className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft">
+                  className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500">
                   {TIPO_DOC_RECEPTOR.map((t) => (
                     <option key={t.valor} value={t.valor}>{t.label}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-ink-soft mb-1">Documento del conductor<Oblig /></label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Documento del conductor<Oblig /></label>
                 <input name="numDoc" value={conductor.numDoc} onChange={campoConductor} disabled={ro} required
-                  className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                  className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
               </div>
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="block text-xs font-medium text-ink-soft mb-1">Nombres<Oblig /></label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Nombres<Oblig /></label>
                 <input name="nombres" value={conductor.nombres} onChange={campoConductor} disabled={ro} required
-                  className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                  className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-ink-soft mb-1">Apellidos<Oblig /></label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Apellidos<Oblig /></label>
                 <input name="apellidos" value={conductor.apellidos} onChange={campoConductor} disabled={ro} required
-                  className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                  className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-ink-soft mb-1">Licencia de conducir<Oblig /></label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Licencia de conducir<Oblig /></label>
                 <input name="licencia" value={conductor.licencia} onChange={campoConductor} disabled={ro} required
-                  className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                  className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
               </div>
             </div>
 
             {/* Vehículos secundarios (hasta 2 adicionales al principal) */}
-            <div className="mt-5 pt-4 border-t border-line">
-              <p className="text-xs font-semibold text-ink-soft uppercase tracking-wide mb-3">
+            <div className="mt-5 pt-4 border-t border-gray-100">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
                 Vehículos secundarios (opcional, máx. 2)
               </p>
               {vehiculosSecundarios.map((v, idx) => (
                 <div key={v._key} className="grid grid-cols-[1fr_auto] gap-4 items-end mb-3">
                   <div>
-                    <label className="block text-xs font-medium text-ink-soft mb-1">Placa {idx + 1}</label>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Placa {idx + 1}</label>
                     <input value={v.placa} disabled={ro}
                       onChange={(e) => handleVehiculoSecundario(v._key, e.target.value)}
-                      className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                      className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
                   </div>
                   {!ro && (
                     <button type="button" onClick={() => eliminarVehiculoSecundario(v._key)}
@@ -985,47 +985,47 @@ export default function EmitirGuia() {
               ))}
               {!ro && vehiculosSecundarios.length < 2 && (
                 <button type="button" onClick={agregarVehiculoSecundario}
-                  className="text-sm text-ink-soft hover:text-ink transition">
+                  className="text-sm text-gray-500 hover:text-gray-800 transition">
                   + Agregar vehículo secundario
                 </button>
               )}
             </div>
 
             {/* Conductores secundarios (hasta 2 adicionales al principal) */}
-            <div className="mt-5 pt-4 border-t border-line">
-              <p className="text-xs font-semibold text-ink-soft uppercase tracking-wide mb-3">
+            <div className="mt-5 pt-4 border-t border-gray-100">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
                 Conductores secundarios (opcional, máx. 2)
               </p>
               {conductoresSecundarios.map((c, idx) => (
                 <div key={c._key} className="mb-4">
                   <div className="grid grid-cols-[auto_1fr_1fr_1fr_auto] gap-4 items-end">
                     <div>
-                      <label className="block text-xs font-medium text-ink-soft mb-1">Tipo doc.</label>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Tipo doc.</label>
                       <select value={c.tipoDoc} disabled={ro}
                         onChange={(e) => handleConductorSecundario(c._key, "tipoDoc", e.target.value)}
-                        className="input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft">
+                        className="input-field w-auto disabled:bg-gray-50 disabled:text-gray-500">
                         {TIPO_DOC_RECEPTOR.map((t) => (
                           <option key={t.valor} value={t.valor}>{t.label}</option>
                         ))}
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-ink-soft mb-1">Documento {idx + 1}</label>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Documento {idx + 1}</label>
                       <input value={c.numDoc} disabled={ro}
                         onChange={(e) => handleConductorSecundario(c._key, "numDoc", e.target.value)}
-                        className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                        className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-ink-soft mb-1">Nombres</label>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Nombres</label>
                       <input value={c.nombres} disabled={ro}
                         onChange={(e) => handleConductorSecundario(c._key, "nombres", e.target.value)}
-                        className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                        className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-ink-soft mb-1">Apellidos</label>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Apellidos</label>
                       <input value={c.apellidos} disabled={ro}
                         onChange={(e) => handleConductorSecundario(c._key, "apellidos", e.target.value)}
-                        className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                        className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
                     </div>
                     {!ro && (
                       <button type="button" onClick={() => eliminarConductorSecundario(c._key)}
@@ -1033,16 +1033,16 @@ export default function EmitirGuia() {
                     )}
                   </div>
                   <div className="mt-2 w-1/3">
-                    <label className="block text-xs font-medium text-ink-soft mb-1">Licencia de conducir</label>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Licencia de conducir</label>
                     <input value={c.licencia} disabled={ro}
                       onChange={(e) => handleConductorSecundario(c._key, "licencia", e.target.value)}
-                      className="w-full input-field w-auto disabled:bg-surface-alt disabled:text-ink-soft" />
+                      className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
                   </div>
                 </div>
               ))}
               {!ro && conductoresSecundarios.length < 2 && (
                 <button type="button" onClick={agregarConductorSecundario}
-                  className="text-sm text-ink-soft hover:text-ink transition">
+                  className="text-sm text-gray-500 hover:text-gray-800 transition">
                   + Agregar conductor secundario
                 </button>
               )}
@@ -1051,10 +1051,10 @@ export default function EmitirGuia() {
         )}
 
         {/* Tabla de items */}
-        <div className="bg-surface rounded-xl border border-line shadow-sm overflow-hidden mb-5">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-5">
           <div className="overflow-x-auto">
             <table className="erp-table w-full text-sm min-w-[700px]">
-              <thead className="bg-surface-alt text-xs uppercase tracking-wide border-b-2 border-line">
+              <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-100">
                 <tr>
                   <th className="px-3 py-3 text-center w-8">#</th>
                   <th className="px-3 py-3 text-left">Descripción<Oblig /></th>
@@ -1074,8 +1074,8 @@ export default function EmitirGuia() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {items.map((item, idx) => (
-                  <tr key={item._key} className="hover:bg-surface-alt/50">
-                    <td className="px-3 py-2 text-center text-ink-muted">{idx + 1}</td>
+                  <tr key={item._key} className="hover:bg-gray-50/50">
+                    <td className="px-3 py-2 text-center text-gray-400">{idx + 1}</td>
                     <td className="px-3 py-2">
                       <input value={item.descripcion}
                         onChange={(e) => handleItem(item._key, "descripcion", e.target.value)}
@@ -1139,9 +1139,9 @@ export default function EmitirGuia() {
             </table>
           </div>
           {!ro && (
-            <div className="px-4 py-3 border-t border-line">
+            <div className="px-4 py-3 border-t border-gray-100">
               <button type="button" onClick={agregarItem}
-                className="text-sm text-ink-soft hover:text-ink transition">
+                className="text-sm text-gray-500 hover:text-gray-800 transition">
                 + Agregar ítem
               </button>
             </div>
@@ -1149,31 +1149,31 @@ export default function EmitirGuia() {
         </div>
 
         {/* Datos adicionales del traslado */}
-        <div className="bg-surface rounded-xl border border-line shadow-sm p-6 mb-5">
-          <p className="text-xs font-semibold text-ink-soft uppercase tracking-wide mb-3">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mb-5">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
             Datos adicionales del traslado
           </p>
           <div className="flex flex-wrap gap-6 mb-4">
-            <label className="flex items-center gap-2 text-sm text-ink-soft">
+            <label className="flex items-center gap-2 text-sm text-gray-500">
               <input type="checkbox" checked={realizaTransbordo} disabled={ro}
                 onChange={(e) => setRealizaTransbordo(e.target.checked)} />
               Transbordo programado
             </label>
-            <label className="flex items-center gap-2 text-sm text-ink-soft">
+            <label className="flex items-center gap-2 text-sm text-gray-500">
               <input type="checkbox" checked={retornoEnvasesVacios} disabled={ro}
                 onChange={(e) => setRetornoEnvasesVacios(e.target.checked)} />
               Retorno de vehículo con envases o embalajes vacíos
             </label>
-            <label className="flex items-center gap-2 text-sm text-ink-soft">
+            <label className="flex items-center gap-2 text-sm text-gray-500">
               <input type="checkbox" checked={retornoVehiculoVacio} disabled={ro}
                 onChange={(e) => setRetornoVehiculoVacio(e.target.checked)} />
               Retorno de vehículo vacío
             </label>
           </div>
-          <label className="block text-xs font-medium text-ink-soft mb-1">Observaciones (opcional)</label>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Observaciones (opcional)</label>
           <textarea value={observaciones} onChange={(e) => setObservaciones(e.target.value)}
             disabled={ro} rows={2} placeholder="Observaciones por el traslado..."
-            className="w-full input-field disabled:bg-surface-alt disabled:text-ink-soft" />
+            className="w-full input-field disabled:bg-gray-50 disabled:text-gray-500" />
         </div>
 
         {/* Acciones */}
@@ -1200,14 +1200,14 @@ export default function EmitirGuia() {
 
       {confirmando && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-surface rounded-xl shadow-xl p-6 w-full max-w-sm">
-            <h3 className="font-semibold text-ink mb-2">¿Emitir guía de remisión?</h3>
-            <p className="text-sm text-ink-soft mb-6">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm">
+            <h3 className="font-semibold text-gray-800 mb-2">¿Emitir guía de remisión?</h3>
+            <p className="text-sm text-gray-500 mb-6">
               Se enviará a SUNAT a través del hub. Esta acción genera un correlativo nuevo aunque la guía sea rechazada.
             </p>
             <div className="flex justify-end gap-3">
               <button onClick={() => setConfirmando(false)}
-                className="border border-line-strong text-ink px-4 py-2 rounded-lg text-sm hover:bg-surface-alt transition">
+                className="border border-gray-300 text-gray-800 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition">
                 Cancelar
               </button>
               <button onClick={async () => { setConfirmando(false); await emitir(); }}
