@@ -279,6 +279,9 @@ export default function ListaOrdenesTrabajo() {
   filtradas.sort((a, b) => {
     if (sortBy === "numeroOT") return compararTexto(a.numeroOT, b.numeroOT);
     if (sortBy === "numeroCotizacion") return compararTexto(a.cotizacion?.numeroCotizacion, b.cotizacion?.numeroCotizacion);
+    // Descendente: más días esperando primero — sin fechaRecibida (null) va
+    // al final, igual que un valor "menor" a cualquier día real (>= 0).
+    if (sortBy === "diasRecibido") return (diasDesdeRecibido(b.fechaRecibida) ?? -1) - (diasDesdeRecibido(a.fechaRecibida) ?? -1);
     return new Date(b.createdAt) - new Date(a.createdAt);
   });
 
@@ -524,6 +527,21 @@ export default function ListaOrdenesTrabajo() {
             <option key={e} value={e} className="capitalize">{e}</option>
           ))}
         </select>
+
+        {/* Botón dedicado (a pedido del usuario) — planner/coordinadora/
+            asistente comparten esta misma vista de OTs, y las 3 lo usan para
+            priorizar por antigüedad en todas las tablas de un solo click. */}
+        <button
+          type="button"
+          onClick={() => setSortBy(sortBy === "diasRecibido" ? "fecha" : "diasRecibido")}
+          className={`px-3 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap ${
+            sortBy === "diasRecibido"
+              ? "bg-gray-900 text-white"
+              : "border border-gray-300 text-gray-600 hover:bg-gray-50"
+          }`}
+        >
+          Días desde recibido ↓
+        </button>
 
         {Object.values(filtros).some(Boolean) && (
           <button
