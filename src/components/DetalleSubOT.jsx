@@ -5,7 +5,7 @@ import FormInformeTecnico from "./FormInformeTecnico";
 import VistaInformeTecnico from "./VistaInformeTecnico";
 import ModalRequerimiento from "./ModalRequerimiento";
 import TablaServiciosExternos from "./TablaServiciosExternos";
-import { Chip, BotonAnular, BannerAnulado, bloqueadoPorCadenaCerrada } from "./detalleShared";
+import { Chip, BotonAnular, BotonCerrarCadena, BotonDesanular, BannerAnulado, bloqueadoPorCadenaCerrada } from "./detalleShared";
 
 const CATEGORIAS_SERVICIO = ["SOPORTE", "DEVOLUCION", "DIAGNOSTICO", "GARANTIA", "MANTENIMIENTO", "REPARACION", "PRESTAMO", "SUMINISTRO", "MANTENIMIENTO EN PLANTA"];
 
@@ -48,8 +48,10 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
   });
   const rolActual = getUsuario()?.rol;
   const puedeEditarCampos = ["admin", "supervisor", "planner"].includes(rolActual);
-  // Anular un documento queda reservado a Admin, Facturación y Jefatura.
-  const puedeAnular = ["admin", "facturacion", "jefatura"].includes(rolActual);
+  // Anular un documento queda reservado a Admin y Jefatura — Facturación ya
+  // no puede. Desanular y cerrar/abrir la cadena a mano son exclusivos de admin.
+  const puedeAnular = ["admin", "jefatura"].includes(rolActual);
+  const esAdmin = rolActual === "admin";
   const puedeAprobarInforme = ["admin", "jefatura", "planner"].includes(rolActual);
   const esTecnico = ["tecnico", "tecnico_prueba", "tecnico_intervencion"].includes(rolActual);
   // Tabla de Servicios Externos: la ven todos los roles menos técnico.
@@ -165,6 +167,32 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
     }
   };
 
+  const desanular = async () => {
+    const res = await fetchAuth(`/ordenes-trabajo/${ot._id}/desanular`, { method: "PATCH" });
+    if (res.ok) {
+      const actualizada = await res.json();
+      setOt(actualizada);
+      onGuardada?.(actualizada);
+    } else {
+      setError("Error al desanular el documento.");
+    }
+  };
+
+  const toggleCerrarCadena = async (cerrado) => {
+    const res = await fetchAuth(`/ordenes-trabajo/${ot._id}/cerrar-cadena`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cerrado }),
+    });
+    if (res.ok) {
+      const actualizada = await res.json();
+      setOt(actualizada);
+      onGuardada?.(actualizada);
+    } else {
+      setError("Error al cerrar/abrir la cadena.");
+    }
+  };
+
   const toggleAprobarInforme = async (informeId, actual) => {
     const res = await fetchAuth(`/informes-tecnicos/${informeId}/aprobar`, {
       method: "PATCH",
@@ -221,6 +249,8 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
               {ot.irreparable && <Chip className="mt-1 bg-red-500/40 text-white block">Irreparable</Chip>}
             </div>
             {!ot.anulado && !cadenaCerrada && puedeAnular && <BotonAnular onAnular={anular} />}
+            {esAdmin && ot.anulado && <BotonDesanular onDesanular={desanular} />}
+            {esAdmin && <BotonCerrarCadena cerrado={cadenaCerrada} onToggle={toggleCerrarCadena} />}
             {!ot.anulado && !cadenaCerrada && puedeEditarCampos && (
               <button onClick={guardar} disabled={guardando}
                 className="bg-white text-violet-700 text-sm px-5 py-2 rounded-lg hover:bg-violet-50 disabled:opacity-60 transition font-semibold shadow-sm shrink-0">

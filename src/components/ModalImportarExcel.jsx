@@ -93,7 +93,7 @@ export const COLS_MATERIALES = [
 // la Cotización se RELACIONA a esa OT en vez de crear una duplicada.
 export const COLS_COTIZACIONES = [
   { key: "numeroCotizacion", label: "N° Cotización" },
-  { key: "razonSocial",      label: "Empresa", requerido: true },
+  { key: "ruc",              label: "RUC", requerido: true },
   { key: "descripcion",      label: "Título/Descripción", requerido: true },
   { key: "numeroOT",         label: "OT" },
   { key: "estado",           label: "Estado" },

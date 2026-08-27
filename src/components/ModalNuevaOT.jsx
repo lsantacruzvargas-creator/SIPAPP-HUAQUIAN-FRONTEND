@@ -33,6 +33,8 @@ export default function ModalNuevaOT({ onClose, onCreada }) {
   const [empresasOpen, setEmpresasOpen] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
+  const [busquedaEmpresa, setBusquedaEmpresa] = useState("");
+  const [listaEmpresaAbierta, setListaEmpresaAbierta] = useState(false);
 
   const cargarEmpresas = () =>
     fetchAuth("/empresas").then((res) => res.ok && res.json().then(setEmpresas));
@@ -54,6 +56,26 @@ export default function ModalNuevaOT({ onClose, onCreada }) {
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
+  const qEmpresa = busquedaEmpresa.trim().toLowerCase();
+  const empresasFiltradas = (qEmpresa
+    ? empresas.filter((e) =>
+        [e.razonSocial, e.alias, e.ruc].some((v) => v?.toLowerCase().includes(qEmpresa))
+      )
+    : empresas
+  ).slice(0, 50);
+
+  const seleccionarEmpresa = (e) => {
+    setForm((f) => ({ ...f, empresa: e._id, planta: "" }));
+    setBusquedaEmpresa(e.alias ? `${e.alias} — ${e.razonSocial}` : e.razonSocial);
+    setListaEmpresaAbierta(false);
+  };
+
+  const cambiarBusquedaEmpresa = (e) => {
+    setBusquedaEmpresa(e.target.value);
+    setListaEmpresaAbierta(true);
+    if (form.empresa) setForm((f) => ({ ...f, empresa: "", planta: "" }));
+  };
+
   const guardar = async () => {
     if (!form.numeroOT.trim()) return setError("El N° de Orden de Trabajo es obligatorio.");
     if (!form.titulo.trim()) return setError("La descripción es obligatoria.");
@@ -65,6 +87,10 @@ export default function ModalNuevaOT({ onClose, onCreada }) {
       fechaRecibida: form.fechaRecibida || null,
       codigoSap: form.codigoSap,
       empresa: form.empresa || undefined,
+      // Si no se eligió una Empresa ya registrada, se manda el texto tal
+      // cual se escribió — el backend la busca por razón social (sin
+      // importar mayúsculas) y la crea sola si no existe.
+      empresaNombre: form.empresa ? undefined : busquedaEmpresa.trim() || undefined,
       planta: form.planta,
       contactoNombre: plantaSel?.contactoNombre || "",
       contactoTelefono: plantaSel?.contactoTelefono || "",
@@ -128,17 +154,32 @@ export default function ModalNuevaOT({ onClose, onCreada }) {
           </div>
 
           <div className="grid grid-cols-3 gap-4">
-            <div>
+            <div className="relative">
               <label className="text-xs text-gray-500 block mb-1">Cliente</label>
               <div className="flex gap-2">
-                <select name="empresa" value={form.empresa} onChange={handleChange} className={INP}>
-                  <option value="">Seleccionar empresa…</option>
-                  {empresas.map((e) => (
-                    <option key={e._id} value={e._id}>
-                      {e.alias ? `${e.alias} — ` : ""}{e.razonSocial}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    value={busquedaEmpresa}
+                    onChange={cambiarBusquedaEmpresa}
+                    onFocus={() => setListaEmpresaAbierta(true)}
+                    onBlur={() => setListaEmpresaAbierta(false)}
+                    placeholder="Escribe el nombre de la empresa…"
+                    className={INP}
+                    autoComplete="off"
+                  />
+                  {listaEmpresaAbierta && empresasFiltradas.length > 0 && (
+                    <div className="absolute z-10 mt-1 w-full max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+                      {empresasFiltradas.map((e) => (
+                        <button type="button" key={e._id}
+                          onMouseDown={() => seleccionarEmpresa(e)}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition border-b border-gray-50 last:border-0">
+                          {e.alias ? `${e.alias} — ` : ""}{e.razonSocial}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <button
                   type="button"
                   onClick={() => setEmpresasOpen(true)}
@@ -147,6 +188,9 @@ export default function ModalNuevaOT({ onClose, onCreada }) {
                   Empresas
                 </button>
               </div>
+              {!form.empresa && busquedaEmpresa.trim() && (
+                <p className="text-[11px] text-amber-600 mt-1">Se creará una empresa nueva con este nombre.</p>
+              )}
             </div>
             <div>
               <label className="text-xs text-gray-500 block mb-1">Planta</label>
@@ -270,12 +314,15 @@ export default function ModalNuevaOT({ onClose, onCreada }) {
           empresas={empresas}
           onClose={() => setEmpresasOpen(false)}
           onSeleccionar={(e) => {
-            setForm((f) => ({ ...f, empresa: e._id, planta: "" }));
+            seleccionarEmpresa(e);
             setEmpresasOpen(false);
           }}
           onCambio={async (guardada, { esNueva }) => {
             await cargarEmpresas();
-            if (esNueva) setForm((f) => ({ ...f, empresa: guardada._id, planta: "" }));
+            if (esNueva) {
+              setForm((f) => ({ ...f, empresa: guardada._id, planta: "" }));
+              setBusquedaEmpresa(guardada.alias ? `${guardada.alias} — ${guardada.razonSocial}` : guardada.razonSocial);
+            }
           }}
         />
       )}

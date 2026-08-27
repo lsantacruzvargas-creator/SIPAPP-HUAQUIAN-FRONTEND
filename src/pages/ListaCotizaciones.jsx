@@ -579,7 +579,8 @@ export default function ListaCotizaciones() {
         nombreColeccion="todas las Cotizaciones"
         instrucciones={
           <>1. Descarga la plantilla, rellena tus datos y súbela. La <strong>Empresa</strong> se busca por
-          Razón Social; si no existe, se crea sola (sin RUC). Si el <strong>N° OT</strong> ya existe, la cotización se
+          RUC (11 dígitos); si no existe, se crea sola con la razón social en blanco (edítala después desde
+          Empresas para completarla vía SUNAT). Si el <strong>N° OT</strong> ya existe, la cotización se
           relaciona a esa OT en vez de crear una nueva. <strong>Estado</strong>: Precotizado (falta aprobación),
           Enviado, o Facturado. <strong>Estado factura</strong> (opcional, texto libre): si vale "Facturado" cierra
           la cadena completa (Cotización/OT/OC) de esa fila, cualquier otro texto la deja abierta; si se deja

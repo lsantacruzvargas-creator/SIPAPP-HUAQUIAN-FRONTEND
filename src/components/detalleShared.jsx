@@ -303,6 +303,47 @@ export function BotonAnular({ onAnular }) {
   );
 }
 
+// Cierra/abre a mano TODA la cadena (Cotización+OT+OC+Informes+Factura del
+// mismo numeroDocumento) — override manual exclusivo de admin, por fuera del
+// disparador normal (factura pagada). Reversible, sin motivo (a diferencia
+// de anular).
+export function BotonCerrarCadena({ cerrado, onToggle }) {
+  const [enviando, setEnviando] = useState(false);
+  const confirmar = async () => {
+    const pregunta = cerrado
+      ? "¿Reabrir a mano toda la cadena de este documento (Cotización, OT, OC, Informes y Factura relacionados)?"
+      : "¿Cerrar a mano toda la cadena de este documento (Cotización, OT, OC, Informes y Factura relacionados)?";
+    if (!window.confirm(pregunta)) return;
+    setEnviando(true);
+    await onToggle(!cerrado);
+    setEnviando(false);
+  };
+  return (
+    <button onClick={confirmar} disabled={enviando}
+      className="text-xs text-white/70 hover:text-white underline transition disabled:opacity-50">
+      {enviando ? "…" : cerrado ? "Reabrir cadena" : "Cerrar cadena"}
+    </button>
+  );
+}
+
+// Revierte una anulación — exclusivo de admin (a diferencia de anular, que
+// también permite jefatura). Mantiene el historial (motivo/quién/cuándo).
+export function BotonDesanular({ onDesanular }) {
+  const [enviando, setEnviando] = useState(false);
+  const confirmar = async () => {
+    if (!window.confirm("¿Revertir la anulación de este documento?")) return;
+    setEnviando(true);
+    await onDesanular();
+    setEnviando(false);
+  };
+  return (
+    <button onClick={confirmar} disabled={enviando}
+      className="text-xs text-white/70 hover:text-white underline transition disabled:opacity-50">
+      {enviando ? "…" : "Desanular"}
+    </button>
+  );
+}
+
 export function BannerAnulado({ motivo, por, fecha }) {
   return (
     <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">

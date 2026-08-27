@@ -8,7 +8,7 @@ import BuscadorOrdenTrabajo from "./BuscadorOrdenTrabajo";
 import TablaItemsCotizacion from "./TablaItemsCotizacion";
 import {
   FlujoNegocio, TarjetaRelacion, Chip,
-  badgePago, badgeOT, money, BotonAnular, BannerAnulado, bloqueadoPorCadenaCerrada,
+  badgePago, badgeOT, money, BotonAnular, BotonCerrarCadena, BotonDesanular, BannerAnulado, bloqueadoPorCadenaCerrada,
 } from "./detalleShared";
 
 const INP = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 w-full transition";
@@ -83,8 +83,10 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   const [generandoOT, setGenerandoOT] = useState(false);
   const rolActual = getUsuario()?.rol;
   const puedeEditar = ["admin", "asistente", "facturacion", "jefatura"].includes(rolActual);
-  // Anular un documento queda reservado a Admin, Facturación y Jefatura.
-  const puedeAnular = ["admin", "facturacion", "jefatura"].includes(rolActual);
+  // Anular un documento queda reservado a Admin y Jefatura — Facturación ya
+  // no puede. Desanular y cerrar/abrir la cadena a mano son exclusivos de admin.
+  const puedeAnular = ["admin", "jefatura"].includes(rolActual);
+  const esAdmin = rolActual === "admin";
   // Precios: información sensible, solo Admin/Facturación/Jefatura los ven —
   // ni Asistente ni Planner, aunque puedan editar/ver el resto de la cotización.
   const puedeVerPrecios = ["admin", "facturacion", "jefatura"].includes(rolActual);
@@ -348,6 +350,32 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
     }
   };
 
+  const desanular = async () => {
+    const res = await fetchAuth(`/cotizaciones/${cot._id}/desanular`, { method: "PATCH" });
+    if (res.ok) {
+      const actualizada = await res.json();
+      setCot(actualizada);
+      onGuardada?.(actualizada);
+    } else {
+      setError("Error al desanular el documento.");
+    }
+  };
+
+  const toggleCerrarCadena = async (cerrado) => {
+    const res = await fetchAuth(`/cotizaciones/${cot._id}/cerrar-cadena`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cerrado }),
+    });
+    if (res.ok) {
+      const actualizada = await res.json();
+      setCot(actualizada);
+      onGuardada?.(actualizada);
+    } else {
+      setError("Error al cerrar/abrir la cadena.");
+    }
+  };
+
   const toggleAprobar = async () => {
     const res = await fetchAuth(`/cotizaciones/${cot._id}/aprobar`, {
       method: "PATCH",
@@ -436,6 +464,8 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
               </button>
             )}
             {!cot.anulado && !cadenaCerrada && puedeAnular && <BotonAnular onAnular={anular} />}
+            {esAdmin && cot.anulado && <BotonDesanular onDesanular={desanular} />}
+            {esAdmin && <BotonCerrarCadena cerrado={cadenaCerrada} onToggle={toggleCerrarCadena} />}
             {!cot.anulado && !cot.enviado && !cadenaCerrada && puedeEditar && (
               <button onClick={guardar} disabled={guardando}
                 className="bg-white text-sky-700 text-sm px-5 py-2 rounded-lg hover:bg-sky-50 disabled:opacity-60 transition font-semibold shadow-sm shrink-0">
