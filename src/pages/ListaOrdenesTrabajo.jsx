@@ -775,7 +775,8 @@ export default function ListaOrdenesTrabajo() {
         nombreColeccion="todas las Órdenes de Trabajo"
         instrucciones={
           <>1. Descarga la plantilla, rellena tus datos y súbela. La <strong>Empresa</strong> se busca por
-          Razón Social (debe existir ya registrada). <strong>Estado de la orden</strong>: No asignado, En proceso,
+          <strong>RUC</strong> (11 dígitos); si no existe, se crea sola con la razón social en blanco (edítala
+          después desde Empresas para completarla vía SUNAT). <strong>Estado de la orden</strong>: No asignado, En proceso,
           Terminado o Entregado — sin un técnico asignado, la OT se sigue viendo como "No asignado" en las tablas
           hasta que alguien lo asigne a mano.</>
         }

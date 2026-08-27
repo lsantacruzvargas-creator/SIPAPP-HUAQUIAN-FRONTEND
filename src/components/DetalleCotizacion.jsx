@@ -13,10 +13,23 @@ import {
 
 const INP = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 w-full transition";
 
-function calcular(sub) {
+// El descuento global es sobre la SUMA de subtotales (no por ítem, ver
+// items[].descuento) y se aplica antes del IGV — `subtotal` sigue siendo el
+// bruto para mostrarlo tal cual, IGV/total ya salen sobre la base descontada.
+function calcular(sub, descuentoPct = 0) {
   const s = Math.round(Number(sub) * 100) / 100 || 0;
-  const igv = Math.round(s * 0.18 * 100) / 100;
-  return { subtotal: s, igv, total: Math.round((s + igv) * 100) / 100 };
+  const pct = Math.min(100, Math.max(0, Number(descuentoPct) || 0));
+  const descuento = Math.round(s * (pct / 100) * 100) / 100;
+  const subtotalConDescuento = Math.round((s - descuento) * 100) / 100;
+  const igv = Math.round(subtotalConDescuento * 0.18 * 100) / 100;
+  return {
+    subtotal: s,
+    descuentoPorcentaje: pct,
+    descuento,
+    subtotalConDescuento,
+    igv,
+    total: Math.round((subtotalConDescuento + igv) * 100) / 100,
+  };
 }
 
 export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuardada, onNavegar }) {
@@ -24,6 +37,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   const subtotalInicial = inicial.subtotal ?? 0;
   const [form, setForm] = useState({
     subtotal: subtotalInicial > 0 ? String(subtotalInicial) : "",
+    descuentoPorcentaje: inicial.descuentoPorcentaje ? String(inicial.descuentoPorcentaje) : "",
     empresa: inicial.empresa?._id || "",
     tipo: inicial.tipo || "venta",
     moneda: inicial.moneda || "PEN",
@@ -53,7 +67,6 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
     jefeSupervisorSolicitante: inicial.jefeSupervisorSolicitante || "",
     compradorResponsable: inicial.compradorResponsable || "",
   });
-  const [calc, setCalc] = useState(() => calcular(subtotalInicial));
   const [items, setItems] = useState(() => (inicial.items || []).map(itemDesdeDb));
   const [intentoGuardar, setIntentoGuardar] = useState(false);
   const [empresas, setEmpresas] = useState([]);
@@ -131,7 +144,6 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    if (name === "subtotal") setCalc(calcular(value));
     setForm(prev => ({
       ...prev,
       [name]: value,
@@ -187,7 +199,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
 
   const subtotalItems = parseFloat(items.reduce((acc, i) => acc + calcSubtotal(i), 0).toFixed(2));
   const usarTotalesDeItems = items.length > 0;
-  const totalesMostrados = usarTotalesDeItems ? calcular(subtotalItems) : calc;
+  const totalesMostrados = calcular(usarTotalesDeItems ? subtotalItems : form.subtotal, form.descuentoPorcentaje);
 
   // Arma el objeto para el PDF con lo que hay en pantalla ahora mismo, sin
   // depender de que se haya guardado antes (Guardar cambios cierra el modal).
@@ -205,6 +217,8 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
     validezOferta: form.validezOferta,
     moneda: form.moneda,
     subtotal: totalesMostrados.subtotal,
+    descuentoPorcentaje: totalesMostrados.descuentoPorcentaje,
+    descuento: totalesMostrados.descuento,
     igv: totalesMostrados.igv,
     total: totalesMostrados.total,
     asesorComercial: form.asesorComercial,
@@ -254,6 +268,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
       validezOferta: form.validezOferta,
       moneda: form.moneda,
       subtotal: totalesMostrados.subtotal,
+      descuentoPorcentaje: totalesMostrados.descuentoPorcentaje,
       igv: totalesMostrados.igv,
       total: totalesMostrados.total,
       numeroGuiaEmision: form.numeroGuiaEmision,
@@ -779,6 +794,16 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
                 ) : (
                   <input type="number" name="subtotal" value={form.subtotal} onChange={handleChange}
                     step="0.01" min="0" placeholder="0.00" className={`${INP} text-lg font-semibold`} />
+                )}
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Descuento global (%)</label>
+                <input type="number" name="descuentoPorcentaje" value={form.descuentoPorcentaje} onChange={handleChange}
+                  step="0.01" min="0" max="100" placeholder="0" className={INP} />
+                {totalesMostrados.descuento > 0 && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    −{totalesMostrados.descuento.toFixed(2)} · Subtotal con descuento: {totalesMostrados.subtotalConDescuento.toFixed(2)}
+                  </p>
                 )}
               </div>
               <div className="grid grid-cols-2 gap-3 text-sm">

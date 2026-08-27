@@ -49,7 +49,7 @@ function TablaOC({
   mostrarFactura = true, mostrarTitulo = true, mostrarDocumento = true, mostrarHesActa = false,
   puedeVerPrecios = true, vacioMsg,
 }) {
-  const totalColumnas = 8
+  const totalColumnas = 9
     + (puedeVerPrecios ? 2 : 0)
     + (mostrarFactura ? 1 : 0) + (mostrarTitulo ? 1 : 0)
     + (mostrarHesActa ? 2 : 0) + (mostrarDocumento ? 1 : 0);
@@ -68,6 +68,7 @@ function TablaOC({
               <th className={`${TH} text-left`}>Cotización</th>
               <th className={`${TH} text-left`}>N° OT</th>
               <th className={`${TH} text-left`}>N° Orden de Compra</th>
+              <th className={`${TH} text-left`}>Fecha de creación</th>
               {mostrarFactura && <th className={`${TH} text-left`}>N° Factura</th>}
               <th className={`${TH} text-left`}>Empresa</th>
               {mostrarTitulo && <th className={`${TH} text-left`}>Título</th>}
@@ -108,6 +109,9 @@ function TablaOC({
                         </span>
                       )}
                     </div>
+                  </td>
+                  <td className="px-4 py-3.5 text-gray-600 whitespace-nowrap">
+                    {o.createdAt ? new Date(o.createdAt).toLocaleDateString("es-PE") : <span className="text-gray-300">—</span>}
                   </td>
                   {mostrarFactura && (
                     <td className="px-4 py-3.5 text-gray-600 whitespace-nowrap">{o.numeroFactura || factura?.numeroFactura || <span className="text-gray-300">—</span>}</td>
@@ -198,6 +202,7 @@ function TablaOC({
                   onClick={() => onSelect(o)}>
                   <td className="px-4 py-3" />
                   <td className="px-4 py-3 font-semibold text-indigo-700 whitespace-nowrap pl-8">↳ {s.numeroOT}</td>
+                  <td className="px-4 py-3" />
                   <td className="px-4 py-3" />
                   {mostrarFactura && <td className="px-4 py-3" />}
                   <td className="px-4 py-3" />
@@ -388,6 +393,7 @@ export default function ListaOrdenesCompra() {
     return {
       "Cotización":         o.cotizacion?.numeroCotizacion || "—",
       "N° Orden de Compra": o.numeroOrden || "—",
+      "Fecha de creación":  o.createdAt ? new Date(o.createdAt).toLocaleDateString("es-PE") : "—",
       "N° OT":              grupoOT?.parent?.numeroOT || "—",
       "Sub-OTs":            grupoOT?.subs?.map((s) => s.numeroOT).join(", ") || "—",
       "N° Factura":         o.numeroFactura || factura?.numeroFactura || "—",

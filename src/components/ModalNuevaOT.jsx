@@ -227,7 +227,7 @@ export default function ModalNuevaOT({ onClose, onCreada }) {
               <label className="text-xs text-gray-500 block mb-1">Guía de llegada</label>
               <input name="numeroGuiaEmision" value={form.numeroGuiaEmision} onChange={handleChange} className={INP} />
             </div>
-            <div hidden>
+            <div>
               <label className="text-xs text-gray-500 block mb-1">Guía de salida</label>
               <input name="numeroGuiaRemision" value={form.numeroGuiaRemision} onChange={handleChange} className={INP} />
             </div>

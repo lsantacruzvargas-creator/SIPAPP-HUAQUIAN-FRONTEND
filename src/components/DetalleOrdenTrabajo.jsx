@@ -506,7 +506,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
                 <label className="text-xs text-gray-500 block mb-1">N° OT</label>
                 <input name="numeroOT" value={form.numeroOT} onChange={handleChange} placeholder="—" className={INP} />
               </div>
-              <div hidden>
+              <div>
                 <label className="text-xs text-gray-500 block mb-1">Fecha de ingreso</label>
                 <input type="date" name="fechaRecibida" value={form.fechaRecibida} onChange={handleChange} className={INP} />
               </div>
@@ -618,7 +618,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
                 <label className="text-xs text-gray-500 block mb-1">Guía de llegada</label>
                 <input name="numeroGuiaEmision" value={form.numeroGuiaEmision} onChange={handleChange} placeholder="—" className={INP} />
               </div>
-              <div hidden>
+              <div>
                 <label className="text-xs text-gray-500 block mb-1">Guía de salida</label>
                 <input name="numeroGuiaRemision" value={form.numeroGuiaRemision} onChange={handleChange} placeholder="—" className={INP} />
               </div>

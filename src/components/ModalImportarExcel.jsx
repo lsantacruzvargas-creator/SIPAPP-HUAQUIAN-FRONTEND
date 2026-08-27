@@ -101,21 +101,29 @@ export const COLS_COTIZACIONES = [
   { key: "estadoFactura",    label: "Estado factura" },
 ];
 
-// Una fila crea una OT suelta (sin Cotización). La Empresa se busca por
-// Razón Social (debe existir ya). "Estado de la orden" mapea directo al
+// Una fila crea una OT suelta (sin Cotización). La Empresa se busca por RUC
+// (11 dígitos) — si no existe, se crea "en blanco" (razonSocial = el mismo
+// RUC como placeholder, ver Backend/src/routes/ordenesTrabajo.js); se
+// completa después desde Empresas → Editar, donde el RUC ya viene cargado
+// y al presionar Enter se consulta SUNAT/Decolecta (ver ModalEmpresa.jsx) y
+// rellena razón social + dirección. "Estado de la orden" mapea directo al
 // enum de estado (Encargado Intervención) — "No asignado" deja la OT sin
 // técnico asignado (queda pendiente); las otras 3 opciones guardan el
 // avance real, aunque sin un técnico asignado la tabla la siga mostrando
 // como "No asignado" hasta que alguien lo asigne a mano.
 export const COLS_OT = [
   { key: "numeroOT",             label: "OT" },
-  { key: "razonSocial",          label: "Empresa", requerido: true },
+  { key: "ruc",                  label: "RUC", requerido: true },
   { key: "descripcion",          label: "Descripción", requerido: true },
+  { key: "micLinea",             label: "MIC/Línea" },
   { key: "fechaIngreso",         label: "Fecha ingreso", tipo: "fecha" },
   { key: "guia",                 label: "Guía" },
   { key: "categorizacionTaller", label: "Categorización de servicio" },
   { key: "estadoOrden",          label: "Estado de la orden" },
   { key: "observaciones",        label: "Observación" },
+  { key: "entregadoPor",         label: "Entregado por" },
+  { key: "fechaSalida",          label: "Fecha de salida", tipo: "fecha" },
+  { key: "guiaSalida",           label: "Guía de salida" },
 ];
 
 const LABELS_DETALLE = {

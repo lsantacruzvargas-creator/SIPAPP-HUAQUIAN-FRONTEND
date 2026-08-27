@@ -202,6 +202,8 @@ function SeccionMateriales() {
 
   const guardar = async () => {
     if (!form.nombre.trim()) return;
+    if (!form.codigo.trim()) { setError("El código es obligatorio."); return; }
+    if (!form.descripcion.trim()) { setError("La descripción es obligatoria."); return; }
     if (!form.tipoMaterial) { setError("Selecciona si es Repuesto o Consumible."); return; }
     setError("");
     setGuardando(true);
@@ -293,9 +295,9 @@ function SeccionMateriales() {
             </select>
           </div>
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Código</label>
+            <label className="text-xs text-gray-500 block mb-1">Código *</label>
             <input name="codigo" value={form.codigo} onChange={handleChange}
-              className={`w-full ${INP}`} placeholder="Opcional" />
+              className={`w-full ${INP}`} />
           </div>
           <div>
             <label className="text-xs text-gray-500 block mb-1">Título *</label>
@@ -303,9 +305,9 @@ function SeccionMateriales() {
               className={`w-full ${INP}`} placeholder="Ej: Válvula de expansión 3/8" />
           </div>
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Descripción</label>
+            <label className="text-xs text-gray-500 block mb-1">Descripción *</label>
             <input name="descripcion" value={form.descripcion} onChange={handleChange}
-              className={`w-full ${INP}`} placeholder="Opcional" />
+              className={`w-full ${INP}`} />
           </div>
           <div>
             <label className="text-xs text-gray-500 block mb-1">Unidad de medida</label>
@@ -342,7 +344,7 @@ function SeccionMateriales() {
               Cancelar
             </button>
           )}
-          <button onClick={guardar} disabled={guardando || !form.nombre.trim() || !form.tipoMaterial}
+          <button onClick={guardar} disabled={guardando || !form.nombre.trim() || !form.codigo.trim() || !form.descripcion.trim() || !form.tipoMaterial}
             className="text-sm bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition font-medium">
             {guardando ? "Guardando…" : editando ? "Actualizar" : "Crear material"}
           </button>
@@ -808,8 +810,34 @@ function ModalIngreso({ materiales, materialInicial, onClose, onGuardado }) {
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
   const [rqPendiente, setRqPendiente] = useState(null);
+  const [busquedaMaterial, setBusquedaMaterial] = useState(materialInicial ? `${materialInicial.sku} — ${materialInicial.nombre}` : "");
+  const [listaAbierta, setListaAbierta] = useState(false);
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  const q = busquedaMaterial.trim().toLowerCase();
+  // Solo se arma la lista de resultados si hay texto — con 6000+ materiales
+  // no tiene sentido mostrar nada hasta que el usuario empiece a escribir
+  // (mismo criterio que ModalEgreso).
+  const materialesFiltrados = q
+    ? materiales.filter((m) =>
+        m.sku?.toLowerCase().includes(q) ||
+        m.nombre?.toLowerCase().includes(q) ||
+        m.ubicacion?.nombre?.toLowerCase().includes(q)
+      ).slice(0, 50)
+    : [];
+
+  const seleccionarMaterial = (m) => {
+    setForm((prev) => ({ ...prev, material: m._id }));
+    setBusquedaMaterial(`${m.sku} — ${m.nombre}`);
+    setListaAbierta(false);
+  };
+
+  const cambiarBusqueda = (e) => {
+    setBusquedaMaterial(e.target.value);
+    setListaAbierta(true);
+    if (form.material) setForm((prev) => ({ ...prev, material: "" }));
+  };
 
   // Si este material tiene una solicitud de compra vinculada y pendiente, se
   // avisa acá — pero el ingreso por sí solo NO la resuelve: el almacenero
@@ -863,14 +891,28 @@ function ModalIngreso({ materiales, materialInicial, onClose, onGuardado }) {
           {error && <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="md:col-span-2">
+            <div className="md:col-span-2 relative">
               <label className="text-xs text-gray-500 block mb-1">Material *</label>
-              <select name="material" value={form.material} onChange={handleChange} className={`w-full ${INP}`}>
-                <option value="">Seleccionar material…</option>
-                {materiales.map((m) => (
-                  <option key={m._id} value={m._id}>{m.sku} — {m.nombre}</option>
-                ))}
-              </select>
+              <input type="text" value={busquedaMaterial} onChange={cambiarBusqueda}
+                onFocus={() => setListaAbierta(true)}
+                onBlur={() => setListaAbierta(false)}
+                placeholder="Buscar por SKU, nombre o ubicación…" className={`w-full ${INP}`}
+                autoComplete="off" />
+              {listaAbierta && q && (
+                <div className="absolute z-10 mt-1 w-full max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+                  {materialesFiltrados.length === 0 ? (
+                    <p className="px-3 py-2 text-sm text-gray-400">Sin resultados</p>
+                  ) : (
+                    materialesFiltrados.map((m) => (
+                      <button type="button" key={m._id}
+                        onMouseDown={() => seleccionarMaterial(m)}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition border-b border-gray-50 last:border-0">
+                        <span className="font-mono text-xs text-blue-600">{m.sku}</span> — {m.nombre}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
             <div>
               <label className="text-xs text-gray-500 block mb-1">Cantidad *</label>

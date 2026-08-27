@@ -6,10 +6,22 @@ import { FlujoNegocio, TarjetaRelacion, money } from "./detalleShared";
 
 const INP = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 w-full transition";
 
-function calcular(sub) {
+// Descuento global sobre la suma de subtotales (no por ítem) — se aplica
+// antes del IGV, mismo criterio en DetalleCotizacion.jsx/Cotizaciones.jsx.
+function calcular(sub, descuentoPct = 0) {
   const s = Math.round(Number(sub) * 100) / 100 || 0;
-  const igv = Math.round(s * 0.18 * 100) / 100;
-  return { subtotal: s, igv, total: Math.round((s + igv) * 100) / 100 };
+  const pct = Math.min(100, Math.max(0, Number(descuentoPct) || 0));
+  const descuento = Math.round(s * (pct / 100) * 100) / 100;
+  const subtotalConDescuento = Math.round((s - descuento) * 100) / 100;
+  const igv = Math.round(subtotalConDescuento * 0.18 * 100) / 100;
+  return {
+    subtotal: s,
+    descuentoPorcentaje: pct,
+    descuento,
+    subtotalConDescuento,
+    igv,
+    total: Math.round((subtotalConDescuento + igv) * 100) / 100,
+  };
 }
 
 const FORM_VACIO = {
@@ -21,7 +33,7 @@ const FORM_VACIO = {
   asesorComercial: "", numeroCelular: "", numeroSolicitudPedido: "",
   numeroPeticionOferta: "", tiempoGarantia: "",
   area: "", omAviso: "", numeroGuia: "", jefeSupervisorSolicitante: "", compradorResponsable: "",
-  subtotal: "", moneda: "PEN",
+  subtotal: "", descuentoPorcentaje: "", moneda: "PEN",
 };
 
 const PASOS_VACIOS = [
@@ -69,7 +81,7 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
 
   const subtotalItems = parseFloat(items.reduce((acc, i) => acc + calcSubtotal(i), 0).toFixed(2));
   const usarTotalesDeItems = items.length > 0;
-  const totalesMostrados = usarTotalesDeItems ? calcular(subtotalItems) : calcular(form.subtotal);
+  const totalesMostrados = calcular(usarTotalesDeItems ? subtotalItems : form.subtotal, form.descuentoPorcentaje);
 
   const guardar = async () => {
     setIntentoGuardar(true);
@@ -92,6 +104,7 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
       validezOferta: form.validezOferta,
       moneda: form.moneda,
       subtotal: totalesMostrados.subtotal,
+      descuentoPorcentaje: totalesMostrados.descuentoPorcentaje,
       igv: totalesMostrados.igv,
       total: totalesMostrados.total,
       numeroGuiaEmision: form.numeroGuiaEmision,
@@ -395,6 +408,16 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
                 ) : (
                   <input type="number" name="subtotal" value={form.subtotal} onChange={handleChange}
                     step="0.01" min="0" placeholder="0.00" className={`${INP} text-lg font-semibold`} />
+                )}
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Descuento global (%)</label>
+                <input type="number" name="descuentoPorcentaje" value={form.descuentoPorcentaje} onChange={handleChange}
+                  step="0.01" min="0" max="100" placeholder="0" className={INP} />
+                {totalesMostrados.descuento > 0 && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    −{totalesMostrados.descuento.toFixed(2)} · Subtotal con descuento: {totalesMostrados.subtotalConDescuento.toFixed(2)}
+                  </p>
                 )}
               </div>
               <div className="grid grid-cols-2 gap-3 text-sm">

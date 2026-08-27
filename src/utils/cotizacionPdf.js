@@ -57,16 +57,26 @@ export const exportarCotizacionPdf = async (cotizacion) => {
     cargarImagen("/assets/logos/banco_nacion_logo.png"),
   ]);
 
-  // ─── Marca de agua: ícono centrado detrás de todo el contenido ───
-  // Se dibuja primero (antes que cualquier otro texto/imagen) para que quede
-  // detrás — en PDF cada trazo nuevo se pinta encima de lo anterior.
-  if (icono) {
-    const wSize = 100;
+  // ─── Marca de agua: ícono + marcas representadas, en TODAS las hojas ───
+  // Se dibuja primero en cada página (antes que cualquier otro texto/imagen)
+  // para que quede detrás — en PDF cada trazo nuevo se pinta encima del
+  // anterior. Se repite en cada página nueva (autoTable vía `didDrawPage`
+  // más abajo, y manualmente después de cada `doc.addPage()` propio).
+  const dibujarMarcaDeAgua = () => {
     doc.saveGraphicsState();
     doc.setGState(new doc.GState({ opacity: 0.06 }));
-    doc.addImage(icono, "PNG", (PAGE_W - wSize) / 2, (PAGE_H - wSize) / 2, wSize, wSize);
+    if (icono) {
+      const wSize = 100;
+      doc.addImage(icono, "PNG", 96 - (PAGE_W - wSize) / 2, (PAGE_H - wSize) / 2 - 35, wSize + 40, wSize + 40);
+    }
+    if (marcasFooter) {
+      const w = CONTENT_W * 0.85;
+      const h = w * (marcasFooter.naturalHeight / marcasFooter.naturalWidth);
+      doc.addImage(marcasFooter, "PNG", (PAGE_W - w) / 2, (PAGE_H - h) / 2 + 110, w, h);
+    }
     doc.restoreGraphicsState();
-  }
+  };
+  dibujarMarcaDeAgua();
 
   // ─── Banner de encabezado (navy, ancho completo) ───
   let y = 6;
@@ -195,31 +205,35 @@ export const exportarCotizacionPdf = async (cotizacion) => {
   // símbolo de Valor de la Oferta / IGV / Valor Total al pie de la tabla.
   const simboloDoc = cotizacion.moneda === "USD" ? "US$" : "S/";
 
-  // Un ítem = una fila; sus sub-ítems (si tiene) van como filas adicionales
-  // en bullet, en la misma columna Descripción (ver recetas del skill
-  // pdf-cotizacion-recetas para el porqué de una fila por sub-ítem).
-  const esSubfila = [];
+  // Un ítem = una fila; sus sub-ítems (si tiene) van DENTRO de la misma
+  // celda de Descripción, como líneas en bullet debajo del texto padre (no
+  // como filas propias) — mismo patrón que el proyecto Alcoinsac
+  // (Frontend/src/utils/cotizacionPdf.js): autoTable no soporta estilos
+  // mixtos dentro de una celda, así que la celda completa se dibuja primero
+  // en peso normal (padre + bullets con "\n"), y en `didDrawCell` se tapa
+  // con un rectángulo blanco solo la franja del texto padre para
+  // redibujarla en negrita encima — ver receta #1/#2 del skill
+  // pdf-cotizacion-recetas (el alto de línea real sale de lo que autoTable
+  // ya calculó para esa celda, `doc.getLineHeight()` no coincide).
   autoTable(doc, {
     startY: y,
     head: [["ITEM", "DESCRIPCIÓN", "UNID.", "CANT.", "PRECIO UNITARIO", "PRECIO TOTAL"]],
-    body: cotizacion.items.flatMap((item, i) => {
+    body: cotizacion.items.map((item, i) => {
       const precioNum = Number(item.precio) || 0;
       const subtotalNum = Number(item.subtotal) || 0;
       const esInformativo = precioNum === 0;
-      esSubfila.push(false);
-      const filaPadre = [
+      let desc = item.descripcion;
+      if (item.subItems?.length > 0) {
+        desc += "\n" + item.subItems.map((s) => `   • ${s}`).join("\n");
+      }
+      return [
         esInformativo ? "" : i + 1,
-        item.descripcion,
+        desc,
         esInformativo ? "" : (item.unidad || "und"),
         esInformativo ? "" : item.cantidad,
         esInformativo ? "" : precioNum.toFixed(2),
         subtotalNum === 0 ? "" : subtotalNum.toFixed(2),
       ];
-      const filasSub = (item.subItems || []).map((s) => {
-        esSubfila.push(true);
-        return ["", `   • ${s}`, "", "", "", ""];
-      });
-      return [filaPadre, ...filasSub];
     }),
     theme: "grid",
     margin: { left: M, right: M },
@@ -227,27 +241,55 @@ export const exportarCotizacionPdf = async (cotizacion) => {
     headStyles: { fontSize: 8, fontStyle: "bold", textColor: [0, 0, 0], fillColor: GRIS_CLARO, lineColor: [0, 0, 0], lineWidth: 0.1, halign: "center" },
     columnStyles: {
       0: { cellWidth: 10, halign: "center" },
-      2: { cellWidth: 16, halign: "center" },
-      3: { cellWidth: 16, halign: "center" },
-      4: { cellWidth: 30, halign: "right" },
-      5: { cellWidth: 30, halign: "right" },
+      2: { cellWidth: 12, halign: "center" },
+      3: { cellWidth: 12, halign: "center" },
+      4: { cellWidth: 18, halign: "right" },
+      5: { cellWidth: 18, halign: "right" },
     },
-    didParseCell: (data) => {
+    didDrawPage: dibujarMarcaDeAgua,
+    didDrawCell: (data) => {
       if (data.section !== "body" || data.column.index !== 1) return;
-      if (esSubfila[data.row.index]) {
-        data.cell.styles.cellPadding = { ...data.cell.styles.cellPadding, left: (data.cell.styles.cellPadding.left || 0) + 4 };
-      } else {
-        data.cell.styles.fontStyle = "bold";
-      }
+      const item = cotizacion.items[data.row.index];
+      if (!item) return;
+      const { cell } = data;
+      doc.setFontSize(cell.styles.fontSize);
+      const maxWidth = cell.width - cell.padding("left") - cell.padding("right");
+      const lineasPadre = doc.splitTextToSize(item.descripcion, maxWidth);
+
+      const totalLineas = Array.isArray(cell.text) && cell.text.length > 0 ? cell.text.length : lineasPadre.length;
+      const padTop = cell.padding("top");
+      const padBottom = cell.padding("bottom");
+      const alturaInterior = cell.height - padTop - padBottom;
+      const lineHeight = alturaInterior / totalLineas;
+      const bandHeight = lineasPadre.length * lineHeight;
+
+      doc.setFillColor(255, 255, 255);
+      doc.rect(cell.x + 0.3, cell.y + padTop - 0.2, cell.width - 0.6, bandHeight + 0.2, "F");
+
+      const x = cell.x + cell.padding("left");
+      let ly = cell.y + padTop + lineHeight * 0.75;
+      doc.setFont("helvetica", "bold");
+      lineasPadre.forEach((linea) => { doc.text(linea, x, ly); ly += lineHeight; });
+      doc.setFont("helvetica", "normal");
     },
   });
   y = doc.lastAutoTable.finalY + 4;
 
   // ─── Totales (VALOR DE LA OFERTA / I.G.V. / VALOR TOTAL) ───
-  if (y + 24 > PAGE_H - 15) { doc.addPage(); y = 15; }
+  if (y + 24 > PAGE_H - 15) { doc.addPage(); dibujarMarcaDeAgua(); y = 15; }
   const totW = 80, totX = PAGE_W - M - totW, filaTotH = 7;
+  // El descuento global (sobre la suma de subtotales, antes del IGV) solo
+  // se muestra si se aplicó — ver mismo cálculo en DetalleCotizacion.jsx.
+  const descuentoPct = Number(cotizacion.descuentoPorcentaje) || 0;
+  // Se deriva del subtotal en vez de depender de un campo `descuento` aparte
+  // — no todos los que llaman a esta función lo mandan (ej. la cotización
+  // recién guardada del backend solo trae `descuentoPorcentaje`).
+  const descuentoMonto = (Number(cotizacion.subtotal) || 0) * (descuentoPct / 100);
   const totales = [
     ["VALOR DE LA OFERTA", `${simboloDoc} ${Number(cotizacion.subtotal).toFixed(2)}`, AZUL_CLARO, false],
+    ...(descuentoPct > 0 ? [
+      [`DESCUENTO (${descuentoPct}%)`, `- ${simboloDoc} ${descuentoMonto.toFixed(2)}`, [255, 255, 255], false],
+    ] : []),
     ["I.G.V. (18%)", `${simboloDoc} ${Number(cotizacion.igv).toFixed(2)}`, [255, 255, 255], false],
     ["VALOR TOTAL DE LA OFERTA", `${simboloDoc} ${Number(cotizacion.total).toFixed(2)}`, [255, 255, 255], true],
   ];
@@ -265,7 +307,7 @@ export const exportarCotizacionPdf = async (cotizacion) => {
   y += 6;
 
   // ─── TERMINOS Y CONDICIONES ───
-  if (y + 40 > PAGE_H - 15) { doc.addPage(); y = 15; }
+  if (y + 40 > PAGE_H - 15) { doc.addPage(); dibujarMarcaDeAgua(); y = 15; }
   const yTerminosBarra = y;
   y = barraSeccion("TERMINOS Y CONDICIONES", y);
   const yTerminosInicio = y;
@@ -293,7 +335,7 @@ export const exportarCotizacionPdf = async (cotizacion) => {
   y += 6;
 
   // ─── METODO DE PAGO ───
-  if (y + 34 > PAGE_H - 15) { doc.addPage(); y = 15; }
+  if (y + 34 > PAGE_H - 15) { doc.addPage(); dibujarMarcaDeAgua(); y = 15; }
   const yPagoBarra = y;
   y = barraSeccion("METODO DE PAGO", y);
   const yPagoInicio = y;
@@ -302,7 +344,7 @@ export const exportarCotizacionPdf = async (cotizacion) => {
     const w = logoAltoBanco * (bcpLogo.naturalWidth / bcpLogo.naturalHeight);
     doc.addImage(bcpLogo, "PNG", M + 2, y, w, logoAltoBanco);
   }
-  y += logoAltoBanco + 2;
+  y += logoAltoBanco + 3;
   doc.setFontSize(8);
   const lineaPago = (label, valor) => {
     doc.setFont("helvetica", "bold");
@@ -320,7 +362,7 @@ export const exportarCotizacionPdf = async (cotizacion) => {
     const w = logoAltoBanco * (bnLogo.naturalWidth / bnLogo.naturalHeight);
     doc.addImage(bnLogo, "PNG", M + 2, y, w, logoAltoBanco);
   }
-  y += logoAltoBanco + 2;
+  y += logoAltoBanco + 3;
   lineaPago("* N° DE CUENTA DETRACCIÓN: ", BANCOS.bnCuentaDetraccion);
   doc.setDrawColor(0);
   doc.rect(M, yPagoBarra, CONTENT_W, (y - yPagoInicio) + 2 + (yPagoInicio - yPagoBarra));
@@ -330,8 +372,10 @@ export const exportarCotizacionPdf = async (cotizacion) => {
   if (marcasFooter) {
     const h = CONTENT_W * (marcasFooter.naturalHeight / marcasFooter.naturalWidth) * 0.5;
     const w = h * (marcasFooter.naturalWidth / marcasFooter.naturalHeight);
-    if (y + h > PAGE_H - 6) { doc.addPage(); y = 15; }
+    if (y + h > PAGE_H - 6) { doc.addPage(); dibujarMarcaDeAgua(); y = 15; }
     doc.addImage(marcasFooter, "PNG", (PAGE_W - w) / 2, y, w, h);
+        // doc.addImage(marcasFooter, "PNG", 15, y, 180, 70);
+
   }
 
   doc.save(`Cotización N° ${cotizacion.numeroCotizacion || cotizacion.codigo}.pdf`);

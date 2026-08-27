@@ -97,8 +97,13 @@ export default function Cotizaciones() {
     ));
 
   const subtotalGeneral = parseFloat(items.reduce((acc, i) => acc + calcSubtotal(i), 0).toFixed(2));
-  const igv = parseFloat((subtotalGeneral * 0.18).toFixed(2));
-  const total = parseFloat((subtotalGeneral + igv).toFixed(2));
+  // Descuento global sobre la suma de subtotales (no por ítem) — se aplica
+  // antes del IGV, ver mismo criterio en DetalleCotizacion.jsx.
+  const descuentoPorcentaje = Math.min(100, Math.max(0, Number(form.descuentoPorcentaje) || 0));
+  const descuentoGeneral = parseFloat((subtotalGeneral * (descuentoPorcentaje / 100)).toFixed(2));
+  const subtotalConDescuento = parseFloat((subtotalGeneral - descuentoGeneral).toFixed(2));
+  const igv = parseFloat((subtotalConDescuento * 0.18).toFixed(2));
+  const total = parseFloat((subtotalConDescuento + igv).toFixed(2));
 
   const validar = () => {
     if (!form.titulo.trim()) return "El título del trabajo es requerido.";
@@ -132,6 +137,7 @@ export default function Cotizaciones() {
           return item;
         }),
         subtotal: subtotalGeneral,
+        descuentoPorcentaje,
         igv,
         total,
       };
@@ -467,6 +473,18 @@ export default function Cotizaciones() {
                 <tr>
                   <td colSpan={7} className="px-4 py-2 text-right text-xs text-gray-500">Subtotal</td>
                   <td className="px-3 py-2 text-right font-medium">{moneda === "USD" ? "US$" : "S/"} {subtotalGeneral.toFixed(2)}</td>
+                  {!ro && <td />}
+                </tr>
+                <tr>
+                  <td colSpan={7} className="px-4 py-2 text-right text-xs text-gray-500">Descuento global (%)</td>
+                  <td className="px-3 py-2 text-right font-medium">
+                    {ro ? (
+                      <>{descuentoPorcentaje > 0 ? `${descuentoPorcentaje}% (−${descuentoGeneral.toFixed(2)})` : "—"}</>
+                    ) : (
+                      <input type="number" name="descuentoPorcentaje" value={form.descuentoPorcentaje || ""} onChange={handleChange}
+                        step="0.01" min="0" max="100" placeholder="0" className={`w-20 text-right ${INP}`} />
+                    )}
+                  </td>
                   {!ro && <td />}
                 </tr>
                 <tr>
