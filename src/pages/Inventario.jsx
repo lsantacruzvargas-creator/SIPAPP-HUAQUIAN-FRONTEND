@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { fetchAuth } from "../utils/fetchAuth";
+import TablaScroll from "../components/TablaScroll";
 
 const INP = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white";
 const LIMIT = 50;
@@ -74,7 +75,7 @@ export default function Inventario() {
 
       {/* Tabla — ancha al 90vw (se sale del contenedor max-w-5xl de la página), columnas con ancho fijo para evitar desborde */}
       <div className="relative left-1/2 -ml-[45vw] w-[90vw] max-w-[90vw] bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        <TablaScroll className="overflow-x-auto">
         <table className="w-full text-sm table-fixed">
           <colgroup>
             <col className="w-[10%]" />
@@ -120,7 +121,7 @@ export default function Inventario() {
             ))}
           </tbody>
         </table>
-        </div>
+        </TablaScroll>
 
         <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 text-sm text-gray-400">
           <span>{cargando ? "Cargando…" : `Mostrando ${items.length} de ${total} resultados`}</span>

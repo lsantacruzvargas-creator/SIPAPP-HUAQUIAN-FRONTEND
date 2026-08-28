@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { fetchAuth } from "../utils/fetchAuth";
+import TablaScroll from "../components/TablaScroll";
 import {
   TIPO_GUIA,
   MODALIDAD_TRASLADO,
@@ -1054,7 +1055,7 @@ export default function EmitirGuia() {
 
         {/* Tabla de items */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-5">
-          <div className="overflow-x-auto">
+          <TablaScroll className="overflow-x-auto">
             <table className="erp-table w-full text-sm min-w-[700px]">
               <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-100">
                 <tr>
@@ -1139,7 +1140,7 @@ export default function EmitirGuia() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </TablaScroll>
           {!ro && (
             <div className="px-4 py-3 border-t border-gray-100">
               <button type="button" onClick={agregarItem}

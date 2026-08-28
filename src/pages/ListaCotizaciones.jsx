@@ -6,6 +6,7 @@ import ModalImportarExcel, { COLS_COT_OT, COLS_COTIZACIONES } from "../component
 import ModalNuevaOT from "../components/ModalNuevaOT";
 import ModalNuevaCotizacion from "../components/ModalNuevaCotizacion";
 import { DotChip, badgeGeneral, dotGeneral } from "../components/detalleShared";
+import TablaScroll from "../components/TablaScroll";
 import * as XLSX from "xlsx";
 
 const MESES = [
@@ -75,7 +76,7 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
         <span className="text-xs text-gray-400">({cotizaciones.length})</span>
       </div>
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        <TablaScroll className="overflow-x-auto">
         <table className="w-full text-sm" style={{ minWidth: "1000px" }}>
           <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-200">
             <tr>
@@ -200,7 +201,7 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
             )}
           </tbody>
         </table>
-        </div>
+        </TablaScroll>
       </div>
     </div>
   );

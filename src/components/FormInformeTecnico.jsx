@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { fetchAuth, uploadAuth, getUsuario } from "../utils/fetchAuth";
 import { tipoInformePorValor, claveChecklist } from "../utils/informesTecnicos";
 import ImagenProtegida from "./ImagenProtegida";
+import TablaScroll from "./TablaScroll";
 
 const INP = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 w-full transition";
 
@@ -139,7 +140,7 @@ function SeccionTabla({ seccion, campos, onCampo, onCampos }) {
           </div>
         </div>
       )}
-      <div className="overflow-x-auto">
+      <TablaScroll className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr>
@@ -176,7 +177,7 @@ function SeccionTabla({ seccion, campos, onCampo, onCampos }) {
             ))}
           </tbody>
         </table>
-      </div>
+      </TablaScroll>
     </Seccion>
   );
 }

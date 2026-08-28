@@ -9,6 +9,7 @@ import {
   INP_RO,
 } from "../utils/cotizacionItems";
 import CeldasNumericas from "../components/CeldasNumericas";
+import TablaScroll from "../components/TablaScroll";
 
 const hoy = () => new Date().toISOString().split("T")[0];
 
@@ -374,7 +375,7 @@ export default function Cotizaciones() {
 
         {/* Tabla */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-5">
-          <div className="overflow-x-auto">
+          <TablaScroll className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-500 text-white text-xs uppercase">
                 <tr>
@@ -499,7 +500,7 @@ export default function Cotizaciones() {
                 </tr>
               </tfoot>
             </table>
-          </div>
+          </TablaScroll>
           {!ro && (
             <div className="px-4 py-3 border-t border-gray-100">
               <button type="button" onClick={agregarItem}

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { fetchAuth } from "../utils/fetchAuth";
 import ModalOTEquipo from "../components/ModalOTEquipo";
+import TablaScroll from "../components/TablaScroll";
 
 const ESTADOS = ["recibido", "en diagnóstico", "en reparación", "listo", "entregado"];
 const ESTADOS_OT = ["pendiente", "en progreso", "completado", "entregado"];
@@ -254,7 +255,7 @@ export default function IngresoEquipos() {
       </div>
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        <TablaScroll className="overflow-x-auto">
         <table className="w-full text-sm min-w-[600px]">
           <thead className="bg-gray-500 text-white text-xs uppercase">
             <tr>
@@ -329,7 +330,7 @@ export default function IngresoEquipos() {
             })}
           </tbody>
         </table>
-        </div>
+        </TablaScroll>
       </div>
 
       {/* Modal crear / editar */}

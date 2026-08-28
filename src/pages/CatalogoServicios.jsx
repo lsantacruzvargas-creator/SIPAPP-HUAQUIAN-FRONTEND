@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { fetchAuth } from "../utils/fetchAuth";
 import ModalCatalogoServicio from "../components/ModalCatalogoServicio";
+import TablaScroll from "../components/TablaScroll";
 
 export default function CatalogoServicios() {
   const [catalogo, setCatalogo] = useState([]);
@@ -42,7 +43,7 @@ export default function CatalogoServicios() {
       </div>
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        <TablaScroll className="overflow-x-auto">
           <table className="w-full text-sm min-w-[500px]">
             <thead className="bg-gray-500 text-white text-xs uppercase">
               <tr>
@@ -72,7 +73,7 @@ export default function CatalogoServicios() {
               ))}
             </tbody>
           </table>
-        </div>
+        </TablaScroll>
       </div>
 
       {modal && (

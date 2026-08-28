@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { fetchAuth } from "../utils/fetchAuth";
 import ModalServicioExterno from "./ModalServicioExterno";
+import TablaScroll from "./TablaScroll";
 
 const money = (v) => "S/ " + Number(v ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2 });
 
@@ -46,7 +47,7 @@ export default function TablaServiciosExternos({ ot, subOTs = [], servicios, pue
         {servicios.length === 0 ? (
           <p className="text-sm text-gray-400">Sin servicios externos registrados</p>
         ) : (
-          <div className="overflow-x-auto">
+          <TablaScroll className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-xs uppercase tracking-wide text-gray-400 border-b border-gray-100">
                 <tr>
@@ -104,7 +105,7 @@ export default function TablaServiciosExternos({ ot, subOTs = [], servicios, pue
                 </tfoot>
               )}
             </table>
-          </div>
+          </TablaScroll>
         )}
       </div>
 

@@ -82,7 +82,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   const [seleccionados, setSeleccionados] = useState(() => new Set());
   const [generandoOT, setGenerandoOT] = useState(false);
   const rolActual = getUsuario()?.rol;
-  const puedeEditar = ["admin", "asistente", "facturacion", "jefatura"].includes(rolActual);
+  const puedeEditar = ["admin", "asistente", "facturacion", "jefatura", "coordinadora"].includes(rolActual);
   // Anular un documento queda reservado a Admin y Jefatura — Facturación ya
   // no puede. Desanular y cerrar/abrir la cadena a mano son exclusivos de admin.
   const puedeAnular = ["admin", "jefatura"].includes(rolActual);
@@ -94,7 +94,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   const puedeEnviar = ["admin", "asistente", "jefatura"].includes(rolActual);
   const puedeConfirmarInformeEnviado = ["admin", "asistente", "facturacion", "jefatura"].includes(rolActual);
   // Generar OT desde un ítem es un set más amplio que `puedeEditar`: incluye
-  // Planner y Coordinadora, que no editan el resto de la cotización — y a
+  // además a Planner (Coordinadora ya está en `puedeEditar`) — y a
   // diferencia de `puedeEditar`, sí se permite con la cotización ya
   // enviada/aprobada (mismo criterio que el backend, ver puedeGenerarOTDesdeItem).
   const puedeGenerarOT = ["admin", "asistente", "facturacion", "jefatura", "planner", "coordinadora"].includes(rolActual);

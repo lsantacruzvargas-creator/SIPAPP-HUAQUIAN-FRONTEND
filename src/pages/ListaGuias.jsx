@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchAuth } from "../utils/fetchAuth";
+import TablaScroll from "../components/TablaScroll";
 import {
   TIPO_GUIA,
   MODALIDAD_TRASLADO,
@@ -148,7 +149,7 @@ export default function ListaGuias() {
 
       {/* Tabla */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        <TablaScroll className="overflow-x-auto">
         <table className="erp-table w-full text-sm min-w-[700px]">
           <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-100">
             <tr>
@@ -187,7 +188,7 @@ export default function ListaGuias() {
             )}
           </tbody>
         </table>
-        </div>
+        </TablaScroll>
         {paginacion.pages > 1 && (
           <div className="flex justify-between items-center px-4 py-3 border-t border-gray-100 text-sm">
             <button

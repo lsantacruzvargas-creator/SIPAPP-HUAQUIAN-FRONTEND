@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import ModalImportarExcel, { COLS_MATERIALES } from "../components/ModalImportarExcel";
 import BuscadorMaterialInline from "../components/BuscadorMaterialInline";
+import TablaScroll from "../components/TablaScroll";
 import * as XLSX from "xlsx";
 
 const INP =
@@ -426,7 +427,7 @@ function SeccionMateriales() {
 
       {/* Tabla — ancha al 80vw (se sale del contenedor max-w-6xl de la página) */}
       <div className="relative left-1/2 -ml-[40vw] w-[80vw] max-w-[80vw] bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        <TablaScroll className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
@@ -479,7 +480,7 @@ function SeccionMateriales() {
             ))}
           </tbody>
         </table>
-        </div>
+        </TablaScroll>
 
         <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 text-sm text-gray-400">
           <span>{cargandoLista ? "Cargando…" : `Mostrando ${items.length} de ${total} resultados`}</span>
@@ -1290,7 +1291,7 @@ function SeccionMovimientos() {
 
       {/* Tabla — ancha al 90vw (se sale del contenedor max-w-6xl de la página) */}
       <div className="relative left-1/2 -ml-[45vw] w-[90vw] max-w-[90vw] bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        <TablaScroll className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
@@ -1353,7 +1354,7 @@ function SeccionMovimientos() {
               ))}
             </tbody>
           </table>
-        </div>
+        </TablaScroll>
       </div>
 
       {modalIngreso && (

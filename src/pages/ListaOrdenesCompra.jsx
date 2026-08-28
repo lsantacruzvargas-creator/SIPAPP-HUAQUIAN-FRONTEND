@@ -4,6 +4,7 @@ import DetalleDocumento from "../components/DetalleDocumento";
 import ModalCrearOrdenCompra   from "../components/ModalCrearOrdenCompra";
 import ModalImportarExcel, { COLS_OC, COLS_CADENA } from "../components/ModalImportarExcel";
 import { DotChip, badgeOT, dotOT, badgeInformes, dotInformes } from "../components/detalleShared";
+import TablaScroll from "../components/TablaScroll";
 import * as XLSX from "xlsx";
 
 const ESTADOS_OT = ["", "pendiente", "en progreso", "completado"];
@@ -61,7 +62,7 @@ function TablaOC({
         <span className="text-xs text-gray-400">({ordenes.length})</span>
       </div>
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        <TablaScroll className="overflow-x-auto">
         <table className="w-full text-sm" style={{ minWidth: `${totalColumnas * 85}px` }}>
           <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-200">
             <tr>
@@ -235,7 +236,7 @@ function TablaOC({
             })}
           </tbody>
         </table>
-        </div>
+        </TablaScroll>
       </div>
     </div>
   );

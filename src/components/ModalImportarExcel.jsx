@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { fetchAuth } from "../utils/fetchAuth";
 import * as XLSX from "xlsx";
+import TablaScroll from "./TablaScroll";
 
 /* Config por tipo: columnas del Excel (orden = plantilla) */
 export const COLS_FACTURAS = [
@@ -343,7 +344,7 @@ export default function ModalImportarExcel({ tipo, columnas, endpoint, color = "
               </div>
 
               <div className="border border-gray-100 rounded-xl overflow-hidden">
-                <div className="overflow-x-auto max-h-[45vh]">
+                <TablaScroll className="overflow-x-auto max-h-[45vh]">
                   <table className="w-full text-xs">
                     <thead className="bg-gray-50 text-gray-500 uppercase sticky top-0">
                       <tr>
@@ -374,7 +375,7 @@ export default function ModalImportarExcel({ tipo, columnas, endpoint, color = "
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </TablaScroll>
               </div>
 
               {errorGlobal && <p className="text-sm text-red-500">{errorGlobal}</p>}

@@ -5,6 +5,7 @@ import FormInformeTecnico from "./FormInformeTecnico";
 import VistaInformeTecnico from "./VistaInformeTecnico";
 import ModalRequerimiento from "./ModalRequerimiento";
 import TablaServiciosExternos from "./TablaServiciosExternos";
+import TablaScroll from "./TablaScroll";
 import { Chip, BotonAnular, BotonCerrarCadena, BotonDesanular, BannerAnulado, bloqueadoPorCadenaCerrada } from "./detalleShared";
 
 const CATEGORIAS_SERVICIO = ["SOPORTE", "DEVOLUCION", "DIAGNOSTICO", "GARANTIA", "MANTENIMIENTO", "REPARACION", "PRESTAMO", "SUMINISTRO", "MANTENIMIENTO EN PLANTA"];
@@ -67,6 +68,11 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
   const coincideNombre = (a, b) => !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
   const puedeEditarEstado = puedeEditarCampos || (esTecnico && coincideNombre(ot.encargado2, nombreActual));
   const puedeEditarEstadoPrueba = puedeEditarCampos || (esTecnico && coincideNombre(ot.encargado, nombreActual));
+  // Reasignar QUIÉN es Encargado Prueba/Intervención — a diferencia de arriba,
+  // no exige ya ser el encargado (reasignar a otra persona es el propósito).
+  // Estrictamente el rol "tecnico" (NO tecnico_prueba/tecnico_intervencion,
+  // que solo editan su propia tarjeta de estado/progreso más arriba).
+  const puedeEditarEncargados = puedeEditarCampos || rolActual === "tecnico";
   const [usuarios, setUsuarios] = useState([]);
   const [tecnicos, setTecnicos] = useState([]);
   const [informes, setInformes] = useState([]);
@@ -153,6 +159,19 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
       body: JSON.stringify({ estadoPrueba: nuevo }),
     });
     if (res.ok) setOt(await res.json());
+  };
+
+  const cambiarEncargado = async (campo, nombre) => {
+    const res = await fetchAuth(`/ordenes-trabajo/${ot._id}/encargados`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ [campo]: nombre }),
+    });
+    if (res.ok) {
+      const actualizada = await res.json();
+      setOt(actualizada);
+      setForm((f) => ({ ...f, [campo]: actualizada[campo] }));
+    }
   };
 
   const anular = async (motivo) => {
@@ -280,9 +299,15 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
           {/* Progreso (Encargado Prueba) y Estado (Encargado Intervención) —
               cards independientes del fieldset principal. */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-2">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-              Progreso — Encargado Prueba{ot.encargado && <span className="normal-case font-normal text-gray-400"> ({ot.encargado})</span>}
-            </p>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Progreso — Encargado Prueba</p>
+            <select value={ot.encargado || ""} disabled={!puedeEditarEncargados}
+              onChange={(e) => cambiarEncargado("encargado", e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm disabled:bg-gray-50 disabled:text-gray-500">
+              <option value="">Sin asignar</option>
+              {tecnicos.filter(t => t.rol === "tecnico_prueba").map(t => (
+                <option key={t._id} value={t.nombre}>{t.nombre}</option>
+              ))}
+            </select>
             <div className="flex gap-2">
               {ESTADOS.map(e => (
                 <button key={e} type="button" disabled={!puedeEditarEstadoPrueba}
@@ -295,9 +320,15 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
           </div>
 
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-2">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-              Estado — Encargado Intervención{ot.encargado2 && <span className="normal-case font-normal text-gray-400"> ({ot.encargado2})</span>}
-            </p>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Estado — Encargado Intervención</p>
+            <select value={ot.encargado2 || ""} disabled={!puedeEditarEncargados}
+              onChange={(e) => cambiarEncargado("encargado2", e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm disabled:bg-gray-50 disabled:text-gray-500">
+              <option value="">Sin asignar</option>
+              {tecnicos.filter(t => t.rol === "tecnico_intervencion").map(t => (
+                <option key={t._id} value={t.nombre}>{t.nombre}</option>
+              ))}
+            </select>
             <div className="flex gap-2">
               {ESTADOS.map(e => (
                 <button key={e} type="button" disabled={!puedeEditarEstado}
@@ -365,27 +396,6 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
                   <option value="">Sin asignar</option>
                   {usuarios.map(u => (
                     <option key={u._id} value={u._id}>{u.nombre}{!u.activo ? " (inactivo)" : ""}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Encargado Prueba</label>
-                <select name="encargado" value={form.encargado} onChange={handleChange} className={INP}>
-                  <option value="">Sin asignar</option>
-                  {tecnicos.filter(t => t.rol === "tecnico_prueba").map(t => (
-                    <option key={t._id} value={t.nombre}>{t.nombre}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Encargado Intervención</label>
-                <select name="encargado2" value={form.encargado2} onChange={handleChange} className={INP}>
-                  <option value="">Sin asignar</option>
-                  {tecnicos.filter(t => t.rol === "tecnico_intervencion").map(t => (
-                    <option key={t._id} value={t.nombre}>{t.nombre}</option>
                   ))}
                 </select>
               </div>
@@ -498,7 +508,7 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
             {requerimientos.length === 0 ? (
               <p className="text-sm text-gray-400">Sin requerimientos de material</p>
             ) : (
-              <div className="overflow-x-auto">
+              <TablaScroll className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="text-xs uppercase tracking-wide text-gray-400 border-b border-gray-100">
                     <tr>
@@ -536,7 +546,7 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
                     })}
                   </tbody>
                 </table>
-              </div>
+              </TablaScroll>
             )}
           </div>
         </div>

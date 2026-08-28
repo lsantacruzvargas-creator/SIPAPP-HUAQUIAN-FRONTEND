@@ -19,15 +19,15 @@ export default function ModalRequerimiento({ ot, onClose, onCreado }) {
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
 
-  // "Solicitado por" lista solo a los técnicos de prueba/intervención (no
-  // el registro general de Personal ni la cuenta legado "tecnico") — son
-  // quienes de verdad piden material contra una OT. Si el usuario logueado
-  // es uno de ellos, se autoselecciona y se bloquea (no puede pedir a
-  // nombre de otro técnico); si es otro rol (admin/jefatura/coordinadora
-  // pidiendo a nombre de un técnico) el select arranca vacío y editable.
+  // "Solicitado por" lista a los 3 roles técnico (tecnico/tecnico_prueba/
+  // tecnico_intervencion — los 3 tienen exactamente los mismos privilegios,
+  // no solo Personal general). Si el usuario logueado es uno de ellos, se
+  // autoselecciona y se bloquea (no puede pedir a nombre de otro técnico);
+  // si es otro rol (admin/jefatura/coordinadora pidiendo a nombre de un
+  // técnico) el select arranca vacío y editable.
   useEffect(() => {
     fetchAuth("/usuarios/lista").then((r) => r.ok && r.json()).then((d) => {
-      const filtrados = (d || []).filter((u) => ["tecnico_prueba", "tecnico_intervencion"].includes(u.rol));
+      const filtrados = (d || []).filter((u) => ["tecnico", "tecnico_prueba", "tecnico_intervencion"].includes(u.rol));
       setPersonal(filtrados);
       const propio = filtrados.find((u) => u._id === getUsuario()?.id);
       if (propio) {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import ModalEmpresa from "../components/ModalEmpresa";
+import TablaScroll from "../components/TablaScroll";
 
 export default function Empresas() {
   const [empresas, setEmpresas] = useState([]);
@@ -71,7 +72,7 @@ export default function Empresas() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
+        <TablaScroll className="overflow-x-auto">
         <table className="w-full text-sm min-w-[600px]">
           <thead className="bg-gray-500 text-white text-xs uppercase">
             <tr>
@@ -122,7 +123,7 @@ export default function Empresas() {
             )}
           </tbody>
         </table>
-        </div>
+        </TablaScroll>
       </div>
 
       {modal && (

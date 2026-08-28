@@ -1,5 +1,6 @@
 import { useState } from "react";
 import SelectorCatalogoServicios from "./SelectorCatalogoServicios";
+import TablaScroll from "./TablaScroll";
 import {
   calcSubtotal, itemVacioServicio, UNIDADES,
   descripcionInvalida, cantidadInvalida, precioInvalido, itemInvalido,
@@ -140,7 +141,7 @@ export default function TablaItemsCotizacion({
         </p>
       )}
 
-      <div className="overflow-x-auto">
+      <TablaScroll className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
             <tr>
@@ -296,7 +297,7 @@ export default function TablaItemsCotizacion({
             </tfoot>
           )}
         </table>
-      </div>
+      </TablaScroll>
 
       {catalogoOpen && (
         <SelectorCatalogoServicios

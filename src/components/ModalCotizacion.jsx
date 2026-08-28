@@ -8,6 +8,7 @@ import {
   itemDesdeDb, itemVacioVenta, itemVacioServicio,
 } from "../utils/cotizacionItems";
 import CeldasNumericas from "./CeldasNumericas";
+import TablaScroll from "./TablaScroll";
 
 // Módulo-nivel: evita desmontaje/remontaje en cada render (previene pérdida de foco)
 function FilaDescripcionEditable({ item, tipo, onUpdate, onAddSub, onUpdateSub, onDeleteSub }) {
@@ -165,7 +166,7 @@ function VistaDetalle({ cot, ie, ocVinculada, onVincularOC, vinculandoOC }) {
         </div>
       </div>
 
-      <div className="overflow-x-auto mb-5">
+      <TablaScroll className="overflow-x-auto mb-5">
         <table className="w-full text-sm border border-gray-100 rounded-xl overflow-hidden">
           <thead className="bg-gray-50 text-gray-500 text-xs">
             <tr>
@@ -207,7 +208,7 @@ function VistaDetalle({ cot, ie, ocVinculada, onVincularOC, vinculandoOC }) {
             ))}
           </tbody>
         </table>
-      </div>
+      </TablaScroll>
 
       <div className="flex justify-end gap-8 text-sm border-t border-gray-100 pt-4">
         <div className="text-right space-y-1 text-gray-500">
@@ -602,7 +603,7 @@ export default function ModalCotizacion({ cotizacion: inicial, onClose, onSaved 
                 </div>
               </div>
 
-              <div className="overflow-x-auto mb-4">
+              <TablaScroll className="overflow-x-auto mb-4">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 text-gray-500 text-xs">
                     <tr>
@@ -643,7 +644,7 @@ export default function ModalCotizacion({ cotizacion: inicial, onClose, onSaved 
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </TablaScroll>
 
               <button
                 type="button"

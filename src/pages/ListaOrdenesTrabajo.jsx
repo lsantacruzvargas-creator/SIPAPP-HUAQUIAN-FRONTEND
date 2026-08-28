@@ -3,6 +3,7 @@ import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import DetalleDocumento from "../components/DetalleDocumento";
 import ModalNuevaOT from "../components/ModalNuevaOT";
 import ModalImportarExcel, { COLS_OT } from "../components/ModalImportarExcel";
+import TablaScroll from "../components/TablaScroll";
 import { DotChip, badgeOT, dotOT, badgeInformes, dotInformes, badgeGeneral, dotGeneral } from "../components/detalleShared";
 import * as XLSX from "xlsx";
 
@@ -56,7 +57,7 @@ function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg }) {
         <span className="text-xs text-gray-400">({ordenes.length})</span>
       </div>
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        <TablaScroll className="overflow-x-auto">
           <table className="w-full text-sm" style={{ minWidth: "1000px" }}>
             <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-200">
               <tr>
@@ -157,7 +158,7 @@ function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg }) {
               )}
             </tbody>
           </table>
-        </div>
+        </TablaScroll>
       </div>
     </div>
   );
@@ -213,27 +214,29 @@ export default function ListaOrdenesTrabajo() {
     subOTs: ordenes.filter((o) => (o.ordenPadre?._id || o.ordenPadre) === p._id),
   }));
 
-  // Técnico solo ve las OTs/sub-OTs donde es Encargado Prueba o Encargado
-  // Intervención — el padre se muestra si él mismo coincide o si al menos
-  // una de sus sub-OTs coincide (y en ese caso, solo esas sub-OTs se listan,
-  // no las de sus compañeros).
   const rolActual = getUsuario()?.rol;
   const nombreActual = getUsuario()?.nombre;
   const coincideNombre = (a, b) => !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
-  // "tecnico" (legado) + los 2 roles especializados se tratan igual para el
-  // filtro de "solo mis OTs asignadas" — lo que cambia es qué tablas ve cada
-  // uno más abajo (esTecnicoPrueba/esTecnicoIntervencion).
+  // "tecnico" (legado) + los 2 roles especializados comparten la misma
+  // estructura de tablas (split Prueba/Intervención) — lo que cambia es el
+  // ALCANCE: estrictamente el rol "tecnico" ve TODAS las OTs (mismo criterio
+  // que planner, a pedido explícito del usuario); tecnico_prueba/
+  // tecnico_intervencion siguen viendo solo las suyas (encargado/encargado2
+  // coincidiendo con su nombre) — ver esTecnicoRestringido más abajo.
   const esTecnicoRol = ["tecnico", "tecnico_prueba", "tecnico_intervencion"].includes(rolActual);
+  const esTecnicoRestringido = ["tecnico_prueba", "tecnico_intervencion"].includes(rolActual);
   // Vista simplificada de 4 grupos (No asignadas/En progreso/Completadas/
   // Entregadas), sin el split Prueba/Intervención — planner, Administración
   // ("asistente" es el valor de rol real, ver Sidebar.jsx), Jefatura y
   // Coordinadora (estas dos últimas solo en la vista de OTs, a pedido
-  // explícito del usuario — el resto de sus permisos no cambia).
-  const esVistaSimplificada = ["planner", "asistente", "jefatura", "coordinadora"].includes(rolActual);
+  // explícito del usuario — el resto de sus permisos no cambia). El rol
+  // "tecnico" (estrictamente, no tecnico_prueba/tecnico_intervencion) usa
+  // esta misma vista — copia exacta del UI de planner, a pedido del usuario.
+  const esVistaSimplificada = ["planner", "asistente", "jefatura", "coordinadora", "tecnico"].includes(rolActual);
   const esTecnicoPrueba = rolActual === "tecnico_prueba";
   const esTecnicoIntervencion = rolActual === "tecnico_intervencion";
   const esAsignado = (o) => coincideNombre(o.encargado, nombreActual) || coincideNombre(o.encargado2, nombreActual);
-  const conSubOTs = !esTecnicoRol
+  const conSubOTs = !esTecnicoRestringido
     ? conSubOTsCompleto
     : conSubOTsCompleto
         .map((p) => ({ ...p, subOTs: p.subOTs.filter(esAsignado) }))
@@ -296,11 +299,12 @@ export default function ListaOrdenesTrabajo() {
   const abiertas = filtradas.filter((o) => !esCerrada(o));
 
   // Una OT/sub-OT "califica" para un track (Prueba=encargado,
-  // Intervención=encargado2) si tiene alguien asignado — para técnico,
-  // además debe ser SU nombre (no el de un compañero asignado al otro
-  // track), mismo criterio que `esAsignado`.
+  // Intervención=encargado2) si tiene alguien asignado — tecnico_prueba/
+  // tecnico_intervencion además exigen que sea SU nombre (no el de un
+  // compañero asignado al otro track), mismo criterio que `esAsignado`. El
+  // rol "tecnico" (sin restringir) usa el criterio general, igual que el resto.
   const califica = (doc, campo) =>
-    esTecnicoRol ? coincideNombre(doc[campo], nombreActual) : !!doc[campo]?.trim();
+    esTecnicoRestringido ? coincideNombre(doc[campo], nombreActual) : !!doc[campo]?.trim();
 
   // Agrupa por las 4 tablas de estado de un track. Una OT padre puede tener
   // sub-OTs en estados distintos (o asignadas a técnicos distintos) — cada
@@ -322,15 +326,15 @@ export default function ListaOrdenesTrabajo() {
       if (califica(o, campoEncargado) && buckets[o[campoEstado]]) {
         buckets[o[campoEstado]].push({ ...o, subOTs: porEstado[o[campoEstado]] || [] });
         delete porEstado[o[campoEstado]];
-        Object.entries(porEstado).forEach(([estado, subs]) => buckets[estado].push({ ...o, subOTs: subs }));
-      } else if (esTecnicoRol) {
-        // Para técnico, si el padre no le pertenece (no calificó), la OT
-        // padre no debe aparecer como contexto — cada sub-OT suya se lista
-        // como su propia fila, sola, sin el padre encima.
+      } else if (esTecnicoRestringido) {
+        // Para tecnico_prueba/tecnico_intervencion, si el padre no le
+        // pertenece (no calificó), la OT padre no debe aparecer como
+        // contexto — cada sub-OT suya se lista como su propia fila, sola,
+        // sin el padre encima.
         Object.values(porEstado).flat().forEach((s) => buckets[s[campoEstado]].push({ ...s, subOTs: [] }));
-      } else {
-        Object.entries(porEstado).forEach(([estado, subs]) => buckets[estado].push({ ...o, subOTs: subs }));
+        return;
       }
+      Object.entries(porEstado).forEach(([estado, subs]) => buckets[estado].push({ ...o, subOTs: subs }));
     });
     return buckets;
   };
@@ -488,7 +492,7 @@ export default function ListaOrdenesTrabajo() {
           </select>
         )}
 
-        {esTecnicoRol && (
+        {esTecnicoRol && !esVistaSimplificada && (
           <select value={filtroEstadoTecnico} onChange={(e) => setFiltroEstadoTecnico(e.target.value)} className={SELECT}>
             <option value="todos">Todo estado</option>
             <option value="pendiente">Pendiente</option>
@@ -583,8 +587,10 @@ export default function ListaOrdenesTrabajo() {
       {/* Una OT sin ningún técnico asignado (p.ej. recién importada del Excel)
           no cae en la tabla de Prueba ni en la de Intervención abajo —
           ambas exigen encargado/encargado2. Sin esta tabla quedaría
-          invisible para admin y roles no-técnico/no-planner. */}
-      {!esVistaSimplificada && !esTecnicoRol && (
+          invisible para admin y roles no-técnico/no-planner. Tecnico_prueba/
+          tecnico_intervencion no la ven (su vista sigue acotada a lo suyo);
+          el rol "tecnico" sí, porque ahora ve todas las OTs igual que planner. */}
+      {!esVistaSimplificada && !esTecnicoRestringido && (
         <TablaOTs
           titulo="Órdenes no asignadas"
           acento="bg-red-500"

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { fetchAuth } from "../utils/fetchAuth";
 import { money } from "../components/detalleShared";
+import TablaScroll from "../components/TablaScroll";
 import * as XLSX from "xlsx";
 
 const TH = "px-4 py-3 font-semibold text-gray-500 whitespace-nowrap";
@@ -33,9 +34,9 @@ function Seccion({ titulo, acento, count, children }) {
         <span className="text-xs text-gray-400">({count})</span>
       </div>
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        <TablaScroll className="overflow-x-auto">
           <table className="w-full text-sm">{children}</table>
-        </div>
+        </TablaScroll>
       </div>
     </div>
   );
@@ -177,7 +178,7 @@ export default function Reportes() {
           <p className="text-2xl sm:text-3xl font-bold text-gray-900">{money(data.valorizado.total)}</p>
         </div>
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
+          <TablaScroll className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-200">
                 <tr>
@@ -208,7 +209,7 @@ export default function Reportes() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </TablaScroll>
         </div>
       </div>
 

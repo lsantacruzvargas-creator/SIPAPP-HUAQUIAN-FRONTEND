@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchAuth } from "../utils/fetchAuth";
+import TablaScroll from "../components/TablaScroll";
 
 const ROLES = ["admin", "tecnico", "tecnico_prueba", "tecnico_intervencion", "almacenero", "asistente", "supervisor", "jefatura", "facturacion", "planner", "coordinadora"];
 // "asistente" es el valor de rol real (DB/JWT/permisos) — solo se renombra
@@ -258,7 +259,7 @@ export default function Usuarios() {
         </div>
 
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
+          <TablaScroll className="overflow-x-auto">
           <table className="w-full text-sm min-w-[500px]">
             <thead className="bg-gray-500 text-white text-xs uppercase">
               <tr>
@@ -291,7 +292,7 @@ export default function Usuarios() {
               ))}
             </tbody>
           </table>
-          </div>
+          </TablaScroll>
         </div>
       </section>
 
@@ -311,7 +312,7 @@ export default function Usuarios() {
         </div>
 
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
+          <TablaScroll className="overflow-x-auto">
           <table className="w-full text-sm min-w-[400px]">
             <thead className="bg-gray-500 text-white text-xs uppercase">
               <tr>
@@ -336,7 +337,7 @@ export default function Usuarios() {
               ))}
             </tbody>
           </table>
-          </div>
+          </TablaScroll>
         </div>
       </section>
 

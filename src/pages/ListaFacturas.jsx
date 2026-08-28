@@ -4,6 +4,7 @@ import DetalleDocumento from "../components/DetalleDocumento";
 import ModalCrearFactura  from "../components/ModalCrearFactura";
 import ModalImportarExcel, { COLS_FACTURAS } from "../components/ModalImportarExcel";
 import { DotChip, badgePago, dotPago } from "../components/detalleShared";
+import TablaScroll from "../components/TablaScroll";
 import * as XLSX from "xlsx";
 
 const MESES = [
@@ -118,7 +119,7 @@ function TablaFacturas({ titulo, acento, facturas, onSelect, handlePagoMonto, ha
         <span className="text-xs text-gray-400">({facturas.length})</span>
       </div>
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        <TablaScroll className="overflow-x-auto">
           <table className="w-full text-sm" style={{ minWidth: "1000px" }}>
             <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-200">
               <tr>
@@ -268,7 +269,7 @@ function TablaFacturas({ titulo, acento, facturas, onSelect, handlePagoMonto, ha
               )}
             </tbody>
           </table>
-        </div>
+        </TablaScroll>
       </div>
     </div>
   );

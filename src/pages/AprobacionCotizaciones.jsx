@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import DetalleDocumento from "../components/DetalleDocumento";
+import TablaScroll from "../components/TablaScroll";
 import { DotChip, badgeOT, dotOT } from "../components/detalleShared";
 
 const TH = "px-4 py-3 font-semibold text-gray-500 whitespace-nowrap";
@@ -17,7 +18,7 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, otGroupMap, mostrarOT
         <span className="text-xs text-gray-400">({cotizaciones.length})</span>
       </div>
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        <TablaScroll className="overflow-x-auto">
           <table className="w-full text-sm" style={{ minWidth: "900px" }}>
             <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-200">
               <tr>
@@ -109,7 +110,7 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, otGroupMap, mostrarOT
               )}
             </tbody>
           </table>
-        </div>
+        </TablaScroll>
       </div>
     </div>
   );

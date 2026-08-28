@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
+import TablaScroll from "../components/TablaScroll";
 
 const INP = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white";
 
@@ -134,7 +135,7 @@ export default function TipoCambio() {
       {tc?.historial?.length > 0 && (
         <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
           <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide mb-3">Historial de cambios</h2>
-          <div className="overflow-x-auto">
+          <TablaScroll className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-xs uppercase tracking-wide text-gray-400 border-b border-gray-100">
                 <tr>
@@ -157,7 +158,7 @@ export default function TipoCambio() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </TablaScroll>
         </div>
       )}
     </div>

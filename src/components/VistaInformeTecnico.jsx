@@ -2,6 +2,7 @@ import { abrirArchivoProtegido } from "../utils/fetchAuth";
 import { tipoInformePorValor, claveChecklist } from "../utils/informesTecnicos";
 import { exportarInformeTecnicoExcel } from "../utils/informeTecnicoExcel";
 import ImagenProtegida from "./ImagenProtegida";
+import TablaScroll from "./TablaScroll";
 
 function Campo({ label, valor }) {
   return (
@@ -53,7 +54,7 @@ function BloqueSeccion({ seccion, campos }) {
     const filas = (campos[seccion.clave] || []).filter((f) => f.cantidad || f.descripcion);
     const [colUno, colDos] = seccion.columnas;
     return filas.length ? (
-      <div className="overflow-x-auto">
+      <TablaScroll className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr>
@@ -70,7 +71,7 @@ function BloqueSeccion({ seccion, campos }) {
             ))}
           </tbody>
         </table>
-      </div>
+      </TablaScroll>
     ) : <span className="text-sm text-gray-300">Sin registros</span>;
   }
   if (seccion.tipo === "tabla") {
@@ -85,7 +86,7 @@ function BloqueSeccion({ seccion, campos }) {
             <Campo label="Fecha" valor={campos[claveFecha]} />
           </div>
         )}
-        <div className="overflow-x-auto">
+        <TablaScroll className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr>
@@ -106,7 +107,7 @@ function BloqueSeccion({ seccion, campos }) {
               ))}
             </tbody>
           </table>
-        </div>
+        </TablaScroll>
       </div>
     );
   }
