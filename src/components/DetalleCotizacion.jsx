@@ -52,6 +52,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
     atencion: inicial.atencion || "",
     encargado: inicial.encargado || "",
     planta: inicial.planta || "",
+    personaContacto: inicial.personaContacto || "",
     numeroGuiaEmision: inicial.numeroGuiaEmision || "",
     numeroGuiaRemision: inicial.numeroGuiaRemision || "",
     codigoSap: inicial.codigoSap || "",
