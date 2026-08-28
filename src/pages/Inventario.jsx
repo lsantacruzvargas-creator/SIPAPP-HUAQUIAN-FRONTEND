@@ -76,11 +76,11 @@ export default function Inventario() {
       <div className="relative left-1/2 -ml-[45vw] w-[90vw] max-w-[90vw] bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
         <table className="w-full text-sm table-fixed">
           <colgroup>
-            <col className="w-[10%]" />
+            <col className="w-[5%]" />
             <col className="w-[10%]" />
             <col className="w-[16%]" />
-            <col className="w-[20%]" />
-            <col className="w-[13%]" />
+            <col className="w-[15%]" />
+            <col className="w-[10%]" />
             <col className="w-[13%]" />
             <col className="w-[8%]" />
             <col className="w-[10%]" />

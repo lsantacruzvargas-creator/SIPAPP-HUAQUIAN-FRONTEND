@@ -144,13 +144,21 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   const empresaSel = empresas.find(e => e._id === form.empresa);
   const plantasEmpresa = empresaSel?.plantas ?? [];
   const plantaSel = plantasEmpresa.find(p => p.nombre === form.planta);
+  // Hoy una planta guarda un solo contacto (Empresa.plantas) — se modela ya
+  // como lista para que, cuando una planta pueda tener varios contactos, el
+  // select de abajo solo necesite ampliar este array, sin tocar el resto.
+  const contactosPlanta = plantaSel?.contactoNombre
+    ? [{ nombre: plantaSel.contactoNombre, telefono: plantaSel.contactoTelefono, correo: plantaSel.contactoCorreo }]
+    : [];
+  const contactoSel = contactosPlanta.find(c => c.nombre === form.personaContacto);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm(prev => ({
       ...prev,
       [name]: value,
-      ...(name === "empresa" ? { planta: "" } : {}),
+      ...(name === "empresa" ? { planta: "", personaContacto: "" } : {}),
+      ...(name === "planta" ? { personaContacto: "" } : {}),
     }));
   };
 
@@ -226,6 +234,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
     total: totalesMostrados.total,
     asesorComercial: form.asesorComercial,
     numeroCelular: form.numeroCelular,
+    personaContacto: form.personaContacto,
     numeroSolicitudPedido: form.numeroSolicitudPedido,
     numeroPeticionOferta: form.numeroPeticionOferta,
     tiempoGarantia: form.tiempoGarantia,
@@ -266,6 +275,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
       atencion: form.atencion,
       encargado: form.encargado,
       planta: form.planta,
+      personaContacto: form.personaContacto,
       plazoEntrega: form.plazoEntrega,
       lugarEntrega: form.lugarEntrega,
       validezOferta: form.validezOferta,
@@ -565,12 +575,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
         <div className="max-w-6xl mx-auto px-8 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
 
           {/* Datos editables */}
-          <fieldset disabled={cot.anulado || cot.enviado || cadenaCerrada || !puedeEditar} className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5 self-start">
-            <div className="flex items-center gap-2">
-              <span className="w-1.5 h-5 rounded-full bg-sky-500" />
-              <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Datos de la cotización</h2>
-            </div>
-
+          <div className="lg:col-span-2 space-y-6 self-start">
             {cot.anulado && (
               <BannerAnulado motivo={cot.motivoAnulacion} por={cot.anuladoPor} fecha={cot.fechaAnulacion} />
             )}
@@ -587,271 +592,301 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
               </p>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">N° Cotización</label>
-                <input name="numeroCotizacion" value={form.numeroCotizacion} onChange={handleChange}
-                  placeholder="—" className={INP} />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Fecha</label>
-                <input type="date" name="fecha" value={form.fecha} onChange={handleChange} className={INP} />
-              </div>
-            </div>
+            {/* `contents` — el fieldset deshabilita todos los inputs de las 4
+                cards de abajo sin imponer su propio layout (cada card sigue
+                siendo un hijo directo de este space-y-6). */}
+            <fieldset disabled={cot.anulado || cot.enviado || cadenaCerrada || !puedeEditar} className="contents">
 
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">Empresa</label>
-              <select name="empresa" value={form.empresa} onChange={handleChange} className={INP}>
-                <option value="">— Sin empresa —</option>
-                {empresas.map(e => (
-                  <option key={e._id} value={e._id}>
-                    {e.alias ? `${e.alias} — ` : ""}{e.razonSocial}
-                  </option>
-                ))}
-              </select>
-            </div>
+ {/* Card 2: Detalle de cotización */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5 mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-1.5 h-5 rounded-full bg-blue-500" />
+                  <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Detalle de cotización</h2>
+                </div>
 
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">N° Cotización</label>
+                    <input name="numeroCotizacion" value={form.numeroCotizacion} onChange={handleChange}
+                      placeholder="—" className={INP} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Fecha</label>
+                    <input type="date" name="fecha" value={form.fecha} onChange={handleChange} className={INP} />
+                  </div>
+                </div>
 
-            <div className="grid grid-cols-1 gap-4">
-              <div hidden>
-                <label className="text-xs text-gray-500 block mb-1">Encargado</label>
-                <input name="encargado" value={form.encargado} onChange={handleChange}
-                  placeholder="Nombre del encargado" className={INP} />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Tiempo de entrega de servicio</label>
+                    <input name="plazoEntrega" value={form.plazoEntrega} onChange={handleChange}
+                      placeholder="Ej. 2 días de recibida su O/C." className={INP} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Validez de la oferta</label>
+                    <input name="validezOferta" value={form.validezOferta} onChange={handleChange}
+                      placeholder="Ej. 15 días" className={INP} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Asesor comercial</label>
+                    <input name="asesorComercial" value={form.asesorComercial || "Jose Mateo"} onChange={handleChange}
+                      placeholder="Nombre del asesor" className={INP} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">N° Celular</label>
+                    <input name="numeroCelular" value={form.numeroCelular || "+51 966 757 528"} onChange={handleChange}
+                      placeholder="—" className={INP} />
+                  </div>
+                </div>
               </div>
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Planta</label>
-                {plantasEmpresa.length > 0 ? (
-                  <select name="planta" value={form.planta} onChange={handleChange} className={INP}>
-                    <option value="">— Seleccionar planta —</option>
-                    {plantasEmpresa.map((p, i) => (
-                      <option key={i} value={p.nombre}>{p.nombre}</option>
+
+              {/* Card 1: Datos del cliente */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5 mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-1.5 h-5 rounded-full bg-sky-500" />
+                  <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Datos del cliente</h2>
+                </div>
+
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Empresa</label>
+                  <select name="empresa" value={form.empresa} onChange={handleChange} className={INP}>
+                    <option value="">— Sin empresa —</option>
+                    {empresas.map(e => (
+                      <option key={e._id} value={e._id}>
+                        {e.alias ? `${e.alias} — ` : ""}{e.razonSocial}
+                      </option>
                     ))}
                   </select>
-                ) : (
-                  <input name="planta" value={form.planta} onChange={handleChange}
-                    placeholder="Planta o sede" className={INP} />
-                )}
-              </div>
-            </div>
+                </div>
 
-
-
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Atención</label>
-                <input name="atencion" value={form.atencion} onChange={handleChange}
-                  placeholder="Ej. Área de Compras" className={INP} />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Tipo</label>
-                <select name="tipo" value={form.tipo} onChange={handleChange} className={INP}>
-                  <option value="venta">Venta</option>
-                  <option value="servicio">Servicio</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Asesor comercial</label>
-                <input name="asesorComercial" value={form.asesorComercial} onChange={handleChange}
-                  placeholder="Nombre del asesor" className={INP} />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">N° Celular</label>
-                <input name="numeroCelular" value={form.numeroCelular} onChange={handleChange}
-                  placeholder="—" className={INP} />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">N° de solicitud de pedido</label>
-                <input name="numeroSolicitudPedido" value={form.numeroSolicitudPedido} onChange={handleChange}
-                  placeholder="—" className={INP} />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">N° de petición de oferta</label>
-                <input name="numeroPeticionOferta" value={form.numeroPeticionOferta} onChange={handleChange}
-                  placeholder="—" className={INP} />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Área</label>
-                <input name="area" value={form.area} onChange={handleChange}
-                  placeholder="—" className={INP} />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Jefe / Supervisor solicitante</label>
-                <input name="jefeSupervisorSolicitante" value={form.jefeSupervisorSolicitante} onChange={handleChange}
-                  placeholder="—" className={INP} />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">OM / Aviso</label>
-                <input name="omAviso" value={form.omAviso} onChange={handleChange}
-                  placeholder="—" className={INP} />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Comprador responsable</label>
-                <input name="compradorResponsable" value={form.compradorResponsable} onChange={handleChange}
-                  placeholder="—" className={INP} />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">N° de guía</label>
-                <input name="numeroGuia" value={form.numeroGuia} onChange={handleChange}
-                  placeholder="—" className={INP} />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Moneda de la cotización</label>
-                <select name="moneda" value={form.moneda} onChange={handleChange} className={INP}>
-                  <option value="PEN">Soles (S/)</option>
-                  <option value="USD">Dólares (US$)</option>
-                </select>
-              </div>
-            </div>
-
-
-
-            {plantaSel?.contactoNombre && (
-              <div className="bg-sky-50/50 border border-sky-100 rounded-xl p-4 space-y-1.5">
-                <p className="text-xs font-semibold text-sky-600 uppercase tracking-wide">Contacto de la planta</p>
-                <p className="text-sm text-gray-700">
-                  <span className="font-medium">{plantaSel.contactoNombre}</span>
-                  {(plantaSel.contactoTelefono || plantaSel.contactoCorreo) && (
-                    <span className="text-gray-500"> — {[plantaSel.contactoTelefono, plantaSel.contactoCorreo].filter(Boolean).join(" · ")}</span>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Planta</label>
+                  {plantasEmpresa.length > 0 ? (
+                    <select name="planta" value={form.planta} onChange={handleChange} className={INP}>
+                      <option value="">— Seleccionar planta —</option>
+                      {plantasEmpresa.map((p, i) => (
+                        <option key={i} value={p.nombre}>{p.nombre}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input name="planta" value={form.planta} onChange={handleChange}
+                      placeholder="Planta o sede" className={INP} />
                   )}
-                </p>
-              </div>
-            )}
-
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">Título cotización</label>
-              <input name="titulo" value={form.titulo} onChange={handleChange}
-                placeholder="Título de la cotización" className={INP} />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Forma de pago</label>
-                <input name="condicionPago" value={form.condicionPago} onChange={handleChange}
-                  placeholder="—" className={INP} />
-              </div>
-              <div hidden>
-                <label className="text-xs text-gray-500 block mb-1">Fecha recibida</label>
-                <input type="date" name="fechaRecibida" value={form.fechaRecibida} onChange={handleChange} className={INP} />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Plazo de entrega</label>
-                <input name="plazoEntrega" value={form.plazoEntrega} onChange={handleChange}
-                  placeholder="Ej. 2 días de recibida su O/C." className={INP} />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Lugar de entrega</label>
-                <input name="lugarEntrega" value={form.lugarEntrega} onChange={handleChange}
-                  placeholder="Ej. Planta Chilca" className={INP} />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Validez de la oferta</label>
-                <input name="validezOferta" value={form.validezOferta} onChange={handleChange}
-                  placeholder="Ej. 15 días" className={INP} />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Tiempo de garantía</label>
-                <input name="tiempoGarantia" value={form.tiempoGarantia} onChange={handleChange}
-                  placeholder="Ej. 12 meses" className={INP} />
-              </div>
-            </div>
-
-
-
-            <div className="grid grid-cols-2 gap-4">
-              <div hidden>
-                <label className="text-xs text-gray-500 block mb-1">N° guía de llegada</label>
-                <input name="numeroGuiaEmision" value={form.numeroGuiaEmision} onChange={handleChange}
-                  placeholder="—" className={INP} />
-              </div>
-              <div hidden>
-                <label className="text-xs text-gray-500 block mb-1">N° guía de salida</label>
-                <input name="numeroGuiaRemision" value={form.numeroGuiaRemision} onChange={handleChange}
-                  placeholder="—" className={INP} />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Código SAP</label>
-                <input name="codigoSap" value={form.codigoSap} onChange={handleChange}
-                  placeholder="—" className={INP} />
-              </div>
-              <div hidden>
-                <label className="text-xs text-gray-500 block mb-1">Fecha de salida</label>
-                <input type="date" name="fechaSalida" value={form.fechaSalida} onChange={handleChange} className={INP} />
-              </div>
-            </div>
-
-            {/* Cálculos — precios, información sensible: oculto sin privilegio */}
-            {puedeVerPrecios && (
-            <div className="rounded-xl bg-gradient-to-br from-gray-50 to-sky-50/40 border border-gray-100 p-4 space-y-4">
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">
-                  Subtotal sin IGV
-                  {usarTotalesDeItems && <span className="text-gray-400 font-normal"> (calculado desde Ítems / Servicios)</span>}
-                </label>
-                {usarTotalesDeItems ? (
-                  <p className={`${INP} text-lg font-semibold bg-gray-50 text-gray-700 border-transparent`}>
-                    {totalesMostrados.subtotal.toFixed(2)}
-                  </p>
-                ) : (
-                  <input type="number" name="subtotal" value={form.subtotal} onChange={handleChange}
-                    step="0.01" min="0" placeholder="0.00" className={`${INP} text-lg font-semibold`} />
-                )}
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Descuento global (%)</label>
-                <input type="number" name="descuentoPorcentaje" value={form.descuentoPorcentaje} onChange={handleChange}
-                  step="0.01" min="0" max="100" placeholder="0" className={INP} />
-                {totalesMostrados.descuento > 0 && (
-                  <p className="text-xs text-gray-400 mt-1">
-                    −{totalesMostrados.descuento.toFixed(2)} · Subtotal con descuento: {totalesMostrados.subtotalConDescuento.toFixed(2)}
-                  </p>
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="text-center">
-                  <p className="text-xs text-gray-400">IGV 18%</p>
-                  <p className="font-semibold text-gray-700">{totalesMostrados.igv.toFixed(2)}</p>
                 </div>
-                <div className="text-center">
-                  <p className="text-xs text-gray-400">Total</p>
-                  <p className="font-semibold text-gray-700">{totalesMostrados.total.toFixed(2)}</p>
+
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Persona de contacto</label>
+                  <select name="personaContacto" value={form.personaContacto} onChange={handleChange} className={INP}>
+                    <option value="">— Sin contacto —</option>
+                    {contactosPlanta.map((c) => (
+                      <option key={c.nombre} value={c.nombre}>{c.nombre}</option>
+                    ))}
+                  </select>
+                  {contactoSel && (contactoSel.telefono || contactoSel.correo) && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      {[contactoSel.telefono, contactoSel.correo].filter(Boolean).join(" · ")}
+                    </p>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Área</label>
+                    <input name="area" value={form.area} onChange={handleChange}
+                      placeholder="—" className={INP} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">OM / Aviso</label>
+                    <input name="omAviso" value={form.omAviso} onChange={handleChange}
+                      placeholder="—" className={INP} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">N° de guía</label>
+                    <input name="numeroGuia" value={form.numeroGuia} onChange={handleChange}
+                      placeholder="—" className={INP} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Jefe / Supervisor solicitante</label>
+                    <input name="jefeSupervisorSolicitante" value={form.jefeSupervisorSolicitante} onChange={handleChange}
+                      placeholder="—" className={INP} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Comprador responsable</label>
+                    <input name="compradorResponsable" value={form.compradorResponsable} onChange={handleChange}
+                      placeholder="—" className={INP} />
+                  </div>
+                  <div hidden>
+                    <label className="text-xs text-gray-500 block mb-1">Encargado</label>
+                    <input name="encargado" value={form.encargado} onChange={handleChange}
+                      placeholder="Nombre del encargado" className={INP} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">N° de solicitud de pedido</label>
+                    <input name="numeroSolicitudPedido" value={form.numeroSolicitudPedido} onChange={handleChange}
+                      placeholder="—" className={INP} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">N° de petición de oferta</label>
+                    <input name="numeroPeticionOferta" value={form.numeroPeticionOferta} onChange={handleChange}
+                      placeholder="—" className={INP} />
+                  </div>
                 </div>
               </div>
-            </div>
-            )}
+
+             
+
+              {/* Card 3: Términos y condiciones */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5 mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-1.5 h-5 rounded-full bg-amber-500" />
+                  <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Términos y condiciones</h2>
+                </div>
+
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Tiempo de garantía</label>
+                  <input name="tiempoGarantia" value={form.tiempoGarantia} onChange={handleChange}
+                    placeholder="Ej. 12 meses" className={INP} />
+                </div>
+              </div>
+
+              {/* Otros datos — no forman parte de las 3 cards pedidas; se
+                  mantienen acá para no perder campos que ya se estaban usando. */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5 mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-1.5 h-5 rounded-full bg-gray-400" />
+                  <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Otros datos</h2>
+                </div>
+
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Título cotización</label>
+                  <input name="titulo" value={form.titulo} onChange={handleChange}
+                    placeholder="Título de la cotización" className={INP} />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Atención</label>
+                    <input name="atencion" value={form.atencion} onChange={handleChange}
+                      placeholder="Ej. Área de Compras" className={INP} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Tipo</label>
+                    <select name="tipo" value={form.tipo} onChange={handleChange} className={INP}>
+                      <option value="venta">Venta</option>
+                      <option value="servicio">Servicio</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Moneda de la cotización</label>
+                    <select name="moneda" value={form.moneda} onChange={handleChange} className={INP}>
+                      <option value="PEN">Soles (S/)</option>
+                      <option value="USD">Dólares (US$)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Forma de pago</label>
+                    <input name="condicionPago" value={form.condicionPago} onChange={handleChange}
+                      placeholder="—" className={INP} />
+                  </div>
+                </div>
+
+                <div hidden>
+                  <label className="text-xs text-gray-500 block mb-1">Lugar de entrega</label>
+                  <input name="lugarEntrega" value={form.lugarEntrega} onChange={handleChange}
+                    placeholder="Ej. Planta Chilca" className={INP} />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div hidden>
+                    <label className="text-xs text-gray-500 block mb-1">Fecha recibida</label>
+                    <input type="date" name="fechaRecibida" value={form.fechaRecibida} onChange={handleChange} className={INP} />
+                  </div>
+                  <div hidden>
+                    <label className="text-xs text-gray-500 block mb-1">N° guía de llegada</label>
+                    <input name="numeroGuiaEmision" value={form.numeroGuiaEmision} onChange={handleChange}
+                      placeholder="—" className={INP} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div hidden>
+                    <label className="text-xs text-gray-500 block mb-1">N° guía de salida</label>
+                    <input name="numeroGuiaRemision" value={form.numeroGuiaRemision} onChange={handleChange}
+                      placeholder="—" className={INP} />
+                  </div>
+                  <div hidden>
+                    <label className="text-xs text-gray-500 block mb-1">Fecha de salida</label>
+                    <input type="date" name="fechaSalida" value={form.fechaSalida} onChange={handleChange} className={INP} />
+                  </div>
+                </div>
+
+                <div hidden>
+                  <label className="text-xs text-gray-500 block mb-1">Código SAP</label>
+                  <input name="codigoSap" value={form.codigoSap} onChange={handleChange}
+                    placeholder="—" className={INP} />
+                </div>
+              </div>
+
+              {/* Cálculos — precios, información sensible: oculto sin privilegio */}
+              {puedeVerPrecios && (
+              <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-6">
+                <div className="rounded-xl bg-gradient-to-br from-gray-50 to-sky-50/40 border border-gray-100 p-4 space-y-4">
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">
+                      Subtotal sin IGV
+                      {usarTotalesDeItems && <span className="text-gray-400 font-normal"> (calculado desde Ítems / Servicios)</span>}
+                    </label>
+                    {usarTotalesDeItems ? (
+                      <p className={`${INP} text-lg font-semibold bg-gray-50 text-gray-700 border-transparent`}>
+                        {totalesMostrados.subtotal.toFixed(2)}
+                      </p>
+                    ) : (
+                      <input type="number" name="subtotal" value={form.subtotal} onChange={handleChange}
+                        step="0.01" min="0" placeholder="0.00" className={`${INP} text-lg font-semibold`} />
+                    )}
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Descuento global (%)</label>
+                    <input type="number" name="descuentoPorcentaje" value={form.descuentoPorcentaje} onChange={handleChange}
+                      step="0.01" min="0" max="100" placeholder="0" className={INP} />
+                    {totalesMostrados.descuento > 0 && (
+                      <p className="text-xs text-gray-400 mt-1">
+                        −{totalesMostrados.descuento.toFixed(2)} · Subtotal con descuento: {totalesMostrados.subtotalConDescuento.toFixed(2)}
+                      </p>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="text-center">
+                      <p className="text-xs text-gray-400">IGV 18%</p>
+                      <p className="font-semibold text-gray-700">{totalesMostrados.igv.toFixed(2)}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs text-gray-400">Total</p>
+                      <p className="font-semibold text-gray-700">{totalesMostrados.total.toFixed(2)}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              )}
+            </fieldset>
 
             {error && <p className="text-xs text-red-500">{error}</p>}
-          </fieldset>
+          </div>
 
           {/* Relaciones */}
           <section className="space-y-4">
