@@ -1,12 +1,22 @@
 import { useState, useEffect, useCallback } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import ModalImportarExcel, { COLS_MATERIALES } from "../components/ModalImportarExcel";
+import BuscadorMaterialInline from "../components/BuscadorMaterialInline";
 import * as XLSX from "xlsx";
 
 const INP =
   "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white";
 
 const UNIDADES = ["und", "kg", "g", "L", "mL", "m", "cm", "m²", "caja", "rollo", "par", "juego", "bolsa"];
+
+function useDebounce(value, delay = 350) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(t);
+  }, [value, delay]);
+  return debounced;
+}
 
 // ─── Sección Ubicaciones ────────────────────────────────────────────────────
 
@@ -125,8 +135,21 @@ const FORM_MATERIAL_VACIO = {
   unidad: "und", stockMinimo: 0, ubicacion: "", tipoMaterial: "",
 };
 
+const LIMIT_MATERIALES = 50;
+
 function SeccionMateriales() {
-  const [lista, setLista] = useState([]);
+  // Tabla en pantalla: paginada + búsqueda server-side (con ~9000 SKUs,
+  // traer y filtrar la colección completa en el cliente era el cuello de
+  // botella — ver GET /materiales?page=&q= en materiales.js). El buscador y
+  // "Mostrar inactivos" siguen escribiendo en las mismas etiquetas de
+  // siempre; lo que cambia es que ahora disparan una consulta al backend en
+  // vez de un .filter() local.
+  const [items, setItems] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [cargandoLista, setCargandoLista] = useState(true);
+  const [cargandoMas, setCargandoMas] = useState(false);
+  const [exportando, setExportando] = useState(false);
   const [ubicaciones, setUbicaciones] = useState([]);
   const [tiposComponente, setTiposComponente] = useState([]);
   const [categoriasComponente, setCategoriasComponente] = useState([]);
@@ -137,21 +160,52 @@ function SeccionMateriales() {
   const [mostrarInactivos, setMostrarInactivos] = useState(false);
   const [error, setError] = useState("");
   const [importarOpen, setImportarOpen] = useState(false);
+  const busquedaDebounced = useDebounce(busqueda);
 
-  const cargar = useCallback(async () => {
-    const [rm, ru, rt, rc] = await Promise.all([
-      fetchAuth("/materiales?todas=true"),
+  const cargarLookups = useCallback(async () => {
+    const [ru, rt, rc] = await Promise.all([
       fetchAuth("/ubicaciones"),
       fetchAuth("/tipos-componente"),
       fetchAuth("/categorias-componente"),
     ]);
-    if (rm.ok) setLista(await rm.json());
     if (ru.ok) setUbicaciones(await ru.json());
     if (rt.ok) setTiposComponente(await rt.json());
     if (rc.ok) setCategoriasComponente(await rc.json());
   }, []);
 
-  useEffect(() => { cargar(); }, [cargar]);
+  const cargarPagina = useCallback(async (pagina, reemplazar) => {
+    const params = new URLSearchParams({ page: String(pagina), limit: String(LIMIT_MATERIALES) });
+    if (mostrarInactivos) params.set("todas", "true");
+    if (busquedaDebounced.trim()) params.set("q", busquedaDebounced.trim());
+    const r = await fetchAuth(`/materiales?${params}`);
+    if (!r.ok) return;
+    const data = await r.json();
+    setTotal(data.total);
+    setItems((prev) => (reemplazar ? data.items : [...prev, ...data.items]));
+    setPage(pagina);
+  }, [mostrarInactivos, busquedaDebounced]);
+
+  useEffect(() => { cargarLookups(); }, [cargarLookups]);
+
+  // Cambió la búsqueda (debounced) o "Mostrar inactivos" — reinicia desde la
+  // página 1 y reemplaza la lista acumulada.
+  useEffect(() => {
+    setCargandoLista(true);
+    cargarPagina(1, true).finally(() => setCargandoLista(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [busquedaDebounced, mostrarInactivos]);
+
+  const cargarMas = async () => {
+    setCargandoMas(true);
+    await cargarPagina(page + 1, false);
+    setCargandoMas(false);
+  };
+
+  // Tras crear/editar/activar-desactivar: el material tocado puede haber
+  // cambiado de posición (orden alfabético) o de visibilidad (si dejó de
+  // coincidir con "Mostrar inactivos"), así que se recarga desde la página 1
+  // en vez de intentar parchear `items` a mano.
+  const recargar = () => cargarPagina(1, true);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -174,7 +228,7 @@ function SeccionMateriales() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ activo }),
     });
-    if (r.ok) await cargar();
+    if (r.ok) await recargar();
   };
 
   const iniciarEdicion = (m) => {
@@ -215,7 +269,7 @@ function SeccionMateriales() {
       body: JSON.stringify(form),
     });
     if (r.ok) {
-      await cargar();
+      await recargar();
       cancelar();
     } else {
       const d = await r.json().catch(() => ({}));
@@ -240,21 +294,25 @@ function SeccionMateriales() {
     "Activo":         m.activo ? "Sí" : "No",
   });
 
-  const exportarExcel = () => {
-    const ws = XLSX.utils.json_to_sheet(filtrados.map(filaMaterial));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Materiales (SKU)");
-    XLSX.writeFile(wb, "materiales-sku.xlsx");
+  // Exporta TODO lo que coincide con los filtros actuales, no solo lo que
+  // está paginado en pantalla — a diferencia de la tabla, esto sí pide la
+  // colección completa (sin `page`), igual que el export siempre funcionó,
+  // pero solo al hacer clic (no en cada carga de la página).
+  const exportarExcel = async () => {
+    setExportando(true);
+    const params = new URLSearchParams();
+    if (mostrarInactivos) params.set("todas", "true");
+    if (busquedaDebounced.trim()) params.set("q", busquedaDebounced.trim());
+    const r = await fetchAuth(`/materiales?${params}`);
+    if (r.ok) {
+      const todos = await r.json();
+      const ws = XLSX.utils.json_to_sheet(todos.map(filaMaterial));
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Materiales (SKU)");
+      XLSX.writeFile(wb, "materiales-sku.xlsx");
+    }
+    setExportando(false);
   };
-
-  const filtrados = lista
-    .filter((m) => mostrarInactivos || m.activo)
-    .filter((m) =>
-      m.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-      m.sku?.toLowerCase().includes(busqueda.toLowerCase()) ||
-      m.codigo?.toLowerCase().includes(busqueda.toLowerCase()) ||
-      m.descripcion?.toLowerCase().includes(busqueda.toLowerCase())
-    );
 
   const badgeStock = (m) => {
     if (m.stock <= 0) return "bg-red-100 text-red-700";
@@ -360,9 +418,9 @@ function SeccionMateriales() {
           <input type="checkbox" checked={mostrarInactivos} onChange={(e) => setMostrarInactivos(e.target.checked)} />
           Mostrar inactivos
         </label>
-        <button onClick={exportarExcel}
-          className="text-sm border border-gray-300 text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-50 transition whitespace-nowrap">
-          Exportar Excel
+        <button onClick={exportarExcel} disabled={exportando}
+          className="text-sm border border-gray-300 text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition whitespace-nowrap">
+          {exportando ? "Exportando…" : "Exportar Excel"}
         </button>
       </div>
 
@@ -385,10 +443,10 @@ function SeccionMateriales() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {filtrados.length === 0 && (
+            {!cargandoLista && items.length === 0 && (
               <tr><td colSpan={10} className="text-center py-10 text-gray-300 text-sm">Sin materiales</td></tr>
             )}
-            {filtrados.map((m) => (
+            {items.map((m) => (
               <tr key={m._id} className={`hover:bg-gray-50/50 transition ${!m.activo ? "opacity-50" : ""}`}>
                 <td className="px-5 py-3 font-mono text-xs text-gray-500">{m.sku}</td>
                 <td className="px-5 py-3 font-mono text-xs text-gray-500">{m.codigo || <span className="text-gray-300">—</span>}</td>
@@ -422,6 +480,19 @@ function SeccionMateriales() {
           </tbody>
         </table>
         </div>
+
+        <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 text-sm text-gray-400">
+          <span>{cargandoLista ? "Cargando…" : `Mostrando ${items.length} de ${total} resultados`}</span>
+          {!cargandoLista && items.length < total && (
+            <button
+              onClick={cargarMas}
+              disabled={cargandoMas}
+              className="border border-gray-300 text-gray-600 px-4 py-1.5 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50 transition"
+            >
+              {cargandoMas ? "Cargando…" : "Cargar más"}
+            </button>
+          )}
+        </div>
       </div>
 
       {importarOpen && (
@@ -437,7 +508,7 @@ function SeccionMateriales() {
             <strong>Categoría</strong> y <strong>Ubicación</strong> se crean solos si no existen todavía.</>
           }
           onClose={() => setImportarOpen(false)}
-          onImportado={cargar}
+          onImportado={() => { cargarLookups(); recargar(); }}
         />
       )}
     </div>
@@ -795,7 +866,7 @@ function SeccionComponentes() {
 
 // ─── Modal Ingreso ──────────────────────────────────────────────────────────
 
-function ModalIngreso({ materiales, materialInicial, onClose, onGuardado }) {
+function ModalIngreso({ materialInicial, onClose, onGuardado }) {
   const [form, setForm] = useState({
     material: materialInicial?._id || "",
     cantidad: "",
@@ -811,32 +882,22 @@ function ModalIngreso({ materiales, materialInicial, onClose, onGuardado }) {
   const [error, setError] = useState("");
   const [rqPendiente, setRqPendiente] = useState(null);
   const [busquedaMaterial, setBusquedaMaterial] = useState(materialInicial ? `${materialInicial.sku} — ${materialInicial.nombre}` : "");
-  const [listaAbierta, setListaAbierta] = useState(false);
+  // El material elegido (para el texto de confirmación al guardar) — ya no
+  // se busca en un array local de ~9000 materiales, viene directo de lo que
+  // devolvió la búsqueda server-side (ver BuscadorMaterialInline).
+  const [materialSel, setMaterialSel] = useState(materialInicial || null);
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
-  const q = busquedaMaterial.trim().toLowerCase();
-  // Solo se arma la lista de resultados si hay texto — con 6000+ materiales
-  // no tiene sentido mostrar nada hasta que el usuario empiece a escribir
-  // (mismo criterio que ModalEgreso).
-  const materialesFiltrados = q
-    ? materiales.filter((m) =>
-        m.sku?.toLowerCase().includes(q) ||
-        m.nombre?.toLowerCase().includes(q) ||
-        m.ubicacion?.nombre?.toLowerCase().includes(q)
-      ).slice(0, 50)
-    : [];
-
   const seleccionarMaterial = (m) => {
     setForm((prev) => ({ ...prev, material: m._id }));
+    setMaterialSel(m);
     setBusquedaMaterial(`${m.sku} — ${m.nombre}`);
-    setListaAbierta(false);
   };
 
-  const cambiarBusqueda = (e) => {
-    setBusquedaMaterial(e.target.value);
-    setListaAbierta(true);
-    if (form.material) setForm((prev) => ({ ...prev, material: "" }));
+  const cambiarBusqueda = (texto) => {
+    setBusquedaMaterial(texto);
+    if (form.material) { setForm((prev) => ({ ...prev, material: "" })); setMaterialSel(null); }
   };
 
   // Si este material tiene una solicitud de compra vinculada y pendiente, se
@@ -861,8 +922,7 @@ function ModalIngreso({ materiales, materialInicial, onClose, onGuardado }) {
       setError("Material, cantidad y precio son obligatorios.");
       return;
     }
-    const mat = materiales.find((m) => m._id === form.material);
-    if (!window.confirm(`¿Confirmas el ingreso de ${form.cantidad} ${mat?.unidad || ""} de "${mat?.nombre || "este material"}"?`)) return;
+    if (!window.confirm(`¿Confirmas el ingreso de ${form.cantidad} ${materialSel?.unidad || ""} de "${materialSel?.nombre || "este material"}"?`)) return;
     setGuardando(true);
     const r = await fetchAuth("/movimientos-almacen", {
       method: "POST",
@@ -891,28 +951,13 @@ function ModalIngreso({ materiales, materialInicial, onClose, onGuardado }) {
           {error && <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="md:col-span-2 relative">
+            <div className="md:col-span-2">
               <label className="text-xs text-gray-500 block mb-1">Material *</label>
-              <input type="text" value={busquedaMaterial} onChange={cambiarBusqueda}
-                onFocus={() => setListaAbierta(true)}
-                onBlur={() => setListaAbierta(false)}
-                placeholder="Buscar por SKU, nombre o ubicación…" className={`w-full ${INP}`}
-                autoComplete="off" />
-              {listaAbierta && q && (
-                <div className="absolute z-10 mt-1 w-full max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
-                  {materialesFiltrados.length === 0 ? (
-                    <p className="px-3 py-2 text-sm text-gray-400">Sin resultados</p>
-                  ) : (
-                    materialesFiltrados.map((m) => (
-                      <button type="button" key={m._id}
-                        onMouseDown={() => seleccionarMaterial(m)}
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition border-b border-gray-50 last:border-0">
-                        <span className="font-mono text-xs text-blue-600">{m.sku}</span> — {m.nombre}
-                      </button>
-                    ))
-                  )}
-                </div>
-              )}
+              <BuscadorMaterialInline
+                value={busquedaMaterial}
+                onChange={cambiarBusqueda}
+                onSelect={seleccionarMaterial}
+              />
             </div>
             <div>
               <label className="text-xs text-gray-500 block mb-1">Cantidad *</label>
@@ -981,7 +1026,7 @@ function ModalIngreso({ materiales, materialInicial, onClose, onGuardado }) {
 
 // ─── Modal Egreso Manual ────────────────────────────────────────────────────
 
-function ModalEgreso({ materiales, onClose, onGuardado }) {
+function ModalEgreso({ onClose, onGuardado }) {
   const [form, setForm] = useState({
     material: "",
     cantidad: "",
@@ -994,7 +1039,9 @@ function ModalEgreso({ materiales, onClose, onGuardado }) {
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
   const [busquedaMaterial, setBusquedaMaterial] = useState("");
-  const [listaAbierta, setListaAbierta] = useState(false);
+  // Igual que en ModalIngreso: ya no se busca en un array local de ~9000
+  // materiales, la búsqueda es server-side (ver BuscadorMaterialInline).
+  const [materialSel, setMaterialSel] = useState(null);
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -1005,30 +1052,18 @@ function ModalEgreso({ materiales, onClose, onGuardado }) {
       .then(setLotes);
   }, [form.material]);
 
-  const q = busquedaMaterial.trim().toLowerCase();
-  // Solo se arma la lista de resultados si hay texto — con 6000+ materiales
-  // no tiene sentido mostrar nada hasta que el usuario empiece a escribir.
-  const materialesFiltrados = q
-    ? materiales.filter((m) =>
-        m.sku?.toLowerCase().includes(q) ||
-        m.nombre?.toLowerCase().includes(q) ||
-        m.ubicacion?.nombre?.toLowerCase().includes(q)
-      ).slice(0, 50)
-    : [];
-
   const seleccionarMaterial = (m) => {
     setForm((prev) => ({ ...prev, material: m._id }));
+    setMaterialSel(m);
     setBusquedaMaterial(`${m.sku} — ${m.nombre}`);
-    setListaAbierta(false);
   };
 
-  const cambiarBusqueda = (e) => {
-    setBusquedaMaterial(e.target.value);
-    setListaAbierta(true);
+  const cambiarBusqueda = (texto) => {
+    setBusquedaMaterial(texto);
     // Cualquier edición del texto invalida la selección anterior — hay que
     // volver a elegir un material de la lista para que `form.material` se
     // llene de nuevo.
-    if (form.material) setForm((prev) => ({ ...prev, material: "" }));
+    if (form.material) { setForm((prev) => ({ ...prev, material: "" })); setMaterialSel(null); }
   };
 
   const seleccionarLote = (lote) => {
@@ -1041,8 +1076,7 @@ function ModalEgreso({ materiales, onClose, onGuardado }) {
       setError("Material y cantidad son obligatorios.");
       return;
     }
-    const mat = materiales.find((m) => m._id === form.material);
-    if (!window.confirm(`¿Confirmas el egreso de ${form.cantidad} ${mat?.unidad || ""} de "${mat?.nombre || "este material"}"?`)) return;
+    if (!window.confirm(`¿Confirmas el egreso de ${form.cantidad} ${materialSel?.unidad || ""} de "${materialSel?.nombre || "este material"}"?`)) return;
     setGuardando(true);
     const r = await fetchAuth("/movimientos-almacen", {
       method: "POST",
@@ -1070,29 +1104,14 @@ function ModalEgreso({ materiales, onClose, onGuardado }) {
           {error && <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="md:col-span-2 relative">
+            <div className="md:col-span-2">
               <label className="text-xs text-gray-500 block mb-1">Material *</label>
-              <input type="text" value={busquedaMaterial} onChange={cambiarBusqueda}
-                onFocus={() => setListaAbierta(true)}
-                onBlur={() => setListaAbierta(false)}
-                placeholder="Buscar por SKU, nombre o ubicación…" className={`w-full ${INP}`}
-                autoComplete="off" />
-              {listaAbierta && q && (
-                <div className="absolute z-10 mt-1 w-full max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
-                  {materialesFiltrados.length === 0 ? (
-                    <p className="px-3 py-2 text-sm text-gray-400">Sin resultados</p>
-                  ) : (
-                    materialesFiltrados.map((m) => (
-                      <button type="button" key={m._id}
-                        onMouseDown={() => seleccionarMaterial(m)}
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition border-b border-gray-50 last:border-0">
-                        <span className="font-mono text-xs text-blue-600">{m.sku}</span> — {m.nombre}
-                        <span className="text-xs text-gray-400"> (stock: {m.stock} {m.unidad})</span>
-                      </button>
-                    ))
-                  )}
-                </div>
-              )}
+              <BuscadorMaterialInline
+                value={busquedaMaterial}
+                onChange={cambiarBusqueda}
+                onSelect={seleccionarMaterial}
+                mostrarStock
+              />
             </div>
 
             {lotes.length > 0 && (
@@ -1164,9 +1183,12 @@ function ModalEgreso({ materiales, onClose, onGuardado }) {
 
 function SeccionMovimientos() {
   const [movimientos, setMovimientos] = useState([]);
-  const [materiales, setMateriales] = useState([]);
   const [filtroTipo, setFiltroTipo] = useState("");
   const [filtroMaterial, setFiltroMaterial] = useState("");
+  // Texto del buscador + nombre a mostrar del material elegido para filtrar
+  // — ya no se trae la lista completa de ~9000 materiales solo para armar un
+  // <select> (ver BuscadorMaterialInline, búsqueda server-side).
+  const [busquedaFiltro, setBusquedaFiltro] = useState("");
   const [modalIngreso, setModalIngreso] = useState(false);
   const [modalEgreso, setModalEgreso] = useState(false);
 
@@ -1175,15 +1197,21 @@ function SeccionMovimientos() {
     if (filtroTipo) params.set("tipo", filtroTipo);
     if (filtroMaterial) params.set("material", filtroMaterial);
 
-    const [rm, rmat] = await Promise.all([
-      fetchAuth(`/movimientos-almacen?${params}`),
-      fetchAuth("/materiales"),
-    ]);
-    if (rm.ok) setMovimientos(await rm.json());
-    if (rmat.ok) setMateriales(await rmat.json());
+    const r = await fetchAuth(`/movimientos-almacen?${params}`);
+    if (r.ok) setMovimientos(await r.json());
   }, [filtroTipo, filtroMaterial]);
 
   useEffect(() => { cargar(); }, [cargar]);
+
+  const elegirFiltroMaterial = (m) => {
+    setFiltroMaterial(m._id);
+    setBusquedaFiltro(`${m.sku} — ${m.nombre}`);
+  };
+
+  const limpiarFiltroMaterial = () => {
+    setFiltroMaterial("");
+    setBusquedaFiltro("");
+  };
 
   const onGuardado = async () => {
     setModalIngreso(false);
@@ -1240,10 +1268,19 @@ function SeccionMovimientos() {
           <option value="egreso">Egresos</option>
         </select>
 
-        <select value={filtroMaterial} onChange={(e) => setFiltroMaterial(e.target.value)} className={INP}>
-          <option value="">Todos los materiales</option>
-          {materiales.map((m) => <option key={m._id} value={m._id}>{m.nombre}</option>)}
-        </select>
+        <div className="flex items-center gap-1.5 min-w-[240px]">
+          <BuscadorMaterialInline
+            value={busquedaFiltro}
+            onChange={(texto) => { setBusquedaFiltro(texto); if (filtroMaterial) setFiltroMaterial(""); }}
+            onSelect={elegirFiltroMaterial}
+            placeholder="Filtrar por material…"
+            className="flex-1"
+          />
+          {filtroMaterial && (
+            <button type="button" onClick={limpiarFiltroMaterial}
+              className="text-gray-400 hover:text-gray-700 text-lg leading-none px-1" title="Quitar filtro">✕</button>
+          )}
+        </div>
 
         <button onClick={exportarExcel}
           className="text-sm border border-gray-300 text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-50 transition ml-auto">
@@ -1320,10 +1357,10 @@ function SeccionMovimientos() {
       </div>
 
       {modalIngreso && (
-        <ModalIngreso materiales={materiales} onClose={() => setModalIngreso(false)} onGuardado={onGuardado} />
+        <ModalIngreso onClose={() => setModalIngreso(false)} onGuardado={onGuardado} />
       )}
       {modalEgreso && (
-        <ModalEgreso materiales={materiales} onClose={() => setModalEgreso(false)} onGuardado={onGuardado} />
+        <ModalEgreso onClose={() => setModalEgreso(false)} onGuardado={onGuardado} />
       )}
     </div>
   );
@@ -1339,15 +1376,19 @@ function SeccionAlertaStock() {
   const [lista, setLista] = useState([]);
   const [materialIngreso, setMaterialIngreso] = useState(null);
 
+  // El filtro por stock bajo ahora lo hace el backend (?bajoStock=true) —
+  // sigue necesitando calcular el stock de todos los materiales para saber
+  // quién está en alerta, pero el payload que viaja por la red se reduce al
+  // puñado que realmente está en alerta (~350 de ~9000) en vez de la
+  // colección completa (ver GET /materiales en materiales.js).
   const cargar = useCallback(async () => {
-    const r = await fetchAuth("/materiales");
+    const r = await fetchAuth("/materiales?bajoStock=true");
     if (r.ok) setLista(await r.json());
   }, []);
 
   useEffect(() => { cargar(); }, [cargar]);
 
-  const enAlerta = lista
-    .filter((m) => m.stock <= m.stockMinimo)
+  const enAlerta = [...lista]
     .sort((a, b) => (a.stock <= 0 ? -1 : 0) - (b.stock <= 0 ? -1 : 0) || a.nombre.localeCompare(b.nombre));
 
   const badgeStock = (m) => (m.stock <= 0 ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700");
@@ -1421,7 +1462,6 @@ function SeccionAlertaStock() {
 
       {materialIngreso && (
         <ModalIngreso
-          materiales={lista}
           materialInicial={materialIngreso}
           onClose={() => setMaterialIngreso(null)}
           onGuardado={() => { setMaterialIngreso(null); cargar(); }}

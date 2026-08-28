@@ -736,9 +736,9 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
             )}
 
             <div>
-              <label className="text-xs text-gray-500 block mb-1">Título / Descripción</label>
+              <label className="text-xs text-gray-500 block mb-1">Título cotización</label>
               <input name="titulo" value={form.titulo} onChange={handleChange}
-                placeholder="Descripción de la cotización" className={INP} />
+                placeholder="Título de la cotización" className={INP} />
             </div>
 
             <div className="grid grid-cols-2 gap-4">

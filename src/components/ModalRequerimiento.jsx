@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { fetchAuth } from "../utils/fetchAuth";
+import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import SelectorMateriales from "./SelectorMateriales";
 import ModalSolicitudCompra from "./ModalSolicitudCompra";
 
@@ -11,6 +11,7 @@ const INP = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-n
 export default function ModalRequerimiento({ ot, onClose, onCreado }) {
   const [personal, setPersonal] = useState([]);
   const [personalId, setPersonalId] = useState("");
+  const [solicitanteBloqueado, setSolicitanteBloqueado] = useState(false);
   const [items, setItems] = useState([]);
   const [observaciones, setObservaciones] = useState("");
   const [buscadorAbierto, setBuscadorAbierto] = useState(false);
@@ -20,11 +21,20 @@ export default function ModalRequerimiento({ ot, onClose, onCreado }) {
 
   // "Solicitado por" lista solo a los técnicos de prueba/intervención (no
   // el registro general de Personal ni la cuenta legado "tecnico") — son
-  // quienes de verdad piden material contra una OT.
+  // quienes de verdad piden material contra una OT. Si el usuario logueado
+  // es uno de ellos, se autoselecciona y se bloquea (no puede pedir a
+  // nombre de otro técnico); si es otro rol (admin/jefatura/coordinadora
+  // pidiendo a nombre de un técnico) el select arranca vacío y editable.
   useEffect(() => {
-    fetchAuth("/usuarios/lista").then((r) => r.ok && r.json()).then((d) =>
-      setPersonal((d || []).filter((u) => ["tecnico_prueba", "tecnico_intervencion"].includes(u.rol)))
-    );
+    fetchAuth("/usuarios/lista").then((r) => r.ok && r.json()).then((d) => {
+      const filtrados = (d || []).filter((u) => ["tecnico_prueba", "tecnico_intervencion"].includes(u.rol));
+      setPersonal(filtrados);
+      const propio = filtrados.find((u) => u._id === getUsuario()?.id);
+      if (propio) {
+        setPersonalId(propio._id);
+        setSolicitanteBloqueado(true);
+      }
+    });
   }, []);
 
   const personaSel = personal.find((p) => p._id === personalId);
@@ -100,7 +110,8 @@ export default function ModalRequerimiento({ ot, onClose, onCreado }) {
 
           <div>
             <label className="text-xs text-gray-500 block mb-1">Solicitado por *</label>
-            <select value={personalId} onChange={(e) => setPersonalId(e.target.value)} className={INP}>
+            <select value={personalId} onChange={(e) => setPersonalId(e.target.value)}
+              disabled={solicitanteBloqueado} className={`${INP} disabled:bg-gray-100 disabled:text-gray-500`}>
               <option value="">Seleccionar…</option>
               {personal.map((p) => <option key={p._id} value={p._id}>{p.nombre}{p.dni ? ` — DNI ${p.dni}` : ""}</option>)}
             </select>

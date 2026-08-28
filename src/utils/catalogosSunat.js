@@ -202,6 +202,17 @@ export function ubigeoValido(ubigeo) {
   return /^\d{6}$/.test((ubigeo || "").trim());
 }
 
+// Placa de vehículo para GRE: SUNAT valida el nodo cac:TransportEquipment/cbc:ID
+// como alfanumérico sin separadores (errorCode 2567 confirmado en producción con
+// una guía rechazada por enviar solo "-" como placa) — se normaliza quitando
+// guiones/espacios antes de validar y de mandar a la API.
+export function normalizarPlaca(placa) {
+  return (placa || "").trim().toUpperCase().replace(/[-\s]/g, "");
+}
+export function placaValida(placa) {
+  return /^[A-Z0-9]{5,8}$/.test(normalizarPlaca(placa));
+}
+
 export const TIPO_MONEDA = [
   { valor: "PEN", label: "PEN — Soles" },
   { valor: "USD", label: "USD — Dólares" },

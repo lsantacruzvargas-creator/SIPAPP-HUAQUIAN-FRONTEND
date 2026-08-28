@@ -166,7 +166,7 @@ export default function Sidebar() {
     { to: "/facturacion-electronica", label: "Fact. Electrónica", Icon: IconBolt, show: esAdmin || esFacturacion || esJefatura },
     { to: "/facturacion-electronica/guias", label: "Guías", Icon: IconTruck, show: esAdmin || esFacturacion || esAlmacenero || esJefatura || esPlanner || esCoordinadora || esAsistente },
     { to: "/tipo-cambio", label: "Tipo de Cambio", Icon: IconExchange, show: esAdmin || esFacturacion || esAlmacenero || esJefatura },
-    { to: "/empresas", label: "Empresas", Icon: IconBuilding, show: esComercial || esJefatura || esAlmacenero || esPlanner },
+    { to: "/empresas", label: "Empresas", Icon: IconBuilding, show: esComercial || esJefatura || esAlmacenero || esPlanner || esCoordinadora },
     { to: "/catalogo-servicios", label: "Catálogo", Icon: IconTag, show: esAdmin || esJefatura || esCoordinadora },
     { to: "/almacen", label: "Almacén", Icon: IconArchive, show: esAdmin || esAlmacenero || esJefatura || esCoordinadora },
     { to: "/inventario", label: "Inventario", Icon: IconBoxes, show: esAdmin || esAlmacenero || esTecnico || esPlanner || esJefatura || esCoordinadora },

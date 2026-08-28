@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { fetchAuth } from "../utils/fetchAuth";
 
 const INP = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white";
+const LIMIT = 50;
 
 const badgeStock = (m) => {
   if (m.stock <= 0) return "bg-red-100 text-red-700";
@@ -9,26 +10,56 @@ const badgeStock = (m) => {
   return "bg-green-100 text-green-700";
 };
 
+// El input se actualiza al instante (escritura fluida); el valor debounced
+// es el que realmente dispara la búsqueda al backend, para no mandar una
+// request por cada tecla sobre una colección de ~9000 materiales.
+function useDebounce(value, delay = 350) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(t);
+  }, [value, delay]);
+  return debounced;
+}
+
 // Vista de solo consulta de stock, compartida entre almacenero y técnico —
 // a diferencia de Almacén, acá no se puede crear/editar SKUs ni ubicaciones.
+// Paginada server-side ("Cargar más") — con ~9000 materiales, traer y
+// renderizar la colección completa de una vez (como antes) era el cuello de
+// botella real: 5.4MB de payload + ~9000 filas sin paginar en el DOM.
 export default function Inventario() {
-  const [lista, setLista] = useState([]);
+  const [items, setItems] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [cargando, setCargando] = useState(true);
+  const [cargandoMas, setCargandoMas] = useState(false);
   const [busqueda, setBusqueda] = useState("");
+  const busquedaDebounced = useDebounce(busqueda);
 
-  const cargar = useCallback(async () => {
-    const r = await fetchAuth("/materiales");
-    if (r.ok) setLista(await r.json());
-  }, []);
+  const cargarPagina = useCallback(async (paginaAPedir, reemplazar) => {
+    const params = new URLSearchParams({ page: String(paginaAPedir), limit: String(LIMIT) });
+    if (busquedaDebounced.trim()) params.set("q", busquedaDebounced.trim());
+    const r = await fetchAuth(`/materiales?${params}`);
+    if (!r.ok) return;
+    const data = await r.json();
+    setTotal(data.total);
+    setItems((prev) => (reemplazar ? data.items : [...prev, ...data.items]));
+    setPage(paginaAPedir);
+  }, [busquedaDebounced]);
 
-  useEffect(() => { cargar(); }, [cargar]);
+  // Cambió la búsqueda (debounced) — reinicia desde la página 1 y reemplaza
+  // la lista acumulada, en vez de seguir agregando sobre resultados viejos.
+  useEffect(() => {
+    setCargando(true);
+    cargarPagina(1, true).finally(() => setCargando(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [busquedaDebounced]);
 
-  const filtrados = lista.filter((m) =>
-    m.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-    m.sku?.toLowerCase().includes(busqueda.toLowerCase()) ||
-    m.codigo?.toLowerCase().includes(busqueda.toLowerCase()) ||
-    m.descripcion?.toLowerCase().includes(busqueda.toLowerCase()) ||
-    (m.ubicacion?.nombre || "").toLowerCase().includes(busqueda.toLowerCase())
-  );
+  const cargarMas = async () => {
+    setCargandoMas(true);
+    await cargarPagina(page + 1, false);
+    setCargandoMas(false);
+  };
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
@@ -68,10 +99,10 @@ export default function Inventario() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {filtrados.length === 0 && (
+            {!cargando && items.length === 0 && (
               <tr><td colSpan={8} className="text-center py-10 text-gray-300 text-sm">Sin materiales</td></tr>
             )}
-            {filtrados.map((m) => (
+            {items.map((m) => (
               <tr key={m._id} className="hover:bg-gray-50/50 transition align-top">
                 <td className="px-3 py-3 font-mono text-xs text-gray-500"><div className="line-clamp-2 break-words">{m.sku}</div></td>
                 <td className="px-3 py-3 font-mono text-xs text-gray-500"><div className="line-clamp-2 break-words">{m.codigo || <span className="text-gray-300">—</span>}</div></td>
@@ -89,6 +120,19 @@ export default function Inventario() {
             ))}
           </tbody>
         </table>
+        </div>
+
+        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 text-sm text-gray-400">
+          <span>{cargando ? "Cargando…" : `Mostrando ${items.length} de ${total} resultados`}</span>
+          {!cargando && items.length < total && (
+            <button
+              onClick={cargarMas}
+              disabled={cargandoMas}
+              className="border border-gray-300 text-gray-600 px-4 py-1.5 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50 transition"
+            >
+              {cargandoMas ? "Cargando…" : "Cargar más"}
+            </button>
+          )}
         </div>
       </div>
     </div>

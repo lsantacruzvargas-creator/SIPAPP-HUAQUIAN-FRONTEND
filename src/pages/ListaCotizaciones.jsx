@@ -45,6 +45,9 @@ const compararTexto = (na, nb) => {
 const numerosOT = (ots) =>
   ots?.length ? ots.map((o) => o.numeroOT).filter(Boolean).join(", ") : null;
 
+const titulosOT = (ots) =>
+  ots?.length ? ots.map((o) => o.titulo).filter(Boolean).join(", ") : null;
+
 // Total real (tal como se guardó, en la moneda de la cotización) + su
 // conversión a la otra moneda usando el Tipo de Cambio compartido — la
 // cotización nunca recalcula subtotal/igv/total, solo se muestra la
@@ -63,7 +66,7 @@ const totalesDuales = (c, tipoCambio) => {
 const diasDesdeInforme = (c) =>
   c.fechaInformeEnviado ? Math.floor((Date.now() - new Date(c.fechaInformeEnviado).getTime()) / 86400000) : null;
 
-function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, tipoCambio, mostrarDiasInforme, puedeVerPrecios, mostrarEstadoServicio, otsPorCot }) {
+function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, tipoCambio, mostrarDiasInforme, puedeVerPrecios, mostrarEstadoServicio, mostrarTituloOT, otsPorCot }) {
   return (
     <div className="mb-6">
       <div className="flex items-center gap-2 mb-3">
@@ -81,8 +84,9 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
               {mostrarEstadoServicio && <th className={`${TH} text-center`}>Fecha de salida</th>}
               {mostrarEstadoServicio && <th className={`${TH} text-center`}>Estado de servicio</th>}
               <th className={`${TH} text-left`}>Empresa</th>
+              <th className={`${TH} text-left`}>Título cotización</th>
+              {mostrarTituloOT && <th className={`${TH} text-left`}>Título orden de trabajo</th>}
               <th className={`${TH} text-left`}>Planta</th>
-              <th className={`${TH} text-left`}>Descripción</th>
               {puedeVerPrecios && <th className={`${TH} text-right`}>Total sin IGV (S/)</th>}
               {puedeVerPrecios && <th className={`${TH} text-right`}>Total sin IGV (US$)</th>}
               <th className={`${TH} text-center`}>Aprobado</th>
@@ -94,13 +98,14 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
           <tbody className="divide-y divide-gray-100">
             {cotizaciones.length === 0 ? (
               <tr>
-                <td colSpan={7 + (puedeVerPrecios ? 2 : 0) + (mostrarDiasInforme ? 1 : 0) + (mostrarEstadoServicio ? 3 : 0)} className="px-4 py-8 text-center text-gray-400">{vacioMsg}</td>
+                <td colSpan={7 + (puedeVerPrecios ? 2 : 0) + (mostrarDiasInforme ? 1 : 0) + (mostrarEstadoServicio ? 3 : 0) + (mostrarTituloOT ? 1 : 0)} className="px-4 py-8 text-center text-gray-400">{vacioMsg}</td>
               </tr>
             ) : (
               cotizaciones.map((c) => {
                 const { pen, usd } = totalesDuales(c, tipoCambio);
+                const otsDeCot = (mostrarEstadoServicio || mostrarTituloOT) ? otsPorCot?.get(c._id) : null;
                 // Solo se usa (y se busca) en la tabla de Pendientes de OC.
-                const otPrincipal = mostrarEstadoServicio ? otsPorCot.get(c._id)?.[0] : null;
+                const otPrincipal = mostrarEstadoServicio ? otsDeCot?.[0] : null;
                 return (
                 <tr
                   key={c._id}
@@ -125,7 +130,7 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
                   </td>
                   {mostrarEstadoServicio && (
                     <td className="px-4 py-3.5 text-gray-600 whitespace-nowrap">
-                      {numerosOT(otsPorCot.get(c._id)) || <span className="text-gray-300">—</span>}
+                      {numerosOT(otsDeCot) || <span className="text-gray-300">—</span>}
                     </td>
                   )}
                   {mostrarEstadoServicio && (
@@ -143,8 +148,13 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
                   <td className="px-4 py-3.5 text-gray-700">
                     {c.empresa?.razonSocial || <span className="text-gray-300">—</span>}
                   </td>
-                  <td className="px-4 py-3.5 text-gray-600">{c.planta || <span className="text-gray-300">—</span>}</td>
                   <td className="px-4 py-3.5 text-gray-700">{c.titulo}</td>
+                  {mostrarTituloOT && (
+                    <td className="px-4 py-3.5 text-gray-700">
+                      {titulosOT(otsDeCot) || <span className="text-gray-300">—</span>}
+                    </td>
+                  )}
+                  <td className="px-4 py-3.5 text-gray-600">{c.planta || <span className="text-gray-300">—</span>}</td>
                   {puedeVerPrecios && (
                     <td className="px-4 py-3.5 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap">
                       {pen != null ? pen.toLocaleString("es-PE", { minimumFractionDigits: 2 }) : "—"}
@@ -376,9 +386,10 @@ export default function ListaCotizaciones() {
       "N° Cotización":          c._esOT ? "Sin cotización" : (c.numeroCotizacion || "—"),
       "Fecha recibida":         c.fechaRecibida ? new Date(c.fechaRecibida).toLocaleDateString("es-PE") : "—",
       "Empresa":                c.empresa?.razonSocial || "—",
+      "Título cotización":      c.titulo,
+      "Título orden de trabajo": titulosOT(otsPorCot.get(c._id)) || "—",
       "Planta":                 c.planta || "—",
       "Encargado":              c.encargado || "—",
-      "Descripción":            c.titulo,
       ...(puedeVerPrecios ? {
         "Total sin IGV (S/)":   pen != null ? pen.toFixed(2) : "—",
         "Total sin IGV (US$)":  usd != null ? usd.toFixed(2) : "—",
@@ -529,6 +540,7 @@ export default function ListaCotizaciones() {
           tipoCambio={tipoCambio}
           puedeVerPrecios={puedeVerPrecios}
           mostrarEstadoServicio
+          mostrarTituloOT
           otsPorCot={otsPorCot}
           mostrarDiasInforme
         />
@@ -543,6 +555,8 @@ export default function ListaCotizaciones() {
           vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin cotizaciones con OC"}
           tipoCambio={tipoCambio}
           puedeVerPrecios={puedeVerPrecios}
+          mostrarTituloOT
+          otsPorCot={otsPorCot}
         />
       )}
 
@@ -555,6 +569,8 @@ export default function ListaCotizaciones() {
           vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin cotizaciones cerradas"}
           tipoCambio={tipoCambio}
           puedeVerPrecios={puedeVerPrecios}
+          mostrarTituloOT
+          otsPorCot={otsPorCot}
         />
       )}
     </div>
@@ -580,8 +596,10 @@ export default function ListaCotizaciones() {
         instrucciones={
           <>1. Descarga la plantilla, rellena tus datos y súbela. La <strong>Empresa</strong> se busca por
           RUC (11 dígitos); si no existe, se crea sola con la razón social en blanco (edítala después desde
-          Empresas para completarla vía SUNAT). Si el <strong>N° OT</strong> ya existe, la cotización se
-          relaciona a esa OT en vez de crear una nueva. <strong>Estado</strong>: Precotizado (falta aprobación),
+          Empresas para completarla vía SUNAT). El <strong>Título cotización</strong> es propio de esta fila —
+          no reemplaza el título de la OT. Si el <strong>N° OT</strong> ya existe (numérico, cargado antes con
+          la plantilla de OT), la cotización se relaciona a esa OT en vez de crear una nueva; si no existe o no
+          es un número real, se crea una OT independiente. <strong>Estado</strong>: Precotizado (falta aprobación),
           Enviado, o Facturado. <strong>Estado factura</strong> (opcional, texto libre): si vale "Facturado" cierra
           la cadena completa (Cotización/OT/OC) de esa fila, cualquier otro texto la deja abierta; si se deja
           vacío, se usa el mismo criterio sobre la columna Estado.</>

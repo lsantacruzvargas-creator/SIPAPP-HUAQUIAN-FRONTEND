@@ -41,6 +41,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
     planta: inicial.planta || "",
     contactoNombre: inicial.contactoNombre || "",
     titulo: inicial.titulo || "",
+    cantidad: inicial.cantidad ?? "",
     condicion: inicial.condicion || "",
     categorizacionTaller: inicial.categorizacionTaller || "",
     micLinea: inicial.micLinea || "",
@@ -83,6 +84,9 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
   // Aprueba/desaprueba Informes Técnicos — una vez aprobado, solo estos tres
   // roles pueden seguir editándolo (ver onModificar más abajo).
   const puedeAprobarInforme = ["admin", "jefatura", "planner"].includes(rolActual);
+  // Mientras el informe no esté aprobado, técnico también puede editarlo
+  // (además de puedeEditarCampos) — es quien de hecho lo llena en campo.
+  const puedeEditarInformeNoAprobado = puedeEditarCampos || esTecnico;
   // Mismo set de roles que ya tiene acceso a /facturacion-electronica/guias —
   // técnico (y cualquier otro rol sin acceso a esa ruta) no ve este card.
   const puedeGenerarGRE = ["admin", "asistente", "facturacion", "almacenero", "jefatura", "planner"].includes(rolActual);
@@ -219,6 +223,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
     if (!body.fechaRecibida) delete body.fechaRecibida;
     if (!body.fechaSalida) delete body.fechaSalida;
     if (!body.categorizacionTaller) delete body.categorizacionTaller;
+    body.cantidad = body.cantidad === "" ? null : Number(body.cantidad);
 
     const res = await fetchAuth(`/ordenes-trabajo/${ot._id}`, {
       method: "PUT",
@@ -585,9 +590,15 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
               </div>
             </div>
 
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">Descripción</label>
-              <input name="titulo" value={form.titulo} onChange={handleChange} placeholder="Descripción del trabajo" className={INP} />
+            <div className="grid grid-cols-[1fr_140px] gap-4">
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Título OT</label>
+                <input name="titulo" value={form.titulo} onChange={handleChange} placeholder="Título de la OT" className={INP} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Cantidad</label>
+                <input type="number" name="cantidad" value={form.cantidad} onChange={handleChange} className={INP} />
+              </div>
             </div>
 
             <div hidden>
@@ -995,7 +1006,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
           ordenTrabajo={ot}
           onClose={() => setVerInforme(null)}
           onModificar={
-            (verInforme.aprobado ? puedeAprobarInforme : puedeEditarCampos) && !verInforme.anulado
+            (verInforme.aprobado ? puedeAprobarInforme : puedeEditarInformeNoAprobado) && !verInforme.anulado
               ? () => { setEditandoInforme(verInforme); setVerInforme(null); }
               : undefined
           }

@@ -363,13 +363,16 @@ export default function ListaOrdenesTrabajo() {
   const cerradas = filtradas.filter((o) => esCerrada(o));
 
   // Vista simplificada del planner: un solo set de 4 grupos en vez del split
-  // Prueba/Intervención — agrupa por asignación + avance del track (el que
-  // sea) + aprobación de informe, sin distinguir de qué track viene.
-  const esTrackListo = (o) => ["completado", "entregado"].includes(o.estado) || ["completado", "entregado"].includes(o.estadoPrueba);
+  // Prueba/Intervención — agrupa directo por `estadoGeneral` (calculado y
+  // persistido en el backend, ver estadoGeneralOT.js), sin distinguir de qué
+  // track viene. Antes se recalculaba acá con otro criterio (track listo +
+  // informesAprobados) que no coincidía con el valor que el backend guardaba
+  // — una misma OT podía verse "en progreso" en el badge y "completada" en
+  // esta tabla. Un solo cálculo, una sola fuente de verdad.
   const asignadasPlanner = abiertas.filter((o) => o.encargado?.trim() || o.encargado2?.trim());
-  const plannerEntregadas  = asignadasPlanner.filter((o) => o.informesAprobados && esTrackListo(o));
-  const plannerCompletadas = asignadasPlanner.filter((o) => !o.informesAprobados && esTrackListo(o));
-  const plannerEnProgreso  = asignadasPlanner.filter((o) => !esTrackListo(o));
+  const plannerEntregadas  = asignadasPlanner.filter((o) => o.estadoGeneral === "entregada");
+  const plannerCompletadas = asignadasPlanner.filter((o) => o.estadoGeneral === "completada");
+  const plannerEnProgreso  = asignadasPlanner.filter((o) => o.estadoGeneral === "pendiente" || o.estadoGeneral === "en progreso");
 
   // Tabla "Todas las Órdenes de Trabajo": una sola lista global (sin separar
   // por track ni por asignación) sobre la que responde el filtro de Estado —
@@ -378,7 +381,8 @@ export default function ListaOrdenesTrabajo() {
   const categoriaGlobal = (o) => {
     if (esCerrada(o)) return "cerrada";
     if (o.estadoGeneral === "no asignado") return "noAsignada";
-    if (esTrackListo(o)) return o.informesAprobados ? "entregada" : "completada";
+    if (o.estadoGeneral === "completada") return "completada";
+    if (o.estadoGeneral === "entregada") return "entregada";
     return "enProgreso";
   };
   const todasOTs = filtradas.filter(

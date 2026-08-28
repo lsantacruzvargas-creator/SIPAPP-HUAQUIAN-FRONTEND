@@ -235,13 +235,15 @@ export const dotInformes = (e) => {
 // Estado general de la OT (ver Backend/src/utils/estadoGeneralOT.js) —
 // combina asignación de técnicos, progreso y aprobación de Informe.
 export const badgeGeneral = (e) => {
-  if (e === "completada")  return "bg-teal-100 text-teal-700";
+  if (e === "entregada")   return "bg-teal-100 text-teal-700";
+  if (e === "completada")  return "bg-green-100 text-green-700";
   if (e === "en progreso") return "bg-blue-100 text-blue-700";
   if (e === "pendiente")   return "bg-amber-100 text-amber-700";
   return "bg-gray-100 text-gray-500"; // no asignado
 };
 export const dotGeneral = (e) => {
-  if (e === "completada")  return "bg-teal-500";
+  if (e === "entregada")   return "bg-teal-500";
+  if (e === "completada")  return "bg-green-500";
   if (e === "en progreso") return "bg-blue-500";
   if (e === "pendiente")   return "bg-amber-500";
   return "bg-gray-300"; // no asignado

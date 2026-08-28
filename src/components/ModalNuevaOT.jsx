@@ -214,8 +214,8 @@ export default function ModalNuevaOT({ onClose, onCreada }) {
           </div>
 
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Descripción</label>
-            <input name="titulo" value={form.titulo} onChange={handleChange} className={INP} placeholder="Descripción del trabajo" />
+            <label className="text-xs text-gray-500 block mb-1">Título OT</label>
+            <input name="titulo" value={form.titulo} onChange={handleChange} className={INP} placeholder="Título de la OT" />
           </div>
 
           <div hidden>

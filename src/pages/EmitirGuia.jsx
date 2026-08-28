@@ -13,6 +13,8 @@ import {
   documentoValido,
   serieValida,
   ubigeoValido,
+  normalizarPlaca,
+  placaValida,
 } from "../utils/catalogosSunat";
 
 const PARTE_VACIA         = { schemeID: "6", numDoc: "", nombre: "" };
@@ -273,7 +275,7 @@ export default function EmitirGuia() {
       return "Completa el documento y nombre del comprador, o deja ambos campos vacíos.";
     }
     if (modalidadTraslado === "02") {
-      if (!vehiculo.placa.trim()) return "El transporte privado requiere la placa del vehículo.";
+      if (!placaValida(vehiculo.placa)) return "La placa del vehículo no tiene un formato válido (solo letras y números, sin guiones).";
       if (!conductor.numDoc.trim() || !conductor.nombres.trim() || !conductor.apellidos.trim() || !conductor.licencia.trim()) {
         return "El transporte privado requiere los datos completos del conductor.";
       }
@@ -285,7 +287,7 @@ export default function EmitirGuia() {
     }
     if (modalidadTraslado === "01") {
       if (esM1L) {
-        if (!placaM1L.trim()) return "El vehículo M1/L requiere la placa.";
+        if (!placaValida(placaM1L)) return "La placa del vehículo M1/L no tiene un formato válido (solo letras y números, sin guiones).";
       } else {
         if (!transportista.ruc.trim() || !transportista.razonSocial.trim()) {
           return "El transporte público requiere el RUC y la razón social del transportista.";
@@ -300,7 +302,7 @@ export default function EmitirGuia() {
       if (!doc.numero.trim()) return "Todos los documentos relacionados deben tener número.";
     }
     for (const v of vehiculosSecundarios) {
-      if (!v.placa.trim()) return "Todos los vehículos secundarios deben tener placa.";
+      if (!placaValida(v.placa)) return "Todos los vehículos secundarios deben tener una placa con formato válido (sin guiones).";
     }
     for (const c of conductoresSecundarios) {
       if (!c.numDoc.trim() || !c.nombres.trim() || !c.apellidos.trim() || !c.licencia.trim()) {
@@ -361,10 +363,10 @@ export default function EmitirGuia() {
           comprador: { numDoc: comprador.numDoc.trim(), nombre: comprador.nombre.trim(), schemeID: comprador.schemeID },
         } : {}),
         ...(modalidadTraslado === "01"
-          ? (esM1L ? { vehiculoM1L: { aplica: true, placa: placaM1L.trim() } } : { transportista })
+          ? (esM1L ? { vehiculoM1L: { aplica: true, placa: normalizarPlaca(placaM1L) } } : { transportista })
           : {
-              vehiculo, conductor,
-              ...(vehiculosSecundarios.length ? { vehiculosSecundarios: vehiculosSecundarios.map((v) => ({ placa: v.placa.trim() })) } : {}),
+              vehiculo: { ...vehiculo, placa: normalizarPlaca(vehiculo.placa) }, conductor,
+              ...(vehiculosSecundarios.length ? { vehiculosSecundarios: vehiculosSecundarios.map((v) => ({ placa: normalizarPlaca(v.placa) })) } : {}),
               ...(conductoresSecundarios.length ? {
                 conductoresSecundarios: conductoresSecundarios.map((c) => ({
                   tipoDoc: c.tipoDoc, numDoc: c.numDoc.trim(), nombres: c.nombres.trim(), apellidos: c.apellidos.trim(), licencia: c.licencia.trim(),

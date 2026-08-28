@@ -94,7 +94,7 @@ export const COLS_MATERIALES = [
 export const COLS_COTIZACIONES = [
   { key: "numeroCotizacion", label: "N° Cotización" },
   { key: "ruc",              label: "RUC", requerido: true },
-  { key: "descripcion",      label: "Título/Descripción", requerido: true },
+  { key: "descripcion",      label: "Título cotización", requerido: true },
   { key: "numeroOT",         label: "OT" },
   { key: "estado",           label: "Estado" },
   { key: "numeroOrdenCompra", label: "OC" },
@@ -114,7 +114,7 @@ export const COLS_COTIZACIONES = [
 export const COLS_OT = [
   { key: "numeroOT",             label: "OT" },
   { key: "ruc",                  label: "RUC", requerido: true },
-  { key: "descripcion",          label: "Descripción", requerido: true },
+  { key: "descripcion",          label: "Título OT", requerido: true },
   { key: "micLinea",             label: "MIC/Línea" },
   { key: "fechaIngreso",         label: "Fecha ingreso", tipo: "fecha" },
   { key: "guia",                 label: "Guía" },

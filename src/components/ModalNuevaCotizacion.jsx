@@ -85,7 +85,7 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
 
   const guardar = async () => {
     setIntentoGuardar(true);
-    if (!form.titulo.trim()) return setError("El título / descripción es obligatorio.");
+    if (!form.titulo.trim()) return setError("El título de la cotización es obligatorio.");
     if (items.some(itemInvalido)) {
       return setError("Hay ítems con campos obligatorios sin completar (descripción, cantidad o precio). Corrígelos antes de guardar — resaltados en rojo.");
     }
@@ -331,8 +331,8 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
             )}
 
             <div>
-              <label className="text-xs text-gray-500 block mb-1">Título / Descripción</label>
-              <input name="titulo" value={form.titulo} onChange={handleChange} placeholder="Descripción de la cotización" className={INP} />
+              <label className="text-xs text-gray-500 block mb-1">Título cotización</label>
+              <input name="titulo" value={form.titulo} onChange={handleChange} placeholder="Título de la cotización" className={INP} />
             </div>
 
             <div className="grid grid-cols-2 gap-4">

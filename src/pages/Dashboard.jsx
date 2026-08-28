@@ -189,25 +189,32 @@ function porFecha(arr, campoFecha, ano, mes) {
 // ── Dashboard de Planner / Coordinadora ──────────────────────────────────────
 // Vista específica pedida por el usuario — reemplaza por completo el
 // contenido del dashboard de admin/jefatura para estos dos roles (no se
-// combinan). Un track (Prueba o Intervención) se considera "listo" cuando
-// llegó a completado/entregado — mismo criterio que ya usa la vista
-// simplificada de OTs (ListaOrdenesTrabajo.jsx: esTrackListo/categoriaGlobal).
+// combinan). Los 4 KPIs leen directo el campo `estadoGeneral` (calculado y
+// persistido en el backend, ver Backend/src/utils/estadoGeneralOT.js) — antes
+// se recalculaba con otro criterio acá mismo (vía informesAprobados +
+// estado/estadoPrueba) que no coincidía con el valor que el backend guardaba
+// y mostraba como badge "Servicio", así que una misma OT podía aparecer como
+// "en progreso" en la tabla y como "completada" en el KPI. Un solo cálculo,
+// una sola fuente de verdad.
 function DashboardPlanner({ ots, ocs }) {
   const totalOTs = ots.length;
-  const esTrackListo = (o) =>
-    ["completado", "entregado"].includes(o.estado) || ["completado", "entregado"].includes(o.estadoPrueba);
 
+  // "Pendientes"/"En progreso" en el KPI mapean a las mismas 4 categorías
+  // (No asignada/En progreso/Completada/Entregada) que usa el filtro de la
+  // vista simplificada (ver categoriaGlobal en ListaOrdenesTrabajo.jsx) — "en
+  // progreso" agrupa tanto el estado interno "pendiente" (asignada, sin
+  // arrancar) como "en progreso" (arrancada), igual que allá.
   const pendientes  = ots.filter((o) => o.estadoGeneral === "no asignado").length;
-  const enProgreso  = ots.filter((o) => o.estadoGeneral !== "no asignado" && !esTrackListo(o)).length;
-  const completadas = ots.filter((o) => esTrackListo(o) && !o.informesAprobados).length;
-  const entregadas  = ots.filter((o) => esTrackListo(o) && o.informesAprobados).length;
+  const enProgreso  = ots.filter((o) => o.estadoGeneral === "pendiente" || o.estadoGeneral === "en progreso").length;
+  const completadas = ots.filter((o) => o.estadoGeneral === "completada").length;
+  const entregadas  = ots.filter((o) => o.estadoGeneral === "entregada").length;
 
   // "Completadas o entregadas" = cualquier OT cuyo track ya llegó al final,
   // sin importar si el informe quedó aprobado o no — sobre ESE subconjunto
   // se mide cuántas todavía no tienen informe / no tienen OC vinculada (un
   // trabajo terminado sin su papeleo es la señal de alerta real; contar
   // "sin informe" sobre el total mezclaría OTs que ni siquiera empezaron).
-  const completadasOEntregadas = ots.filter((o) => esTrackListo(o));
+  const completadasOEntregadas = ots.filter((o) => o.estadoGeneral === "completada" || o.estadoGeneral === "entregada");
   const conInforme = completadasOEntregadas.filter((o) => o.estadoInformes !== "pendiente").length;
 
   const cotizacionesConOC = new Set(ocs.map((oc) => oc.cotizacion?._id).filter(Boolean));

@@ -47,13 +47,16 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
     encargado2:             inicial.encargado2             || "",
   });
   const rolActual = getUsuario()?.rol;
-  const puedeEditarCampos = ["admin", "supervisor", "planner"].includes(rolActual);
+  const puedeEditarCampos = ["admin", "supervisor", "planner", "coordinadora"].includes(rolActual);
   // Anular un documento queda reservado a Admin y Jefatura — Facturación ya
   // no puede. Desanular y cerrar/abrir la cadena a mano son exclusivos de admin.
   const puedeAnular = ["admin", "jefatura"].includes(rolActual);
   const esAdmin = rolActual === "admin";
   const puedeAprobarInforme = ["admin", "jefatura", "planner"].includes(rolActual);
   const esTecnico = ["tecnico", "tecnico_prueba", "tecnico_intervencion"].includes(rolActual);
+  // Mientras el informe no esté aprobado, técnico también puede editarlo
+  // (además de puedeEditarCampos) — es quien de hecho lo llena en campo.
+  const puedeEditarInformeNoAprobado = puedeEditarCampos || esTecnico;
   // Tabla de Servicios Externos: la ven todos los roles menos técnico.
   const puedeVerServicios = !esTecnico;
   const cadenaCerrada = bloqueadoPorCadenaCerrada(ot.estadoCadena, rolActual);
@@ -574,7 +577,7 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
           ordenTrabajo={ot}
           onClose={() => setVerInforme(null)}
           onModificar={
-            (verInforme.aprobado ? puedeAprobarInforme : puedeEditarCampos) && !verInforme.anulado
+            (verInforme.aprobado ? puedeAprobarInforme : puedeEditarInformeNoAprobado) && !verInforme.anulado
               ? () => { setEditandoInforme(verInforme); setVerInforme(null); }
               : undefined
           }

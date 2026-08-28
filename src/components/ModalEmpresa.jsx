@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { fetchAuth } from "../utils/fetchAuth";
 
 const FORM_VACIO = { razonSocial: "", ruc: "", direccion: "", alias: "", requiereHes: false, requiereActaConformidad: false, plantas: [] };
@@ -23,27 +23,43 @@ export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
   const [error, setError] = useState("");
   const [cargando, setCargando] = useState(false);
   const [buscandoRuc, setBuscandoRuc] = useState(false);
+  // El input dispara la consulta tanto en Enter como en blur — sin este
+  // guard, escribir el RUC y presionar Enter (y luego salir del campo)
+  // consulta la API 2 veces por el mismo RUC (cada consulta ya cuesta 2
+  // unidades de cuota en apiperu.dev: /ruc + /ruc-domicilio-fiscal).
+  const ultimoRucConsultado = useRef("");
+  // Clic en "Guardar" justo después de escribir el RUC dispara primero el
+  // blur (arranca buscarDatosRuc, async) y recién después el submit — en ese
+  // instante `buscandoRuc` (estado de React) todavía no se re-renderizó, así
+  // que guardar() lo ve en `false` y sigue de largo con razonSocial aún
+  // vacío, obligando a un segundo clic. Un ref sí queda actualizado de
+  // inmediato (sin esperar un render), así que guardar() puede esperar la
+  // consulta en curso en vez de solo chequear el flag.
+  const consultaRucRef = useRef(null);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setForm({ ...form, [name]: type === "checkbox" ? checked : value });
   };
 
-  const buscarDatosRuc = async (ruc) => {
-    if (ruc.length !== 11) return;
+  const buscarDatosRuc = (ruc) => {
+    if (ruc.length !== 11 || ruc === ultimoRucConsultado.current) return;
+    ultimoRucConsultado.current = ruc;
     setBuscandoRuc(true);
-    try {
-      const res = await fetchAuth(`/sunat/ruc/${ruc}`);
-      if (!res.ok) return;
-      const data = await res.json();
-      setForm((f) => ({
-        ...f,
-        razonSocial: data.razonSocial || f.razonSocial,
-        direccion: data.direccion || f.direccion,
-      }));
-    } finally {
-      setBuscandoRuc(false);
-    }
+    consultaRucRef.current = (async () => {
+      try {
+        const res = await fetchAuth(`/sunat/ruc/${ruc}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        setForm((f) => ({
+          ...f,
+          razonSocial: data.razonSocial || f.razonSocial,
+          direccion: data.direccion || f.direccion,
+        }));
+      } finally {
+        setBuscandoRuc(false);
+      }
+    })();
   };
 
   const handlePlantaInputChange = (e) =>
@@ -70,12 +86,18 @@ export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
 
   const guardar = async (e) => {
     e.preventDefault();
-    if (buscandoRuc) return setError("Espera a que termine de consultar el RUC en SUNAT.");
-    if (!form.razonSocial.trim())
-      return setError("No se pudo obtener la razón social para este RUC. Verifica que el RUC sea correcto.");
-    setCargando(true);
     setError("");
+    setCargando(true);
     try {
+      // Si el clic en "Guardar" llegó justo después de escribir el RUC, el
+      // blur recién disparó la consulta a SUNAT — esperarla acá evita el
+      // error falso de "no se pudo obtener la razón social" y el reintento
+      // manual del usuario.
+      if (consultaRucRef.current) await consultaRucRef.current;
+      if (!form.razonSocial.trim()) {
+        setError("No se pudo obtener la razón social para este RUC. Verifica que el RUC sea correcto.");
+        return;
+      }
       const res = await fetchAuth(
         empresa ? `/empresas/${empresa._id}` : "/empresas",
         { method: empresa ? "PUT" : "POST", body: JSON.stringify(form) }
@@ -125,7 +147,6 @@ export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
               onChange={handleChange}
               onBlur={(e) => buscarDatosRuc(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); buscarDatosRuc(e.target.value); } }}
-              required
               maxLength={11}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
             />

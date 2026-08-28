@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 
 const INP = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white";
@@ -34,8 +34,17 @@ export default function TipoCambio() {
     }).finally(() => setCargandoSunat(false));
   };
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { cargar(); if (puedeEditar) cargarSunat(); }, []);
+  // React.StrictMode ejecuta los efectos 2 veces en desarrollo — sin este
+  // guard, cargarSunat() (consulta real a apiperu.dev, con costo de cuota)
+  // se dispara por duplicado cada vez que se abre esta vista en dev.
+  const yaCargado = useRef(false);
+  useEffect(() => {
+    if (yaCargado.current) return;
+    yaCargado.current = true;
+    cargar();
+    if (puedeEditar) cargarSunat();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const guardar = async () => {
     const num = Number(valor);
