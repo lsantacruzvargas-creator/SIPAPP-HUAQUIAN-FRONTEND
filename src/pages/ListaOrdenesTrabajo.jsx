@@ -230,9 +230,10 @@ export default function ListaOrdenesTrabajo() {
   // ("asistente" es el valor de rol real, ver Sidebar.jsx), Jefatura y
   // Coordinadora (estas dos últimas solo en la vista de OTs, a pedido
   // explícito del usuario — el resto de sus permisos no cambia). El rol
-  // "tecnico" (estrictamente, no tecnico_prueba/tecnico_intervencion) usa
-  // esta misma vista — copia exacta del UI de planner, a pedido del usuario.
-  const esVistaSimplificada = ["planner", "asistente", "jefatura", "coordinadora", "tecnico"].includes(rolActual);
+  // "tecnico" (estrictamente, no tecnico_prueba/tecnico_intervencion) y
+  // "admin" también usan esta misma vista — copia exacta del UI de planner,
+  // a pedido del usuario.
+  const esVistaSimplificada = ["planner", "asistente", "jefatura", "coordinadora", "tecnico", "admin"].includes(rolActual);
   const esTecnicoPrueba = rolActual === "tecnico_prueba";
   const esTecnicoIntervencion = rolActual === "tecnico_intervencion";
   const esAsignado = (o) => coincideNombre(o.encargado, nombreActual) || coincideNombre(o.encargado2, nombreActual);
