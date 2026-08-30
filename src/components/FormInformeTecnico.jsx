@@ -250,11 +250,14 @@ function SeccionEvidencias({ seccion, campos, onCampos }) {
               </div>
               <div className="flex flex-wrap gap-2">
                 {g.imagenes.map((img, i) => (
-                  <div key={i} className="relative group/foto shrink-0">
+                  <div key={i} className="relative shrink-0">
                     <ImagenProtegida src={img} className="w-16 h-16 object-cover rounded-lg border border-gray-200" />
                     <button type="button" onClick={() => eliminarImagen(g._key, i)}
                       title="Eliminar foto"
-                      className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white text-xs leading-none flex items-center justify-center opacity-0 group-hover/foto:opacity-100 hover:bg-red-600 transition shadow">
+                      // Siempre visible (no solo en hover) — en tablet/touch no
+                      // existe estado :hover, así que group-hover/foto nunca
+                      // disparaba y el botón quedaba invisible e inalcanzable.
+                      className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white text-xs leading-none flex items-center justify-center hover:bg-red-600 transition shadow">
                       ✕
                     </button>
                   </div>

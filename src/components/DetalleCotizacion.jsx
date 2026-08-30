@@ -1,11 +1,14 @@
 import { useState, useEffect } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import { exportarCotizacionPdf } from "../utils/cotizacionPdf";
-import { calcSubtotal, itemDesdeDb, itemInvalido } from "../utils/cotizacionItems";
+import { exportarCotizacionGloriaPdf } from "../utils/cotizacionGloriaPdf";
+import { calcSubtotalGloria, calcularGloria, itemDesdeDb, itemInvalido, RUC_GLORIA } from "../utils/cotizacionItems";
 import ModalCrearOT from "./ModalCrearOT";
 import ModalOrdenCompra from "./ModalOrdenCompra";
 import BuscadorOrdenTrabajo from "./BuscadorOrdenTrabajo";
+import SelectorEmpresas from "./SelectorEmpresas";
 import TablaItemsCotizacion from "./TablaItemsCotizacion";
+import TablaItemsCotizacionGloria from "./TablaItemsCotizacionGloria";
 import {
   FlujoNegocio, TarjetaRelacion, Chip,
   badgePago, badgeOT, money, BotonAnular, BotonCerrarCadena, BotonDesanular, BannerAnulado, bloqueadoPorCadenaCerrada,
@@ -38,6 +41,8 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   const [form, setForm] = useState({
     subtotal: subtotalInicial > 0 ? String(subtotalInicial) : "",
     descuentoPorcentaje: inicial.descuentoPorcentaje ? String(inicial.descuentoPorcentaje) : "",
+    gastosGeneralesPorcentaje: inicial.gastosGeneralesPorcentaje != null ? String(inicial.gastosGeneralesPorcentaje) : "2",
+    utilidadPorcentaje: inicial.utilidadPorcentaje != null ? String(inicial.utilidadPorcentaje) : "10",
     empresa: inicial.empresa?._id || "",
     tipo: inicial.tipo || "venta",
     moneda: inicial.moneda || "PEN",
@@ -71,6 +76,15 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   const [items, setItems] = useState(() => (inicial.items || []).map(itemDesdeDb));
   const [intentoGuardar, setIntentoGuardar] = useState(false);
   const [empresas, setEmpresas] = useState([]);
+  const [empresasOpen, setEmpresasOpen] = useState(false);
+  // Texto libre además del selector (ver SelectorEmpresas.jsx) — si el
+  // usuario escribe un nombre que no coincide con ninguna empresa ya
+  // registrada, se manda como `empresaNombre` y el backend la crea sola
+  // (mismo criterio que ModalNuevaOT.jsx).
+  const [busquedaEmpresa, setBusquedaEmpresa] = useState(() =>
+    inicial.empresa ? (inicial.empresa.alias ? `${inicial.empresa.alias} — ${inicial.empresa.razonSocial}` : inicial.empresa.razonSocial) : ""
+  );
+  const [listaEmpresaAbierta, setListaEmpresaAbierta] = useState(false);
   const [ots, setOts] = useState([]);
   const [informes, setInformes] = useState([]);
   const [oc, setOc] = useState(null);
@@ -135,8 +149,11 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
     });
   };
 
-  useEffect(() => {
+  const cargarEmpresas = () =>
     fetchAuth("/empresas").then(r => r.ok && r.json()).then(emps => setEmpresas(emps || []));
+
+  useEffect(() => {
+    cargarEmpresas();
     cargarRelaciones();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cot._id]);
@@ -151,6 +168,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
     ? [{ nombre: plantaSel.contactoNombre, telefono: plantaSel.contactoTelefono, correo: plantaSel.contactoCorreo }]
     : [];
   const contactoSel = contactosPlanta.find(c => c.nombre === form.personaContacto);
+  const esGloria = empresaSel?.ruc === RUC_GLORIA;
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -160,6 +178,24 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
       ...(name === "empresa" ? { planta: "", personaContacto: "" } : {}),
       ...(name === "planta" ? { personaContacto: "" } : {}),
     }));
+  };
+
+  const qEmpresa = busquedaEmpresa.trim().toLowerCase();
+  const empresasFiltradas = (qEmpresa
+    ? empresas.filter(e => [e.razonSocial, e.alias, e.ruc].some(v => v?.toLowerCase().includes(qEmpresa)))
+    : empresas
+  ).slice(0, 50);
+
+  const seleccionarEmpresa = (e) => {
+    setForm(f => ({ ...f, empresa: e._id, planta: "", personaContacto: "" }));
+    setBusquedaEmpresa(e.alias ? `${e.alias} — ${e.razonSocial}` : e.razonSocial);
+    setListaEmpresaAbierta(false);
+  };
+
+  const cambiarBusquedaEmpresa = (e) => {
+    setBusquedaEmpresa(e.target.value);
+    setListaEmpresaAbierta(true);
+    if (form.empresa) setForm(f => ({ ...f, empresa: "", planta: "", personaContacto: "" }));
   };
 
   const toggleSeleccion = (idx) => setSeleccionados(prev => {
@@ -208,9 +244,14 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
     }
   };
 
-  const subtotalItems = parseFloat(items.reduce((acc, i) => acc + calcSubtotal(i), 0).toFixed(2));
+  // calcSubtotalGloria degrada a calcSubtotal (cantidad×precio) para
+  // cualquier ítem sin `grupo` — sirve igual para el flujo genérico y para
+  // los 4 grupos de Gloria que no son "mano_obra".
+  const subtotalItems = parseFloat(items.reduce((acc, i) => acc + calcSubtotalGloria(i), 0).toFixed(2));
   const usarTotalesDeItems = items.length > 0;
-  const totalesMostrados = calcular(usarTotalesDeItems ? subtotalItems : form.subtotal, form.descuentoPorcentaje);
+  const totalesMostrados = esGloria
+    ? calcularGloria(usarTotalesDeItems ? subtotalItems : form.subtotal, form.gastosGeneralesPorcentaje, form.utilidadPorcentaje)
+    : calcular(usarTotalesDeItems ? subtotalItems : form.subtotal, form.descuentoPorcentaje);
 
   // Arma el objeto para el PDF con lo que hay en pantalla ahora mismo, sin
   // depender de que se haya guardado antes (Guardar cambios cierra el modal).
@@ -243,14 +284,20 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
     numeroGuia: form.numeroGuia,
     jefeSupervisorSolicitante: form.jefeSupervisorSolicitante,
     compradorResponsable: form.compradorResponsable,
+    gastosGeneralesPorcentaje: form.gastosGeneralesPorcentaje,
+    utilidadPorcentaje: form.utilidadPorcentaje,
     items: items.map(i => ({
       descripcion: i.descripcion,
       unidad: i.unidad || "und",
       cantidad: i.cantidad,
       precio: i.precio,
       moneda: i.moneda,
-      subtotal: calcSubtotal(i),
+      subtotal: calcSubtotalGloria(i),
       subItems: (i.subItems || []).map(s => s.texto).filter(Boolean),
+      grupo: i.grupo,
+      personas: i.personas,
+      horas: i.horas,
+      tarifaHora: i.tarifaHora,
     })),
   });
 
@@ -262,8 +309,15 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   // índice, pero debe seguir generando las OT en el mismo modal abierto.
   const guardarCotizacion = async () => {
     setIntentoGuardar(true);
-    if (items.some(itemInvalido)) {
-      setError("Hay ítems con campos obligatorios sin completar (descripción, cantidad o precio). Corrígelos antes de guardar — resaltados en rojo.");
+    // Formato Gloria: 3 de los 5 grupos no son obligatorios (ver
+    // TablaItemsCotizacionGloria.jsx) y "mano_obra" no usa cantidad/precio,
+    // así que la validación genérica de ítems no aplica — solo se exige que
+    // ningún ítem quede sin descripción.
+    const itemsInvalidos = esGloria ? items.some(i => !i.descripcion?.trim()) : items.some(itemInvalido);
+    if (itemsInvalidos) {
+      setError(esGloria
+        ? "Hay ítems sin descripción. Complétala antes de guardar."
+        : "Hay ítems con campos obligatorios sin completar (descripción, cantidad o precio). Corrígelos antes de guardar — resaltados en rojo.");
       return null;
     }
     setError("");
@@ -298,6 +352,8 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
       numeroGuia: form.numeroGuia,
       jefeSupervisorSolicitante: form.jefeSupervisorSolicitante,
       compradorResponsable: form.compradorResponsable,
+      gastosGeneralesPorcentaje: form.gastosGeneralesPorcentaje,
+      utilidadPorcentaje: form.utilidadPorcentaje,
       items: items.map(i => {
         const it = {
           descripcion: i.descripcion,
@@ -305,14 +361,16 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
           cantidad: i.cantidad,
           precio: i.precio,
           moneda: i.moneda,
-          subtotal: calcSubtotal(i),
+          subtotal: calcSubtotalGloria(i),
         };
         if (i.fechaEntrega) it.fechaEntrega = i.fechaEntrega;
         if (i.subItems?.length > 0) it.subItems = i.subItems.map(s => s.texto).filter(Boolean);
+        if (i.grupo) { it.grupo = i.grupo; it.personas = i.personas; it.horas = i.horas; it.tarifaHora = i.tarifaHora; }
         return it;
       }),
     };
     if (form.empresa) payload.empresa = form.empresa;
+    else if (busquedaEmpresa.trim()) payload.empresaNombre = busquedaEmpresa.trim();
     if (form.fecha) payload.fecha = form.fecha;
     if (form.fechaRecibida) payload.fechaRecibida = form.fechaRecibida;
 
@@ -469,7 +527,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
               <Chip className="mt-0.5 bg-white/20 text-white">{cot.tipo}</Chip>
             </div>
             {!["asistente", "coordinadora", "planner"].includes(rolActual) && (
-              <button onClick={() => exportarCotizacionPdf(datosParaPdf())}
+              <button onClick={() => (esGloria ? exportarCotizacionGloriaPdf : exportarCotizacionPdf)(datosParaPdf())}
                 className="bg-white/15 text-white text-sm px-4 py-2 rounded-lg hover:bg-white/25 transition font-medium shrink-0">
                 Exportar PDF
               </button>
@@ -652,14 +710,38 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
 
                 <div>
                   <label className="text-xs text-gray-500 block mb-1">Empresa</label>
-                  <select name="empresa" value={form.empresa} onChange={handleChange} className={INP}>
-                    <option value="">— Sin empresa —</option>
-                    {empresas.map(e => (
-                      <option key={e._id} value={e._id}>
-                        {e.alias ? `${e.alias} — ` : ""}{e.razonSocial}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <input
+                        type="text"
+                        value={busquedaEmpresa}
+                        onChange={cambiarBusquedaEmpresa}
+                        onFocus={() => setListaEmpresaAbierta(true)}
+                        onBlur={() => setListaEmpresaAbierta(false)}
+                        placeholder="Escribe el nombre de la empresa…"
+                        className={INP}
+                        autoComplete="off"
+                      />
+                      {listaEmpresaAbierta && empresasFiltradas.length > 0 && (
+                        <div className="absolute z-10 mt-1 w-full max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+                          {empresasFiltradas.map(e => (
+                            <button type="button" key={e._id}
+                              onMouseDown={() => seleccionarEmpresa(e)}
+                              className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition border-b border-gray-50 last:border-0">
+                              {e.alias ? `${e.alias} — ` : ""}{e.razonSocial}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <button type="button" onClick={() => setEmpresasOpen(true)}
+                      className="shrink-0 text-xs border border-gray-300 px-3 rounded-lg hover:bg-gray-50 transition">
+                      Empresas
+                    </button>
+                  </div>
+                  {!form.empresa && busquedaEmpresa.trim() && (
+                    <p className="text-[11px] text-amber-600 mt-1">Se creará una empresa nueva con este nombre.</p>
+                  )}
                 </div>
 
                 <div>
@@ -860,26 +942,69 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
                         step="0.01" min="0" placeholder="0.00" className={`${INP} text-lg font-semibold`} />
                     )}
                   </div>
-                  <div>
-                    <label className="text-xs text-gray-500 block mb-1">Descuento global (%)</label>
-                    <input type="number" name="descuentoPorcentaje" value={form.descuentoPorcentaje} onChange={handleChange}
-                      step="0.01" min="0" max="100" placeholder="0" className={INP} />
-                    {totalesMostrados.descuento > 0 && (
-                      <p className="text-xs text-gray-400 mt-1">
-                        −{totalesMostrados.descuento.toFixed(2)} · Subtotal con descuento: {totalesMostrados.subtotalConDescuento.toFixed(2)}
-                      </p>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div className="text-center">
-                      <p className="text-xs text-gray-400">IGV 18%</p>
-                      <p className="font-semibold text-gray-700">{totalesMostrados.igv.toFixed(2)}</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-xs text-gray-400">Total</p>
-                      <p className="font-semibold text-gray-700">{totalesMostrados.total.toFixed(2)}</p>
-                    </div>
-                  </div>
+                  {esGloria ? (
+                    <>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs text-gray-500 block mb-1">Gastos generales (%)</label>
+                          <input type="number" name="gastosGeneralesPorcentaje" value={form.gastosGeneralesPorcentaje} onChange={handleChange}
+                            step="0.01" min="0" max="100" className={INP} />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-500 block mb-1">Utilidad (%)</label>
+                          <input type="number" name="utilidadPorcentaje" value={form.utilidadPorcentaje} onChange={handleChange}
+                            step="0.01" min="0" max="100" className={INP} />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div className="text-center">
+                          <p className="text-xs text-gray-400">Gastos generales</p>
+                          <p className="font-semibold text-gray-700">{totalesMostrados.gastosGenerales.toFixed(2)}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xs text-gray-400">Utilidad</p>
+                          <p className="font-semibold text-gray-700">{totalesMostrados.utilidad.toFixed(2)}</p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div className="text-center">
+                          <p className="text-xs text-gray-400">Total (antes de IGV)</p>
+                          <p className="font-semibold text-gray-700">{totalesMostrados.totalPreIgv.toFixed(2)}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xs text-gray-400">IGV 18%</p>
+                          <p className="font-semibold text-gray-700">{totalesMostrados.igv.toFixed(2)}</p>
+                        </div>
+                      </div>
+                      <div className="text-center border-t border-gray-100 pt-3">
+                        <p className="text-xs text-gray-400">Valor total de la oferta</p>
+                        <p className="font-bold text-gray-900 text-lg">{totalesMostrados.total.toFixed(2)}</p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">Descuento global (%)</label>
+                        <input type="number" name="descuentoPorcentaje" value={form.descuentoPorcentaje} onChange={handleChange}
+                          step="0.01" min="0" max="100" placeholder="0" className={INP} />
+                        {totalesMostrados.descuento > 0 && (
+                          <p className="text-xs text-gray-400 mt-1">
+                            −{totalesMostrados.descuento.toFixed(2)} · Subtotal con descuento: {totalesMostrados.subtotalConDescuento.toFixed(2)}
+                          </p>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div className="text-center">
+                          <p className="text-xs text-gray-400">IGV 18%</p>
+                          <p className="font-semibold text-gray-700">{totalesMostrados.igv.toFixed(2)}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xs text-gray-400">Total</p>
+                          <p className="font-semibold text-gray-700">{totalesMostrados.total.toFixed(2)}</p>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
               )}
@@ -954,25 +1079,60 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
 
         {/* Ítems — ancho completo, debajo de Datos + Relaciones */}
         <div className="max-w-6xl mx-auto px-8 pb-8">
-          <TablaItemsCotizacion
-            items={items}
-            onItemsChange={setItems}
-            tipo={form.tipo}
-            puedeEditar={puedeEditar}
-            disabled={cot.anulado || cot.enviado}
-            intentoGuardar={intentoGuardar}
-            totalesMostrados={totalesMostrados}
-            seleccionables={form.tipo === "servicio" && puedeGenerarOT && !cot.anulado}
-            seleccionados={seleccionados}
-            onToggleSeleccion={toggleSeleccion}
-            onGenerarOT={generarOTSeleccionados}
-            generando={generandoOT}
-            onVerOT={(o) => onNavegar?.({ tipo: "ot", data: ots.find(x => x._id === o._id) || o })}
-            onQuitarOT={quitarOT}
-            puedeVerPrecios={puedeVerPrecios}
-          />
+          {esGloria ? (
+            <TablaItemsCotizacionGloria
+              items={items}
+              onItemsChange={setItems}
+              puedeEditar={puedeEditar}
+              disabled={cot.anulado || cot.enviado}
+              puedeVerPrecios={puedeVerPrecios}
+              seleccionables={puedeGenerarOT && !cot.anulado}
+              seleccionados={seleccionados}
+              onToggleSeleccion={toggleSeleccion}
+              onGenerarOT={generarOTSeleccionados}
+              generando={generandoOT}
+              onVerOT={(o) => onNavegar?.({ tipo: "ot", data: ots.find(x => x._id === o._id) || o })}
+              onQuitarOT={quitarOT}
+            />
+          ) : (
+            <TablaItemsCotizacion
+              items={items}
+              onItemsChange={setItems}
+              tipo={form.tipo}
+              puedeEditar={puedeEditar}
+              disabled={cot.anulado || cot.enviado}
+              intentoGuardar={intentoGuardar}
+              totalesMostrados={totalesMostrados}
+              seleccionables={form.tipo === "servicio" && puedeGenerarOT && !cot.anulado}
+              seleccionados={seleccionados}
+              onToggleSeleccion={toggleSeleccion}
+              onGenerarOT={generarOTSeleccionados}
+              generando={generandoOT}
+              onVerOT={(o) => onNavegar?.({ tipo: "ot", data: ots.find(x => x._id === o._id) || o })}
+              onQuitarOT={quitarOT}
+              puedeVerPrecios={puedeVerPrecios}
+            />
+          )}
         </div>
       </div>
+
+      {empresasOpen && (
+        <SelectorEmpresas
+          empresas={empresas}
+          onClose={() => setEmpresasOpen(false)}
+          onSeleccionar={(e) => {
+            seleccionarEmpresa(e);
+            setEmpresasOpen(false);
+          }}
+          onCambio={async (guardada, { esNueva }) => {
+            await cargarEmpresas();
+            if (esNueva) {
+              setForm(f => ({ ...f, empresa: guardada._id, planta: "", personaContacto: "" }));
+              setBusquedaEmpresa(guardada.alias ? `${guardada.alias} — ${guardada.razonSocial}` : guardada.razonSocial);
+            }
+          }}
+        />
+      )}
 
       {crearOTOpen && (
         <ModalCrearOT

@@ -21,7 +21,7 @@ const AZUL = [0, 74, 173];     // #004AAD — badge "COTIZACIÓN N°"
 const AZUL_CLARO = [173, 193, 229]; // #ADC1E5 — fila "VALOR DE LA OFERTA"
 const GRIS_CLARO = [232, 232, 232]; // #E8E8E8 — encabezados de tabla
 
-const HUAQUIAN = {
+export const HUAQUIAN = {
   razonSocial: "HUAQUIAN S.A.C.",
   ruc: "20601565235",
   direccion: "MZ.A LT1. ASOCIACIÓN VILLA TALAVERA CAMPOY, SAN JUAN DE LURIGANCHO - LIMA.",

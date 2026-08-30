@@ -87,12 +87,18 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
   // Estrictamente el rol "tecnico" (NO tecnico_prueba/tecnico_intervencion,
   // que solo editan su propia tarjeta de estado/progreso más arriba).
   const puedeEditarEncargados = puedeEditarCampos || rolActual === "tecnico";
-  // Aprueba/desaprueba Informes Técnicos — una vez aprobado, solo estos tres
-  // roles pueden seguir editándolo (ver onModificar más abajo).
-  const puedeAprobarInforme = ["admin", "jefatura", "planner"].includes(rolActual);
-  // Mientras el informe no esté aprobado, técnico también puede editarlo
-  // (además de puedeEditarCampos) — es quien de hecho lo llena en campo.
-  const puedeEditarInformeNoAprobado = puedeEditarCampos || esTecnico;
+  // Aprueba/desaprueba Informes Técnicos — mismo set que crea/edita más
+  // abajo, MENOS los roles técnico (ver ROLES_APRUEBAN_INFORME en el
+  // backend, informesTecnicos.js).
+  const puedeAprobarInforme = ["admin", "jefatura", "planner", "coordinadora"].includes(rolActual);
+  // Crea/edita un informe NO aprobado — Admin/Jefatura/Planner/Coordinadora
+  // más los 3 roles técnico (quienes de hecho lo llenan en campo). Asistente
+  // y Supervisor quedaron afuera (corrección explícita del usuario — antes
+  // sí podían) — mismo set que ROLES_CREAN_EDITAN_INFORME en el backend.
+  const puedeEditarInformeNoAprobado = puedeAprobarInforme || esTecnico;
+  // Un informe ya aprobado no lo edita nadie — hay que desaprobarlo primero
+  // (checkbox de arriba) para poder corregirlo.
+  const puedeEditarInformeAprobado = false;
   // Mismo set de roles que ya tiene acceso a /facturacion-electronica/guias —
   // técnico (y cualquier otro rol sin acceso a esa ruta) no ve este card.
   const puedeGenerarGRE = ["admin", "asistente", "facturacion", "almacenero", "jefatura", "planner"].includes(rolActual);
@@ -767,7 +773,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
               numero={informes.length > 1 ? `${informes.length} informes` : undefined}
               vacio={informes.length === 0}
               onClick={!subOTs.length && ultimo ? () => setVerInforme(ultimo) : undefined}
-              onCrear={!subOTs.length && !ot.anulado ? () => setSeleccionarTipoOpen(true) : undefined}
+              onCrear={!subOTs.length && !ot.anulado && puedeEditarInformeNoAprobado ? () => setSeleccionarTipoOpen(true) : undefined}
               crearLabel="informe">
               {subOTs.length > 0 ? (
                 <p className="text-xs text-gray-400">Ver informes por sub-OT (tabla abajo o en cada sub-OT)</p>
@@ -816,7 +822,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
                   </h2>
                 </div>
                 <div className="flex items-center gap-2">
-                {!subOTs.length && !ot.anulado && (
+                {!subOTs.length && !ot.anulado && puedeEditarInformeNoAprobado && (
                   <button type="button" onClick={() => setSeleccionarTipoOpen(true)}
                     className="text-sm border border-teal-600 text-teal-700 px-4 py-2 rounded-lg hover:bg-teal-50 transition font-medium">
                     + Nuevo informe
@@ -1015,7 +1021,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
           ordenTrabajo={ot}
           onClose={() => setVerInforme(null)}
           onModificar={
-            (verInforme.aprobado ? puedeAprobarInforme : puedeEditarInformeNoAprobado) && !verInforme.anulado
+            (verInforme.aprobado ? puedeEditarInformeAprobado : puedeEditarInformeNoAprobado) && !verInforme.anulado
               ? () => { setEditandoInforme(verInforme); setVerInforme(null); }
               : undefined
           }

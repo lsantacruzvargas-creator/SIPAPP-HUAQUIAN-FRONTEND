@@ -344,9 +344,9 @@ export const TIPOS_INFORME = [
       {
         ...EVIDENCIAS_ESTANDAR, titulo: "Imágenes",
         slotsFijos: [
-          { clave: "imagenA", label: "Imagen A" },
-          { clave: "imagenB", label: "Imagen B" },
-          { clave: "imagenC", label: "Imagen C" },
+          { clave: "imagenA", label: "VISTA INICIAL DE TARJETA" },
+          { clave: "imagenB", label: "CAMBIO DE COMPONENTES" },
+          { clave: "imagenC", label: "ESTADO FINAL DE TARJETA" },
         ],
       },
       PIEZAS_A_REEMPLAZAR_TABLA,

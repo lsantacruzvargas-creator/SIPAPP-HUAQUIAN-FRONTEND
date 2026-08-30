@@ -53,11 +53,19 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
   // no puede. Desanular y cerrar/abrir la cadena a mano son exclusivos de admin.
   const puedeAnular = ["admin", "jefatura"].includes(rolActual);
   const esAdmin = rolActual === "admin";
-  const puedeAprobarInforme = ["admin", "jefatura", "planner"].includes(rolActual);
+  // Aprueba/desaprueba Informes Técnicos — mismo set que crea/edita más
+  // abajo, MENOS los roles técnico (ver ROLES_APRUEBAN_INFORME en el
+  // backend, informesTecnicos.js).
+  const puedeAprobarInforme = ["admin", "jefatura", "planner", "coordinadora"].includes(rolActual);
   const esTecnico = ["tecnico", "tecnico_prueba", "tecnico_intervencion"].includes(rolActual);
-  // Mientras el informe no esté aprobado, técnico también puede editarlo
-  // (además de puedeEditarCampos) — es quien de hecho lo llena en campo.
-  const puedeEditarInformeNoAprobado = puedeEditarCampos || esTecnico;
+  // Crea/edita un informe NO aprobado — Admin/Jefatura/Planner/Coordinadora
+  // más los 3 roles técnico (quienes de hecho lo llenan en campo). Asistente
+  // y Supervisor quedaron afuera (corrección explícita del usuario — antes
+  // sí podían) — mismo set que ROLES_CREAN_EDITAN_INFORME en el backend.
+  const puedeEditarInformeNoAprobado = puedeAprobarInforme || esTecnico;
+  // Un informe ya aprobado no lo edita nadie — hay que desaprobarlo primero
+  // (checkbox de arriba) para poder corregirlo.
+  const puedeEditarInformeAprobado = false;
   // Tabla de Servicios Externos: la ven todos los roles menos técnico.
   const puedeVerServicios = !esTecnico;
   const cadenaCerrada = bloqueadoPorCadenaCerrada(ot.estadoCadena, rolActual);
@@ -478,7 +486,7 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
                 <p className="text-xs text-gray-400 mb-2">Sin informes</p>
               </div>
             )}
-            {!ot.anulado && (
+            {!ot.anulado && puedeEditarInformeNoAprobado && (
               <button type="button" onClick={() => setSeleccionarTipoOpen(true)}
                 className="text-xs text-blue-600 hover:text-blue-800 underline">
                 + Crear informe
@@ -587,7 +595,7 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
           ordenTrabajo={ot}
           onClose={() => setVerInforme(null)}
           onModificar={
-            (verInforme.aprobado ? puedeAprobarInforme : puedeEditarInformeNoAprobado) && !verInforme.anulado
+            (verInforme.aprobado ? puedeEditarInformeAprobado : puedeEditarInformeNoAprobado) && !verInforme.anulado
               ? () => { setEditandoInforme(verInforme); setVerInforme(null); }
               : undefined
           }
