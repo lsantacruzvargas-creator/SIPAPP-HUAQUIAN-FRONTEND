@@ -24,6 +24,19 @@ const VEHICULO_VACIO      = { placa: "" };
 const CONDUCTOR_VACIO     = { tipoDoc: "1", numDoc: "", nombres: "", apellidos: "", licencia: "" };
 const TRANSPORTISTA_VACIO = { ruc: "", razonSocial: "", registroMTC: "" };
 
+// Unidades (vehículo + conductor) recurrentes para transporte privado — vive
+// solo acá en el frontend, no hay modelo/endpoint propio en el backend. Al
+// elegir una del selector se autocompletan los campos de abajo; igual quedan
+// editables por si hace falta corregir algo puntual.
+const UNIDADES_TRANSPORTE = [
+  { dni: "44445381", nombres: "JORGE LUIS", apellidos: "MATEO MUCHA", placa: "BRV173", licencia: "Q44445381" },
+  { dni: "20686237", nombres: "NINO SANDRO", apellidos: "DE LA CRUZ MATEO", placa: "CKQ123", licencia: "Q20686237" },
+  { dni: "10669490", nombres: "CARLOS FRANCISCO", apellidos: "ROJAS NUÑEZ", placa: "D8N646", licencia: "Q10669490" },
+  { dni: "08300982", nombres: "ENRIQUE ANTONIO", apellidos: "AGUILAR PARRA", placa: "D1T008", licencia: "Q08300982" },
+  { dni: "44422626", nombres: "JESUS MANUEL", apellidos: "ALVARADO CAYHUA", placa: "D6R937", licencia: "Q44422626" },
+  { dni: "80653251", nombres: "JOSE LUIS", apellidos: "ALVARADO CAYHUA", placa: "D6R937", licencia: "Q80653251" },
+];
+
 // Empresa emisora fija — este ERP emite GRE únicamente a nombre de Huaquian.
 // Las credenciales SUNAT (incluidas las de GRE) las resuelve el hub central por
 // RUC — no hay registro de credenciales en el ERP. Deben coincidir con
@@ -197,6 +210,12 @@ export default function EmitirGuia() {
   const campoTransportista = (e) => setTransportista({ ...transportista, [e.target.name]: e.target.value });
   const campoVehiculo      = (e) => setVehiculo({ ...vehiculo, [e.target.name]: e.target.value });
   const campoConductor     = (e) => setConductor({ ...conductor, [e.target.name]: e.target.value });
+  const seleccionarUnidad  = (dni) => {
+    const u = UNIDADES_TRANSPORTE.find((x) => x.dni === dni);
+    if (!u) return;
+    setVehiculo({ placa: u.placa });
+    setConductor({ tipoDoc: "1", numDoc: u.dni, nombres: u.nombres, apellidos: u.apellidos, licencia: u.licencia });
+  };
 
   const handleItem = (key, campo, valor) =>
     setItems(items.map((i) => (i._key === key ? { ...i, [campo]: valor } : i)));
@@ -928,6 +947,18 @@ export default function EmitirGuia() {
         ) : (
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mb-5">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Vehículo y conductor</p>
+            {!ro && (
+              <div className="mb-4">
+                <label className="block text-xs font-medium text-gray-500 mb-1">Seleccionar unidad</label>
+                <select value="" onChange={(e) => seleccionarUnidad(e.target.value)}
+                  className="w-full input-field w-auto">
+                  <option value="">— Autocompletar desde una unidad guardada —</option>
+                  {UNIDADES_TRANSPORTE.map((u) => (
+                    <option key={u.dni} value={u.dni}>{u.nombres} {u.apellidos} — {u.placa}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="grid grid-cols-3 gap-4 mb-4">
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Placa<Oblig /></label>
