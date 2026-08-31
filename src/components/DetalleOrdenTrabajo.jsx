@@ -107,7 +107,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
   const puedeEditarInformeAprobado = false;
   // Mismo set de roles que ya tiene acceso a /facturacion-electronica/guias —
   // técnico (y cualquier otro rol sin acceso a esa ruta) no ve este card.
-  const puedeGenerarGRE = ["admin", "asistente", "facturacion", "almacenero", "jefatura", "planner"].includes(rolActual);
+  const puedeGenerarGRE = ["admin", "asistente", "facturacion", "almacenero", "jefatura", "planner", "coordinadora"].includes(rolActual);
   const [usuarios, setUsuarios] = useState([]);
   const [empresas, setEmpresas] = useState([]);
   const [empresasOpen, setEmpresasOpen] = useState(false);
