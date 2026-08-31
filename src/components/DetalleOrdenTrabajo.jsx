@@ -40,7 +40,10 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
     codigoSap: inicial.codigoSap || "",
     empresa: inicial.empresa?._id || "",
     planta: inicial.planta || "",
-    contactoNombre: inicial.contactoNombre || "",
+    // Compatibilidad con OTs guardadas antes de este campo: si no hay
+    // personaContacto propio, se intenta preseleccionar por el nombre que ya
+    // tenía copiado en contactoNombre.
+    personaContacto: inicial.personaContacto || inicial.contactoNombre || "",
     titulo: inicial.titulo || "",
     cantidad: inicial.cantidad ?? "",
     condicion: inicial.condicion || "",
@@ -73,6 +76,9 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
   const esVistaLimitada = esTecnico || ["supervisor", "planner"].includes(rolActual);
   // Tabla de Servicios Externos: la ven todos los roles menos técnico.
   const puedeVerServicios = !esTecnico;
+  // Mismo criterio que DetalleCotizacion.jsx/ModalNuevaCotizacion.jsx —
+  // Planner puede ver el card de Cotización (ver más abajo) pero nunca su monto.
+  const puedeVerPrecios = ["admin", "facturacion", "jefatura"].includes(rolActual);
   const cadenaCerrada = bloqueadoPorCadenaCerrada(ot.estadoCadena, rolActual);
   // Estado (Encargado Intervención) y Progreso (Encargado Prueba) son cards
   // independientes del fieldset principal — un técnico no edita el resto de
@@ -214,13 +220,16 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
   const empresaSel = empresas.find(e => e._id === form.empresa);
   const plantasEmpresa = empresaSel?.plantas ?? [];
   const plantaSel = plantasEmpresa.find(p => p.nombre === form.planta);
+  const contactosPlanta = plantaSel?.contactos ?? [];
+  const contactoSel = contactosPlanta.find(c => c.nombre === form.personaContacto);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm(prev => ({
       ...prev,
       [name]: value,
-      ...(name === "empresa" ? { planta: "" } : {}),
+      ...(name === "empresa" ? { planta: "", personaContacto: "" } : {}),
+      ...(name === "planta" ? { personaContacto: "" } : {}),
     }));
   };
 
@@ -228,8 +237,8 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
     setGuardando(true); setError("");
     const body = {
       ...form,
-      contactoNombre: plantaSel?.contactoNombre || "",
-      contactoTelefono: plantaSel?.contactoTelefono || "",
+      contactoNombre: contactoSel?.nombre || "",
+      contactoTelefono: contactoSel?.telefono || "",
     };
     if (!body.empresa) delete body.empresa;
     if (!body.fechaRecibida) delete body.fechaRecibida;
@@ -621,9 +630,17 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
               </div>
               <div>
                 <label className="text-xs text-gray-500 block mb-1">Persona de contacto</label>
-                <p className={`${INP} bg-gray-50 text-gray-500`}>
-                  {plantaSel ? `${plantaSel.contactoNombre} — ${plantaSel.contactoTelefono || "—"}` : "Selecciona una planta"}
-                </p>
+                <select name="personaContacto" value={form.personaContacto} onChange={handleChange} className={INP}>
+                  <option value="">— Sin contacto —</option>
+                  {contactosPlanta.map((c) => (
+                    <option key={c.nombre} value={c.nombre}>{c.nombre}</option>
+                  ))}
+                </select>
+                {contactoSel && (contactoSel.telefono || contactoSel.correo) && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    {[contactoSel.telefono, contactoSel.correo].filter(Boolean).join(" · ")}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -710,12 +727,12 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
               <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Relaciones</h2>
             </div>
 
-            {!esVistaLimitada && (
+            {(!esVistaLimitada || rolActual === "planner") && (
               <TarjetaRelacion tipo="cotizacion" codigo={cot?.codigo} numero={cot?.numeroCotizacion} vacio={!cot}
                 onClick={cot ? () => onNavegar?.({ tipo: "cotizacion", data: cot }) : undefined}
                 onCrear={!cot && !ot.anulado ? crearCotizacion : undefined} crearLabel="Cotización">
                 <p className="text-sm text-gray-700 line-clamp-2">{cot?.titulo}</p>
-                {cot?.total > 0 && <p className="text-xs text-gray-500">{money(cot.total)}</p>}
+                {puedeVerPrecios && cot?.total > 0 && <p className="text-xs text-gray-500">{money(cot.total)}</p>}
               </TarjetaRelacion>
             )}
 

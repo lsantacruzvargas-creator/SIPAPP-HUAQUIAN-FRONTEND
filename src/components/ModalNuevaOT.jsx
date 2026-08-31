@@ -11,6 +11,7 @@ const FORM_VACIO = {
   codigoSap: "",
   empresa: "",
   planta: "",
+  personaContacto: "",
   titulo: "",
   condicion: "",
   categorizacionTaller: "",
@@ -53,8 +54,18 @@ export default function ModalNuevaOT({ onClose, onCreada }) {
 
   const empresaSel = empresas.find((e) => e._id === form.empresa);
   const plantaSel = empresaSel?.plantas?.find((p) => p.nombre === form.planta);
+  const contactosPlanta = plantaSel?.contactos ?? [];
+  const contactoSel = contactosPlanta.find((c) => c.nombre === form.personaContacto);
 
-  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({
+      ...prev,
+      [name]: value,
+      ...(name === "empresa" ? { planta: "", personaContacto: "" } : {}),
+      ...(name === "planta" ? { personaContacto: "" } : {}),
+    }));
+  };
 
   const qEmpresa = busquedaEmpresa.trim().toLowerCase();
   const empresasFiltradas = (qEmpresa
@@ -65,7 +76,7 @@ export default function ModalNuevaOT({ onClose, onCreada }) {
   ).slice(0, 50);
 
   const seleccionarEmpresa = (e) => {
-    setForm((f) => ({ ...f, empresa: e._id, planta: "" }));
+    setForm((f) => ({ ...f, empresa: e._id, planta: "", personaContacto: "" }));
     setBusquedaEmpresa(e.alias ? `${e.alias} — ${e.razonSocial}` : e.razonSocial);
     setListaEmpresaAbierta(false);
   };
@@ -73,7 +84,7 @@ export default function ModalNuevaOT({ onClose, onCreada }) {
   const cambiarBusquedaEmpresa = (e) => {
     setBusquedaEmpresa(e.target.value);
     setListaEmpresaAbierta(true);
-    if (form.empresa) setForm((f) => ({ ...f, empresa: "", planta: "" }));
+    if (form.empresa) setForm((f) => ({ ...f, empresa: "", planta: "", personaContacto: "" }));
   };
 
   const guardar = async () => {
@@ -92,8 +103,9 @@ export default function ModalNuevaOT({ onClose, onCreada }) {
       // importar mayúsculas) y la crea sola si no existe.
       empresaNombre: form.empresa ? undefined : busquedaEmpresa.trim() || undefined,
       planta: form.planta,
-      contactoNombre: plantaSel?.contactoNombre || "",
-      contactoTelefono: plantaSel?.contactoTelefono || "",
+      personaContacto: form.personaContacto,
+      contactoNombre: contactoSel?.nombre || "",
+      contactoTelefono: contactoSel?.telefono || "",
       titulo: form.titulo,
       condicion: form.condicion,
       categorizacionTaller: form.categorizacionTaller || undefined,
@@ -207,9 +219,17 @@ export default function ModalNuevaOT({ onClose, onCreada }) {
             </div>
             <div>
               <label className="text-xs text-gray-500 block mb-1">Persona de contacto</label>
-              <p className={`${INP} bg-gray-50 text-gray-500`}>
-                {plantaSel ? `${plantaSel.contactoNombre} — ${plantaSel.contactoTelefono || "—"}` : "Selecciona una planta"}
-              </p>
+              <select name="personaContacto" value={form.personaContacto} onChange={handleChange} className={INP}>
+                <option value="">— Sin contacto —</option>
+                {contactosPlanta.map((c) => (
+                  <option key={c.nombre} value={c.nombre}>{c.nombre}</option>
+                ))}
+              </select>
+              {contactoSel && (contactoSel.telefono || contactoSel.correo) && (
+                <p className="text-xs text-gray-400 mt-1">
+                  {[contactoSel.telefono, contactoSel.correo].filter(Boolean).join(" · ")}
+                </p>
+              )}
             </div>
           </div>
 

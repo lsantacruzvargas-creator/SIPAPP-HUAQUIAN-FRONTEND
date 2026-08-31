@@ -97,7 +97,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   const [seleccionados, setSeleccionados] = useState(() => new Set());
   const [generandoOT, setGenerandoOT] = useState(false);
   const rolActual = getUsuario()?.rol;
-  const puedeEditar = ["admin", "asistente", "facturacion", "jefatura", "coordinadora"].includes(rolActual);
+  const puedeEditar = ["admin", "asistente", "facturacion", "jefatura", "coordinadora", "planner"].includes(rolActual);
   // Anular un documento queda reservado a Admin y Jefatura — Facturación ya
   // no puede. Desanular y cerrar/abrir la cadena a mano son exclusivos de admin.
   const puedeAnular = ["admin", "jefatura"].includes(rolActual);
@@ -161,12 +161,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   const empresaSel = empresas.find(e => e._id === form.empresa);
   const plantasEmpresa = empresaSel?.plantas ?? [];
   const plantaSel = plantasEmpresa.find(p => p.nombre === form.planta);
-  // Hoy una planta guarda un solo contacto (Empresa.plantas) — se modela ya
-  // como lista para que, cuando una planta pueda tener varios contactos, el
-  // select de abajo solo necesite ampliar este array, sin tocar el resto.
-  const contactosPlanta = plantaSel?.contactoNombre
-    ? [{ nombre: plantaSel.contactoNombre, telefono: plantaSel.contactoTelefono, correo: plantaSel.contactoCorreo }]
-    : [];
+  const contactosPlanta = plantaSel?.contactos ?? [];
   const contactoSel = contactosPlanta.find(c => c.nombre === form.personaContacto);
   const esGloria = empresaSel?.ruc === RUC_GLORIA;
 

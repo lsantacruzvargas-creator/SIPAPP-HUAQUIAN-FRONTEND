@@ -99,8 +99,8 @@ export default function Empresas() {
                   <td className="px-4 py-3 font-medium">{e.alias}</td>
                   <td className="px-4 py-3">{e.razonSocial}</td>
                   <td className="px-4 py-3">{e.ruc}</td>
-                  <td className="px-4 py-3">{e.plantas?.[0]?.contactoTelefono || "—"}</td>
-                  <td className="px-4 py-3">{e.plantas?.[0]?.contactoCorreo || "—"}</td>
+                  <td className="px-4 py-3">{e.plantas?.[0]?.contactos?.[0]?.telefono || "—"}</td>
+                  <td className="px-4 py-3">{e.plantas?.[0]?.contactos?.[0]?.correo || "—"}</td>
                   <td className="px-4 py-3 text-right space-x-3">
                     <button
                       onClick={() => abrirEditar(e)}

@@ -3,6 +3,7 @@ import { fetchAuth } from "../utils/fetchAuth";
 
 const FORM_VACIO = { razonSocial: "", ruc: "", direccion: "", alias: "", requiereHes: false, requiereActaConformidad: false, plantas: [] };
 const PLANTA_VACIA = { nombre: "", contactoNombre: "", contactoTelefono: "", contactoCorreo: "" };
+const CONTACTO_VACIO = { nombre: "", telefono: "", correo: "" };
 
 export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
   const [form, setForm] = useState(
@@ -23,6 +24,10 @@ export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
   const [error, setError] = useState("");
   const [cargando, setCargando] = useState(false);
   const [buscandoRuc, setBuscandoRuc] = useState(false);
+  // Contacto nuevo pendiente de agregar a una planta ya creada — solo una
+  // planta a la vez tiene su mini-form de "+ agregar contacto" abierto.
+  const [contactoNuevo, setContactoNuevo] = useState(CONTACTO_VACIO);
+  const [plantaAgregandoContacto, setPlantaAgregandoContacto] = useState(null);
   // El input dispara la consulta tanto en Enter como en blur — sin este
   // guard, escribir el RUC y presionar Enter (y luego salir del campo)
   // consulta la API 2 veces por el mismo RUC (cada consulta ya cuesta 2
@@ -65,24 +70,61 @@ export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
   const handlePlantaInputChange = (e) =>
     setPlantaInput({ ...plantaInput, [e.target.name]: e.target.value });
 
+  // Cada planta nueva se crea junto con su primer contacto — los contactos
+  // adicionales se agregan después, directo en la lista, con
+  // "+ Agregar contacto" (ver agregarContacto).
   const agregarPlanta = () => {
-    const datos = {
-      nombre: plantaInput.nombre.trim(),
-      contactoNombre: plantaInput.contactoNombre.trim(),
-      contactoTelefono: plantaInput.contactoTelefono.trim(),
-      contactoCorreo: plantaInput.contactoCorreo.trim(),
-    };
-    if (!datos.nombre || !datos.contactoNombre || !datos.contactoTelefono || !datos.contactoCorreo) {
-      setErrorPlanta("Completa el nombre de la planta y su ficha de contacto completa.");
+    const nombre = plantaInput.nombre.trim();
+    const contactoNombre = plantaInput.contactoNombre.trim();
+    const contactoTelefono = plantaInput.contactoTelefono.trim();
+    const contactoCorreo = plantaInput.contactoCorreo.trim();
+    if (!nombre || !contactoNombre || !contactoTelefono) {
+      setErrorPlanta("Completa el nombre de la planta y su primer contacto (nombre y teléfono).");
       return;
     }
     setErrorPlanta("");
-    setForm((f) => ({ ...f, plantas: [...f.plantas, datos] }));
+    setForm((f) => ({
+      ...f,
+      plantas: [...f.plantas, { nombre, contactos: [{ nombre: contactoNombre, telefono: contactoTelefono, correo: contactoCorreo }] }],
+    }));
     setPlantaInput(PLANTA_VACIA);
   };
 
   const quitarPlanta = (idx) =>
     setForm((f) => ({ ...f, plantas: f.plantas.filter((_, i) => i !== idx) }));
+
+  const abrirAgregarContacto = (idx) => {
+    setPlantaAgregandoContacto(idx);
+    setContactoNuevo(CONTACTO_VACIO);
+    setErrorPlanta("");
+  };
+
+  const agregarContacto = (idx) => {
+    const nombre = contactoNuevo.nombre.trim();
+    const telefono = contactoNuevo.telefono.trim();
+    const correo = contactoNuevo.correo.trim();
+    if (!nombre || !telefono) {
+      setErrorPlanta("Completa nombre y teléfono del contacto.");
+      return;
+    }
+    setErrorPlanta("");
+    setForm((f) => ({
+      ...f,
+      plantas: f.plantas.map((p, i) =>
+        i === idx ? { ...p, contactos: [...(p.contactos || []), { nombre, telefono, correo }] } : p
+      ),
+    }));
+    setContactoNuevo(CONTACTO_VACIO);
+    setPlantaAgregandoContacto(null);
+  };
+
+  const quitarContacto = (idxPlanta, idxContacto) =>
+    setForm((f) => ({
+      ...f,
+      plantas: f.plantas.map((p, i) =>
+        i === idxPlanta ? { ...p, contactos: p.contactos.filter((_, ci) => ci !== idxContacto) } : p
+      ),
+    }));
 
   const guardar = async (e) => {
     e.preventDefault();
@@ -199,7 +241,7 @@ export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
           <div className="col-span-2">
             <label className="block text-xs font-medium text-gray-600 mb-1">Plantas</label>
             <p className="text-xs text-gray-400 mb-2">
-              Cada planta requiere su propia ficha de contacto (persona, teléfono y correo).
+              Cada planta requiere al menos un contacto (nombre y teléfono) — se pueden agregar más después.
             </p>
             <div className="grid grid-cols-2 gap-2 mb-2">
               <input
@@ -244,20 +286,74 @@ export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
               </button>
             </div>
             {form.plantas.length > 0 && (
-              <ul className="space-y-1">
+              <ul className="space-y-2">
                 {form.plantas.map((p, idx) => (
-                  <li key={idx} className="flex items-center justify-between bg-gray-50 border border-gray-100 rounded-lg px-3 py-1.5 text-sm">
-                    <span className="text-gray-700">
-                      {p.nombre}
-                      <span className="text-gray-400"> — {p.contactoNombre} · {p.contactoTelefono} · {p.contactoCorreo}</span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => quitarPlanta(idx)}
-                      className="text-gray-400 hover:text-red-500 transition text-base leading-none ml-2"
-                    >
-                      ✕
-                    </button>
+                  <li key={idx} className="bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 text-sm space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-gray-700">{p.nombre}</span>
+                      <button
+                        type="button"
+                        onClick={() => quitarPlanta(idx)}
+                        className="text-gray-400 hover:text-red-500 transition text-base leading-none ml-2"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    {(p.contactos || []).length > 0 && (
+                      <ul className="space-y-1">
+                        {p.contactos.map((c, ci) => (
+                          <li key={ci} className="flex items-center justify-between text-xs text-gray-500 pl-1">
+                            <span>{c.nombre} · {c.telefono}{c.correo ? ` · ${c.correo}` : ""}</span>
+                            <button
+                              type="button"
+                              onClick={() => quitarContacto(idx, ci)}
+                              className="text-gray-300 hover:text-red-500 transition"
+                            >
+                              ✕
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {plantaAgregandoContacto === idx ? (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <input
+                          value={contactoNuevo.nombre}
+                          onChange={(e) => setContactoNuevo((c) => ({ ...c, nombre: e.target.value }))}
+                          placeholder="Nombre"
+                          className="flex-1 min-w-[100px] border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-gray-400"
+                        />
+                        <input
+                          value={contactoNuevo.telefono}
+                          onChange={(e) => setContactoNuevo((c) => ({ ...c, telefono: e.target.value }))}
+                          placeholder="Teléfono"
+                          className="flex-1 min-w-[90px] border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-gray-400"
+                        />
+                        <input
+                          value={contactoNuevo.correo}
+                          onChange={(e) => setContactoNuevo((c) => ({ ...c, correo: e.target.value }))}
+                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); agregarContacto(idx); } }}
+                          placeholder="Correo (opcional)"
+                          className="flex-1 min-w-[120px] border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-gray-400"
+                        />
+                        <button type="button" onClick={() => agregarContacto(idx)}
+                          className="text-xs bg-gray-900 text-white px-2.5 rounded-lg hover:bg-gray-700 transition shrink-0">
+                          Agregar
+                        </button>
+                        <button type="button" onClick={() => setPlantaAgregandoContacto(null)}
+                          className="text-xs text-gray-400 hover:text-gray-600 transition shrink-0">
+                          Cancelar
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => abrirAgregarContacto(idx)}
+                        className="text-xs text-blue-500 hover:text-blue-700 transition"
+                      >
+                        + Agregar contacto
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>

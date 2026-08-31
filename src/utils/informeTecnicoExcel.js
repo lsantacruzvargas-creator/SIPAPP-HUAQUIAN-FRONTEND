@@ -12,6 +12,20 @@ const EXTENSION_SOPORTADA = (ruta) => {
   return null;
 };
 
+// Ancho/alto real en píxeles de la foto (para insertarla en el Excel con su
+// tamaño original en vez de estirarla a una celda o forzarla a un tamaño
+// fijo) — se decodifica vía <img>, igual que cargarImagen() en los exports
+// de PDF, en vez de parsear los bytes del header PNG/JPEG a mano.
+const dimensionesImagen = (buffer, extension) =>
+  new Promise((resolve) => {
+    const blob = new Blob([buffer], { type: `image/${extension}` });
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); resolve({ width: img.naturalWidth, height: img.naturalHeight }); };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+    img.src = url;
+  });
+
 // exceljs pierde varios metadatos de la hoja al recargar y regrabar el
 // archivo, todos ajenos a los datos del informe (nunca cambian entre
 // exportaciones de la misma plantilla), así que se restauran byte a byte
@@ -855,9 +869,10 @@ export async function exportarInformeTecnicoExcel(informe, ot) {
   // Excel. Se calcula en base a ws.dimensions.right (última columna con
   // contenido real) en vez de hardcodear "BC" porque cada plantilla tiene
   // un ancho distinto (ej. las de bobina de estator son mucho más angostas).
-  // El tamaño se fija (no se lee el ancho/alto real de cada foto) para no
-  // tener que decodificar la imagen; queda una distorsión leve si la foto
-  // no es 4:3, aceptable para este flujo de "colocar y luego acomodar".
+  // Cada foto se inserta con su tamaño real (dimensionesImagen), no
+  // estirada a una celda ni a un tamaño fijo — así no queda distorsión,
+  // aceptando que el usuario después la acomode/redimensione a mano si
+  // queda más grande o chica de lo que entra a simple vista en la hoja.
   const numeroAColumna = (n) => {
     let s = "";
     for (; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + ((n - 1) % 26)) + s;
@@ -904,6 +919,10 @@ export async function exportarInformeTecnicoExcel(informe, ot) {
         const resImg = await fetchUpload(ruta);
         const bufferImg = await resImg.arrayBuffer();
         const imageId = wb.addImage({ buffer: bufferImg, extension });
+        // Si no se puede decodificar la imagen (formato raro, buffer corrupto),
+        // cae al tamaño fijo de antes en vez de insertarla con ext undefined.
+        const dim = await dimensionesImagen(bufferImg, extension);
+        const ext = dim || { width: 260, height: 195 };
         let slot = null;
         if (slotsPorNombre) {
           if (slotsConfig[titulo] && !nombresUsados.has(titulo)) {
@@ -914,9 +933,11 @@ export async function exportarInformeTecnicoExcel(informe, ot) {
           slot = slotsPosicionales[i];
         }
         if (slot) {
-          // Posición conocida de la plantilla — ancla de dos puntos, llena
-          // el recuadro impreso exacto en vez de quedar fuera del área.
-          ws.addImage(imageId, slot);
+          // Posición conocida de la plantilla — se usa solo su esquina
+          // superior-izquierda como ancla (no el rango completo B23:E34),
+          // para que la foto entre a su tamaño real en vez de estirarse a
+          // ese recuadro.
+          ws.addImage(imageId, { tl: slot.tl, ext });
         } else {
           if (!encabezadoGenericoEscrito) {
             escribirFilaDerecha(filaFotos, "FOTOS ADJUNTAS (arrastrar a la posición final)");
@@ -926,7 +947,7 @@ export async function exportarInformeTecnicoExcel(informe, ot) {
           escribirFilaDerecha(filaFotos, titulo);
           ws.addImage(imageId, {
             tl: { col: COL_FOTOS_IDX0, row: filaFotos }, // filaFotos es 1-indexado pero el anchor espera 0-indexado
-            ext: { width: 260, height: 195 },
+            ext,
           });
           filaFotos += 11;
         }

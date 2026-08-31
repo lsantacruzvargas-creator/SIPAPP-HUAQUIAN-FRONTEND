@@ -85,12 +85,7 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
   const empresaSel = empresas.find(e => e._id === form.empresa);
   const plantasEmpresa = empresaSel?.plantas ?? [];
   const plantaSel = plantasEmpresa.find(p => p.nombre === form.planta);
-  // Hoy una planta guarda un solo contacto (Empresa.plantas) — se modela ya
-  // como lista para que, cuando una planta pueda tener varios contactos, el
-  // select de abajo solo necesite ampliar este array, sin tocar el resto.
-  const contactosPlanta = plantaSel?.contactoNombre
-    ? [{ nombre: plantaSel.contactoNombre, telefono: plantaSel.contactoTelefono, correo: plantaSel.contactoCorreo }]
-    : [];
+  const contactosPlanta = plantaSel?.contactos ?? [];
   const contactoSel = contactosPlanta.find(c => c.nombre === form.personaContacto);
   const esGloria = empresaSel?.ruc === RUC_GLORIA;
 
