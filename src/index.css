@@ -157,6 +157,21 @@
   background-color: var(--bg-surface-soft) !important;
 }
 
+/* Quita las flechas de spinner de los input[type=number] en todo el
+   proyecto (Chrome/Safari + Firefox) — decisión de diseño, no solo para el
+   formulario de GRE. El scroll del mouse cambiando el valor sin querer se
+   corrige aparte, por input, con onWheel={(e) => e.target.blur()} — eso no
+   se puede resolver solo con CSS. */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 @layer components {
   .btn-primary {
     @apply bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed;

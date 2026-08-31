@@ -11,6 +11,8 @@ import {
   MOTIVO_ND,
   TIPO_MONEDA,
   DETRACCION_BIENES_SERVICIOS,
+  normalizarCuentaDetraccion,
+  cuentaDetraccionValida,
   itemVacioComprobante,
   precioUnitarioDesdeValor,
   calcularLineaComprobante,
@@ -259,6 +261,7 @@ export default function EmitirComprobante() {
       if (!detraccionPorcentaje || Number(detraccionPorcentaje) <= 0) return "El porcentaje de detracción debe ser mayor a 0.";
       if (!detraccionMontoNeto || Number(detraccionMontoNeto) <= 0) return "El monto neto a depositar debe ser mayor a 0.";
       if (!detraccionCuentaBancaria.trim()) return "La cuenta del Banco de la Nación es requerida.";
+      if (!cuentaDetraccionValida(detraccionCuentaBancaria)) return "La cuenta del Banco de la Nación debe tener el formato 0000-0000000000 (4 + 10 dígitos).";
     }
     if (esNota) {
       if (!referencia.id) return "Selecciona el comprobante a modificar.";
@@ -804,20 +807,20 @@ export default function EmitirComprobante() {
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">Porcentaje (%)<Oblig /></label>
                       <input type="number" min="0" max="100" step="0.1" value={detraccionPorcentaje}
-                        onChange={(e) => setDetraccionPorcentaje(e.target.value)} disabled={ro} required
+                        onChange={(e) => setDetraccionPorcentaje(e.target.value)} onWheel={(e) => e.target.blur()} disabled={ro} required
                         className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">Monto neto a depositar<Oblig /></label>
-                      <input type="number" min="0" step="0.01" value={detraccionMontoNeto}
-                        onChange={(e) => setDetraccionMontoNeto(e.target.value)} disabled={ro} required
+                      <input type="number" min="0" step="0.01" value={detraccionMontoNeto} placeholder="0.00"
+                        onChange={(e) => setDetraccionMontoNeto(e.target.value)} onWheel={(e) => e.target.blur()} disabled={ro} required
                         className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
                     </div>
                     <div className="col-span-4">
                       <label className="block text-xs font-medium text-gray-500 mb-1">Cuenta Banco de la Nación<Oblig /></label>
-                      <input value={detraccionCuentaBancaria}
-                        onChange={(e) => setDetraccionCuentaBancaria(e.target.value)} disabled={ro} required
-                        className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
+                      <input value={detraccionCuentaBancaria} placeholder="0000-0000000000" maxLength={15}
+                        onChange={(e) => setDetraccionCuentaBancaria(normalizarCuentaDetraccion(e.target.value))} disabled={ro} required
+                        className={`w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500 ${detraccionCuentaBancaria && !cuentaDetraccionValida(detraccionCuentaBancaria) ? "border-red-300" : ""}`} />
                     </div>
                   </div>
                 )}

@@ -536,7 +536,7 @@ export default function EmitirGuia() {
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Peso bruto total<Oblig /></label>
               <input type="number" min="0" step="0.01" value={pesoBrutoTotal}
-                onChange={(e) => setPesoBrutoTotal(e.target.value)} disabled={ro} required
+                onChange={(e) => setPesoBrutoTotal(e.target.value)} onWheel={(e) => e.target.blur()} disabled={ro} required
                 className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
             </div>
             <div>
@@ -551,7 +551,7 @@ export default function EmitirGuia() {
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">N.º de bultos (opcional)</label>
               <input type="number" min="0" step="1" value={numeroBultos}
-                onChange={(e) => setNumeroBultos(e.target.value)} disabled={ro}
+                onChange={(e) => setNumeroBultos(e.target.value)} onWheel={(e) => e.target.blur()} disabled={ro}
                 className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
             </div>
           </div>
@@ -1087,7 +1087,7 @@ export default function EmitirGuia() {
                     </td>
                     <td className="px-3 py-2">
                       <input type="number" min="0" step="0.01" value={item.cantidad}
-                        onChange={(e) => handleItem(item._key, "cantidad", e.target.value)}
+                        onChange={(e) => handleItem(item._key, "cantidad", e.target.value)} onWheel={(e) => e.target.blur()}
                         required disabled={ro}
                         className="w-full input-field w-auto" />
                     </td>
