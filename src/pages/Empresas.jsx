@@ -80,15 +80,13 @@ export default function Empresas() {
               <th className="px-4 py-3 text-left">Alias</th>
               <th className="px-4 py-3 text-left">Razón social</th>
               <th className="px-4 py-3 text-left">RUC</th>
-              <th className="px-4 py-3 text-left">Teléfono</th>
-              <th className="px-4 py-3 text-left">Correo</th>
               <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {empresasFiltradas.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
                   {filtro ? "Sin resultados para la búsqueda" : "Sin empresas registradas"}
                 </td>
               </tr>
@@ -99,8 +97,6 @@ export default function Empresas() {
                   <td className="px-4 py-3 font-medium">{e.alias}</td>
                   <td className="px-4 py-3">{e.razonSocial}</td>
                   <td className="px-4 py-3">{e.ruc}</td>
-                  <td className="px-4 py-3">{e.plantas?.[0]?.contactos?.[0]?.telefono || "—"}</td>
-                  <td className="px-4 py-3">{e.plantas?.[0]?.contactos?.[0]?.correo || "—"}</td>
                   <td className="px-4 py-3 text-right space-x-3">
                     <button
                       onClick={() => abrirEditar(e)}

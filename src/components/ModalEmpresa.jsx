@@ -156,7 +156,7 @@ export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl p-6">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
         <h3 className="font-semibold text-gray-800 mb-4">
           {empresa ? "Editar empresa" : "Nueva empresa"}
         </h3>
