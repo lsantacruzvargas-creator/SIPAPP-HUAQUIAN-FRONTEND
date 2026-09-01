@@ -131,6 +131,7 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
   };
 
   const guardar = async () => {
+    if (!form.titulo.trim()) { setError("El título de la sub-OT es obligatorio."); return; }
     setGuardando(true); setError("");
     const body = { ...form };
     if (!body.personalAsignado) delete body.personalAsignado;

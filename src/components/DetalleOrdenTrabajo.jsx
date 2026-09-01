@@ -241,6 +241,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
   };
 
   const guardar = async () => {
+    if (!form.titulo.trim()) { setError("El título de la OT es obligatorio."); return; }
     setGuardando(true); setError("");
     const body = {
       ...form,
