@@ -1192,6 +1192,8 @@ function SeccionMovimientos() {
   const [cargandoMas, setCargandoMas] = useState(false);
   const [filtroTipo, setFiltroTipo] = useState("");
   const [filtroMaterial, setFiltroMaterial] = useState("");
+  const [filtroDesde, setFiltroDesde] = useState("");
+  const [filtroHasta, setFiltroHasta] = useState("");
   // Texto del buscador + nombre a mostrar del material elegido para filtrar
   // — ya no se trae la lista completa de ~9000 materiales solo para armar un
   // <select> (ver BuscadorMaterialInline, búsqueda server-side).
@@ -1204,8 +1206,10 @@ function SeccionMovimientos() {
     const params = new URLSearchParams();
     if (filtroTipo) params.set("tipo", filtroTipo);
     if (filtroMaterial) params.set("material", filtroMaterial);
+    if (filtroDesde) params.set("desde", filtroDesde);
+    if (filtroHasta) params.set("hasta", filtroHasta);
     return params;
-  }, [filtroTipo, filtroMaterial]);
+  }, [filtroTipo, filtroMaterial, filtroDesde, filtroHasta]);
 
   const cargarPagina = useCallback(async (paginaAPedir, reemplazar) => {
     const params = paramsFiltro();
@@ -1314,6 +1318,18 @@ function SeccionMovimientos() {
           {filtroMaterial && (
             <button type="button" onClick={limpiarFiltroMaterial}
               className="text-gray-400 hover:text-gray-700 text-lg leading-none px-1" title="Quitar filtro">✕</button>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <input type="date" value={filtroDesde} onChange={(e) => setFiltroDesde(e.target.value)}
+            className={INP} title="Desde" />
+          <span className="text-gray-400 text-xs">a</span>
+          <input type="date" value={filtroHasta} onChange={(e) => setFiltroHasta(e.target.value)}
+            className={INP} title="Hasta" />
+          {(filtroDesde || filtroHasta) && (
+            <button type="button" onClick={() => { setFiltroDesde(""); setFiltroHasta(""); }}
+              className="text-gray-400 hover:text-gray-700 text-lg leading-none px-1" title="Quitar rango de fecha">✕</button>
           )}
         </div>
 
@@ -1437,7 +1453,7 @@ function SeccionAlertaStock() {
   useEffect(() => { cargar(); }, [cargar]);
 
   const enAlerta = [...lista]
-    .sort((a, b) => (a.stock <= 0 ? -1 : 0) - (b.stock <= 0 ? -1 : 0) || a.nombre.localeCompare(b.nombre));
+    .sort((a, b) => (a.stock <= 0 ? -1 : 0) - (b.stock <= 0 ? -1 : 0) || b.sku.localeCompare(a.sku));
 
   const badgeStock = (m) => (m.stock <= 0 ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700");
 
