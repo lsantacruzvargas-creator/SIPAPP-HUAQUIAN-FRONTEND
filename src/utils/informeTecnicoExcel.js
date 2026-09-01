@@ -2,6 +2,7 @@ import ExcelJS from "exceljs";
 import JSZip from "jszip";
 import { tipoInformePorValor, claveChecklist } from "./informesTecnicos";
 import { fetchUpload } from "./fetchAuth";
+import { formatearFecha } from "./fecha";
 
 // exceljs solo puede incrustar estos 3 formatos — si la foto subida es de
 // otro tipo (ej. webp/heic) se omite del Excel (sigue disponible en la app).
@@ -386,18 +387,26 @@ const MAPEOS = {
     },
   },
 
+  // Re-mapeada completa — la plantilla real ya no trae el bloque de
+  // encabezado (CAMPOS_ENCABEZADO_SERVICIO): en su lugar, una sola celda
+  // combinada A2:H3 (bajo el rótulo impreso "DESCRIPCION" en A1:H1) recibe
+  // la descripción de la OT. El resto del contenido subió ~8 filas por la
+  // eliminación del encabezado (confirmado celda por celda contra la
+  // plantilla real, 2026-08-31): datos del componente/equipo en fila 7
+  // (rótulos en fila 6), checklist en H24:H30, recomendaciones con 5 líneas
+  // (filas 32-36, hasta la última fila real de la hoja).
   adicional: {
     campos: {
-      ...CAMPOS_ENCABEZADO_SERVICIO,
-      componenteMarca: "A15", componenteModelo: "B15", componentePotencia: "C15", componenteCantidad: "D15",
-      equipoMarca: "E15", equipoModelo: "F15", equipoPotencia: "G15", equipoCantidad: "H15",
+      descripcion: "A2",
+      componenteMarca: "A7", componenteModelo: "B7", componentePotencia: "C7", componenteCantidad: "D7",
+      equipoMarca: "E7", equipoModelo: "F7", equipoPotencia: "G7", equipoCantidad: "H7",
     },
     checklist: {
       "Checklist de verificación técnica": {
-        items: Object.fromEntries(Array.from({ length: 7 }, (_, i) => [`item${i + 1}`, `H${32 + i}`])),
+        items: Object.fromEntries(Array.from({ length: 7 }, (_, i) => [`item${i + 1}`, `H${24 + i}`])),
       },
     },
-    bullets: { recomendaciones: { col: "A", fila: 40, max: 4 } },
+    bullets: { recomendaciones: { col: "A", fila: 32, max: 5 } },
   },
 
   plc: {
@@ -582,7 +591,11 @@ const SLOTS_FOTOS = {
     cambioLcdInicial: "D40:F49", cambioLcdFinal: "D50:F59",
     cambioTouchInicial: "G40:I49", cambioTouchFinal: "G50:I59",
   },
-  adicional: { vistaFrontalComponente: "A17:D28", vistaFrontalEquipo: "E17:H28" },
+  // Recuadro subió con el resto del contenido (ver comentario en MAPEOS.adicional)
+  // — inferido por el hueco entre la fila 8 (spacer) y el rótulo "VISTA FRONTAL..."
+  // en la fila 21 (ahora DEBAJO del recuadro, no encima como en las demás
+  // plantillas); no confirmado visualmente con una foto real insertada.
+  adicional: { vistaFrontalComponente: "A9:D20", vistaFrontalEquipo: "E9:H20" },
   plc: {
     vistaFrontal: "A19:C38", placaEquipo: "D19:F38", carcasaContaminada: "G19:I38",
     carcasaDescontaminada: "A40:C59", limpiezaTarjetaInicial: "D40:F49", limpiezaTarjetaFinal: "D50:F59",
@@ -769,7 +782,7 @@ export async function exportarInformeTecnicoExcel(informe, ot) {
     }
   });
 
-  const fechaFormateada = informe.fecha ? new Date(informe.fecha).toLocaleDateString("es-PE") : "";
+  const fechaFormateada = informe.fecha ? formatearFecha(informe.fecha) : "";
   escribir(mapa.footer?.hechoPor, informe.hechoPor);
   escribir(mapa.footer?.vB, informe.vB);
   escribir(mapa.footer?.fecha, fechaFormateada);
@@ -919,10 +932,20 @@ export async function exportarInformeTecnicoExcel(informe, ot) {
         const resImg = await fetchUpload(ruta);
         const bufferImg = await resImg.arrayBuffer();
         const imageId = wb.addImage({ buffer: bufferImg, extension });
-        // Si no se puede decodificar la imagen (formato raro, buffer corrupto),
-        // cae al tamaño fijo de antes en vez de insertarla con ext undefined.
-        const dim = await dimensionesImagen(bufferImg, extension);
-        const ext = dim || { width: 260, height: 195 };
+        // Tamaño original (sin estirar a la celda) — pedido explícitamente
+        // solo para INFORME DE SUMINISTRO. El resto de informes sigue
+        // estirando la foto al recuadro completo de la plantilla (comportamiento
+        // de siempre): si esto se generaliza a todos los tipos, cada foto se
+        // pega con su tamaño real sin importar el recuadro, que es justo el bug
+        // que se reportó (se había propagado a todos los informes por error).
+        const esSuministro = informe.tipo === "suministro";
+        let ext = { width: 260, height: 195 };
+        if (esSuministro) {
+          // Si no se puede decodificar la imagen (formato raro, buffer corrupto),
+          // cae al tamaño fijo de antes en vez de insertarla con ext undefined.
+          const dim = await dimensionesImagen(bufferImg, extension);
+          ext = dim || ext;
+        }
         let slot = null;
         if (slotsPorNombre) {
           if (slotsConfig[titulo] && !nombresUsados.has(titulo)) {
@@ -932,12 +955,16 @@ export async function exportarInformeTecnicoExcel(informe, ot) {
         } else {
           slot = slotsPosicionales[i];
         }
-        if (slot) {
+        if (slot && esSuministro) {
           // Posición conocida de la plantilla — se usa solo su esquina
           // superior-izquierda como ancla (no el rango completo B23:E34),
           // para que la foto entre a su tamaño real en vez de estirarse a
           // ese recuadro.
           ws.addImage(imageId, { tl: slot.tl, ext });
+        } else if (slot) {
+          // Resto de informes: se estira al recuadro completo de la plantilla
+          // (tl + br), comportamiento original antes de agregar el tamaño real.
+          ws.addImage(imageId, slot);
         } else {
           if (!encabezadoGenericoEscrito) {
             escribirFilaDerecha(filaFotos, "FOTOS ADJUNTAS (arrastrar a la posición final)");

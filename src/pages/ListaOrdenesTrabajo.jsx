@@ -65,6 +65,7 @@ function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg }) {
                 <th className={`${TH} text-left`}>N° Cotización</th>
                 <th className={`${TH} text-center`}>Servicio</th>
                 <th className={`${TH} text-left`}>Empresa</th>
+                <th className={`${TH} text-left`}>Contacto</th>
                 <th className={`${TH} text-left`}>Descripción</th>
                 <th className={`${TH} text-center`}>Prueba</th>
                 <th className={`${TH} text-left`}>Técnico de prueba</th>
@@ -77,7 +78,7 @@ function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg }) {
             <tbody className="divide-y divide-gray-100">
               {ordenes.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="px-4 py-8 text-center text-gray-400">{vacioMsg}</td>
+                  <td colSpan={12} className="px-4 py-8 text-center text-gray-400">{vacioMsg}</td>
                 </tr>
               ) : (
                 ordenes.flatMap((o) => [
@@ -104,6 +105,9 @@ function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg }) {
                     </td>
                     <td className="px-4 py-3.5 text-gray-700">
                       {o.empresa?.razonSocial || <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="px-4 py-3.5 text-gray-600">
+                      {o.personaContacto || o.contactoNombre || <span className="text-gray-300">—</span>}
                     </td>
                     <td className="px-4 py-3.5 text-gray-700">{o.titulo || <span className="text-gray-300">—</span>}</td>
                     <td className="px-4 py-3.5 text-center">
@@ -136,6 +140,9 @@ function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg }) {
                       </td>
                       <td className="px-4 py-3 text-gray-700">
                         {s.empresa?.razonSocial || o.empresa?.razonSocial || <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">
+                        {s.personaContacto || s.contactoNombre || o.personaContacto || o.contactoNombre || <span className="text-gray-300">—</span>}
                       </td>
                       <td className="px-4 py-3 text-gray-700">{s.titulo || <span className="text-gray-300">—</span>}</td>
                       <td className="px-4 py-3 text-center">
@@ -410,6 +417,7 @@ export default function ListaOrdenesTrabajo() {
     "N° Cotización":  o.cotizacion?.numeroCotizacion || "—",
     "Servicio":       o.estadoGeneral || "—",
     "Empresa":        o.empresa?.razonSocial || "—",
+    "Contacto":       o.personaContacto || o.contactoNombre || "—",
     "Descripción":    o.titulo || "—",
     "Prueba":         o.estadoPrueba || "—",
     "Técnico de prueba":        o.encargado || "—",

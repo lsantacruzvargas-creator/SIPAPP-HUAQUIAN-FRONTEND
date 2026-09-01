@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
+import { formatearFecha } from "../utils/fecha";
 import ModalSeleccionarTipoInforme from "./ModalSeleccionarTipoInforme";
 import FormInformeTecnico from "./FormInformeTecnico";
 import VistaInformeTecnico from "./VistaInformeTecnico";
@@ -46,6 +47,12 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
     irreparable:            inicial.irreparable            || false,
     encargado:              inicial.encargado              || "",
     encargado2:             inicial.encargado2             || "",
+    equipoMarca:            inicial.equipoMarca            || "",
+    equipoModelo:           inicial.equipoModelo           || "",
+    equipoCodigo:           inicial.equipoCodigo           || "",
+    equipoTag:              inicial.equipoTag               || "",
+    equipoPotencia:         inicial.equipoPotencia         || "",
+    equipoSerie:            inicial.equipoSerie             || "",
   });
   const rolActual = getUsuario()?.rol;
   const puedeEditarCampos = ["admin", "supervisor", "planner", "coordinadora"].includes(rolActual);
@@ -296,7 +303,7 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
         <div className="max-w-6xl mx-auto px-8 py-3 flex flex-wrap gap-x-8 gap-y-1 text-xs">
           <span><span className="text-gray-400">Cliente:</span> <span className="text-gray-700">{ot.empresa?.razonSocial || "—"}</span></span>
           <span><span className="text-gray-400">Planta:</span> <span className="text-gray-700">{ot.planta || "—"}</span></span>
-          <span><span className="text-gray-400">Fecha de ingreso:</span> <span className="text-gray-700">{ot.fechaRecibida ? new Date(ot.fechaRecibida).toLocaleDateString("es-PE") : "—"}</span></span>
+          <span><span className="text-gray-400">Fecha de ingreso:</span> <span className="text-gray-700">{ot.fechaRecibida ? formatearFecha(ot.fechaRecibida) : "—"}</span></span>
           <span><span className="text-gray-400">Guía de llegada:</span> <span className="text-gray-700">{ot.numeroGuiaEmision || "—"}</span></span>
         </div>
       </div>
@@ -377,6 +384,36 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
               <label className="text-xs text-gray-500 block mb-1">Descripción</label>
               <textarea name="descripcion" value={form.descripcion} onChange={handleChange}
                 rows={2} className={`${INP} resize-none`} />
+            </div>
+
+            <div className="border border-gray-100 rounded-xl p-4 bg-gray-50/50">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Datos del equipo</p>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Equipo/Marca</label>
+                  <input name="equipoMarca" value={form.equipoMarca} onChange={handleChange} className={INP} />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Modelo</label>
+                  <input name="equipoModelo" value={form.equipoModelo} onChange={handleChange} className={INP} />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Código</label>
+                  <input name="equipoCodigo" value={form.equipoCodigo} onChange={handleChange} className={INP} />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Tag</label>
+                  <input name="equipoTag" value={form.equipoTag} onChange={handleChange} className={INP} />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Potencia</label>
+                  <input name="equipoPotencia" value={form.equipoPotencia} onChange={handleChange} className={INP} />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">S/N</label>
+                  <input name="equipoSerie" value={form.equipoSerie} onChange={handleChange} className={INP} />
+                </div>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -461,7 +498,7 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
                       <p className="text-sm text-gray-700 mt-0.5">{inf.tipo}</p>
                       {inf.fechaHoraGuardado && (
                         <p className="text-xs text-gray-400 mt-1">
-                          {new Date(inf.fechaHoraGuardado).toLocaleDateString("es-PE")}
+                          {formatearFecha(inf.fechaHoraGuardado)}
                         </p>
                       )}
                     </button>
@@ -547,7 +584,7 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
                             </Chip>
                           </td>
                           <td className="py-2 pr-3 text-gray-500">
-                            {req.createdAt ? new Date(req.createdAt).toLocaleDateString("es-PE") : "—"}
+                            {req.createdAt ? formatearFecha(req.createdAt) : "—"}
                           </td>
                         </tr>
                       );

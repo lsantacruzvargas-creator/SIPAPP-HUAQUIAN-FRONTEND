@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { HUAQUIAN } from "./cotizacionPdf";
+import { formatearFecha } from "./fecha";
 import { GRUPOS_GLORIA, calcSubtotalGloria, calcularGloria } from "./cotizacionItems";
 
 // Cargar así (no `import logo from "./logo.png"`) para que un archivo
@@ -186,7 +187,7 @@ export const exportarCotizacionGloriaPdf = async (cotizacion) => {
   y += 10;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
-  const fechaStr = cotizacion.fecha ? new Date(cotizacion.fecha).toLocaleDateString("es-PE") : "—";
+  const fechaStr = cotizacion.fecha ? formatearFecha(cotizacion.fecha) : "—";
   doc.text(`FECHA: ${fechaStr}`, badgeX + badgeW / 2, y, { align: "center" });
 
   // y = Math.max(y + logoH, yCampos, y + 20) + 6;

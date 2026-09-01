@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { formatearFecha } from "./fecha";
 
 const TIPO_DOC_LABEL = {
   "01": "FACTURA ELECTRÓNICA",
@@ -56,7 +57,7 @@ export function generarComprobantePdf(comprobante, { logoUrl } = {}) {
   doc.text("Fecha de emisión:", margin, y);
   doc.setFont("helvetica", "normal");
   doc.text(
-    comprobante.fechaEmision ? new Date(comprobante.fechaEmision).toLocaleDateString("es-PE") : "-",
+    comprobante.fechaEmision ? formatearFecha(comprobante.fechaEmision) : "-",
     margin + doc.getTextWidth("Fecha de emisión:__"), y
   );
   doc.setFont("helvetica", "bold");
@@ -77,7 +78,7 @@ export function generarComprobantePdf(comprobante, { logoUrl } = {}) {
       doc.setFont("helvetica", "bold");
       doc.text("Vence:", margin + 100, y);
       doc.setFont("helvetica", "normal");
-      doc.text(new Date(comprobante.fechaVencimiento).toLocaleDateString("es-PE"), margin + 100 + doc.getTextWidth("Vence:__"), y);
+      doc.text(formatearFecha(comprobante.fechaVencimiento), margin + 100 + doc.getTextWidth("Vence:__"), y);
     }
   }
 

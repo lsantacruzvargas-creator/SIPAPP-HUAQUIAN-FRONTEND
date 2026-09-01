@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchAuth } from "../utils/fetchAuth";
+import { formatearFecha } from "../utils/fecha";
 import { money } from "../components/detalleShared";
 import TablaScroll from "../components/TablaScroll";
 import * as XLSX from "xlsx";
@@ -8,7 +9,7 @@ const TH = "px-4 py-3 font-semibold text-gray-500 whitespace-nowrap";
 const VACIO = { facturacion: [], valorizado: { total: 0, materiales: [] }, consumo: [], ocSinHesActa: [], ranking: [], mora: [] };
 
 const nombreEmpresa = (e) => e?.razonSocial || "Sin empresa";
-const fecha = (f) => f ? new Date(f).toLocaleDateString("es-PE") : "—";
+const fecha = (f) => f ? formatearFecha(f) : "—";
 
 const estadoMoraClase = (e) => {
   if (e === "No ha pagado") return "bg-red-100 text-red-700";

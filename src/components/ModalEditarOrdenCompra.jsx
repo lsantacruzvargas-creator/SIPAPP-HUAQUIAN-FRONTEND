@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchAuth } from "../utils/fetchAuth";
+import { formatearFecha } from "../utils/fecha";
 
 const INP     = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 w-full";
 const INP_RO  = "border border-gray-100 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500 w-full cursor-not-allowed";
@@ -80,7 +81,7 @@ function PanelIngresoEquipo({ ie }) {
         {ie.fechaIngreso && (
           <div>
             <label className="text-xs text-gray-400 block mb-1">Fecha de ingreso</label>
-            <input value={new Date(ie.fechaIngreso).toLocaleDateString("es-PE")} disabled className={INP_RO} />
+            <input value={formatearFecha(ie.fechaIngreso)} disabled className={INP_RO} />
           </div>
         )}
         {ie.caracteristicasElectricas && (

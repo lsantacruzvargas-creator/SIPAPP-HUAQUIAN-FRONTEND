@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchAuth } from "../utils/fetchAuth";
+import { formatearFecha } from "../utils/fecha";
 import { INP, INP_RO } from "../utils/cotizacionItems";
 
 const PRIORIDADES = ["alta", "media", "baja"];
@@ -123,7 +124,7 @@ export default function ModalOTEquipo({ ingreso, onClose, onCreada }) {
               <div>
                 <label className="text-xs text-gray-400 block mb-1">Fecha de ingreso</label>
                 <input
-                  value={ingreso.fechaIngreso ? new Date(ingreso.fechaIngreso).toLocaleDateString("es-PE") : "—"}
+                  value={ingreso.fechaIngreso ? formatearFecha(ingreso.fechaIngreso) : "—"}
                   disabled className={`w-full ${INP_RO}`}
                 />
               </div>

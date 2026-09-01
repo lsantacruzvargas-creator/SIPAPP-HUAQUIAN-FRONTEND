@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
+import { formatearFecha } from "../utils/fecha";
 import {
   FlujoNegocio, TarjetaRelacion, Chip,
   badgeOT, badgePago, money, BotonAnular, BannerAnulado, bloqueadoPorCadenaCerrada,
@@ -344,7 +345,7 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
               <div>
                 <label className="text-xs text-gray-500 block mb-1">Fecha emisión</label>
                 <input value={inicial.fechaEmision
-                  ? new Date(inicial.fechaEmision).toLocaleDateString("es-PE") : "—"}
+                  ? formatearFecha(inicial.fechaEmision) : "—"}
                   disabled className={INP_RO} />
               </div>
               <div>
@@ -461,7 +462,7 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
               vacio={informes.length === 0}>
               {ultimo?.fechaHoraGuardado && (
                 <p className="text-xs text-gray-500">
-                  Último: {new Date(ultimo.fechaHoraGuardado).toLocaleDateString("es-PE")}
+                  Último: {formatearFecha(ultimo.fechaHoraGuardado)}
                 </p>
               )}
               {ultimo?.personalEncargado?.nombre && (

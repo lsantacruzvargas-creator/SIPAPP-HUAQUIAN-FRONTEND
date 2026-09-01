@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchAuth, uploadAuth, abrirArchivoProtegido, getUsuario } from "../utils/fetchAuth";
+import { formatearFecha } from "../utils/fecha";
 import DetalleDocumento from "../components/DetalleDocumento";
 import ModalCrearOrdenCompra   from "../components/ModalCrearOrdenCompra";
 import ModalImportarExcel, { COLS_OC, COLS_CADENA } from "../components/ModalImportarExcel";
@@ -112,7 +113,7 @@ function TablaOC({
                     </div>
                   </td>
                   <td className="px-4 py-3.5 text-gray-600 whitespace-nowrap">
-                    {o.createdAt ? new Date(o.createdAt).toLocaleDateString("es-PE") : <span className="text-gray-300">—</span>}
+                    {o.createdAt ? formatearFecha(o.createdAt) : <span className="text-gray-300">—</span>}
                   </td>
                   {mostrarFactura && (
                     <td className="px-4 py-3.5 text-gray-600 whitespace-nowrap">{o.numeroFactura || factura?.numeroFactura || <span className="text-gray-300">—</span>}</td>
@@ -394,7 +395,7 @@ export default function ListaOrdenesCompra() {
     return {
       "Cotización":         o.cotizacion?.numeroCotizacion || "—",
       "N° Orden de Compra": o.numeroOrden || "—",
-      "Fecha de creación":  o.createdAt ? new Date(o.createdAt).toLocaleDateString("es-PE") : "—",
+      "Fecha de creación":  o.createdAt ? formatearFecha(o.createdAt) : "—",
       "N° OT":              grupoOT?.parent?.numeroOT || "—",
       "Sub-OTs":            grupoOT?.subs?.map((s) => s.numeroOT).join(", ") || "—",
       "N° Factura":         o.numeroFactura || factura?.numeroFactura || "—",

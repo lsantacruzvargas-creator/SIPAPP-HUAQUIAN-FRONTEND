@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
+import { formatearFecha } from "../utils/fecha";
 import { exportarCotizacionPdf } from "../utils/cotizacionPdf";
 import { exportarCotizacionGloriaPdf } from "../utils/cotizacionGloriaPdf";
 import { calcSubtotalGloria, calcularGloria, itemDesdeDb, itemInvalido, RUC_GLORIA } from "../utils/cotizacionItems";
@@ -549,7 +550,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
                   {cot.aprobado ? "Aprobada" : "Pendiente de aprobación"}
                   {cot.aprobado && cot.aprobadoPor && (
                     <span className="text-xs text-white/50">
-                      — {cot.aprobadoPor}{cot.fechaAprobacion && ` · ${new Date(cot.fechaAprobacion).toLocaleDateString("es-PE")}`}
+                      — {cot.aprobadoPor}{cot.fechaAprobacion && ` · ${formatearFecha(cot.fechaAprobacion)}`}
                     </span>
                   )}
                 </label>
@@ -560,7 +561,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
                   </Chip>
                   {cot.aprobado && cot.aprobadoPor && (
                     <span className="text-xs text-white/50">
-                      {cot.aprobadoPor}{cot.fechaAprobacion && ` · ${new Date(cot.fechaAprobacion).toLocaleDateString("es-PE")}`}
+                      {cot.aprobadoPor}{cot.fechaAprobacion && ` · ${formatearFecha(cot.fechaAprobacion)}`}
                     </span>
                   )}
                 </span>
@@ -574,7 +575,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
                   {cot.enviado ? "Enviada" : "No enviada"}
                   {cot.enviado && cot.enviadoPor && (
                     <span className="text-xs text-white/50">
-                      — {cot.enviadoPor}{cot.fechaEnvio && ` · ${new Date(cot.fechaEnvio).toLocaleDateString("es-PE")}`}
+                      — {cot.enviadoPor}{cot.fechaEnvio && ` · ${formatearFecha(cot.fechaEnvio)}`}
                     </span>
                   )}
                 </label>
@@ -597,7 +598,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
                   {cot.informeEnviado ? "Informe enviado" : "Informe no enviado"}
                   {cot.informeEnviado && cot.informeEnviadoPor && (
                     <span className="text-xs text-white/50">
-                      — {cot.informeEnviadoPor}{cot.fechaInformeEnviado && ` · ${new Date(cot.fechaInformeEnviado).toLocaleDateString("es-PE")}`}
+                      — {cot.informeEnviadoPor}{cot.fechaInformeEnviado && ` · ${formatearFecha(cot.fechaInformeEnviado)}`}
                     </span>
                   )}
                 </label>
@@ -1047,7 +1048,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
               vacio={informes.length === 0}>
               {ultimo?.fechaHoraGuardado && (
                 <p className="text-xs text-gray-500">
-                  Último: {new Date(ultimo.fechaHoraGuardado).toLocaleDateString("es-PE")}
+                  Último: {formatearFecha(ultimo.fechaHoraGuardado)}
                 </p>
               )}
             </TarjetaRelacion>

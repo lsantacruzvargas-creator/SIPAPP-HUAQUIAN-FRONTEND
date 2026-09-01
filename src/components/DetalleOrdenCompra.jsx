@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
+import { formatearFecha } from "../utils/fecha";
 import ModalCrearFactura from "./ModalCrearFactura";
 import {
   FlujoNegocio, TarjetaRelacion, Chip,
@@ -458,7 +459,7 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
               vacio={informes.length === 0}>
               {ultimo?.fechaHoraGuardado && (
                 <p className="text-xs text-gray-500">
-                  Último: {new Date(ultimo.fechaHoraGuardado).toLocaleDateString("es-PE")}
+                  Último: {formatearFecha(ultimo.fechaHoraGuardado)}
                 </p>
               )}
               {ultimo?.personalEncargado?.nombre && (

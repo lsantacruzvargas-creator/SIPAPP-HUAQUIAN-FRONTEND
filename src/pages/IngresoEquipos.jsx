@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchAuth } from "../utils/fetchAuth";
+import { formatearFecha } from "../utils/fecha";
 import ModalOTEquipo from "../components/ModalOTEquipo";
 import TablaScroll from "../components/TablaScroll";
 
@@ -303,7 +304,7 @@ export default function IngresoEquipos() {
                     {[i.marca, i.modelo].filter(Boolean).join(" / ") || <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-4 py-3 text-center text-gray-500">
-                    {new Date(i.fechaIngreso).toLocaleDateString("es-PE")}
+                    {formatearFecha(i.fechaIngreso)}
                   </td>
                   <td className="px-4 py-3 text-center font-mono text-xs text-emerald-600">
                     {ot ? ot.codigo : <span className="text-gray-300">—</span>}

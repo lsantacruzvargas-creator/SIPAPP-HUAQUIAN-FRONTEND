@@ -25,6 +25,11 @@ export default function ModalNuevaSubOT({ padre, onClose, onCreada }) {
     // defecto — cada sub-OT puede tener su propio par de técnicos si la
     // sub-tarea lo requiere.
     encargado: padre.encargado || "", encargado2: padre.encargado2 || "",
+    // Datos del equipo — heredan del padre por defecto, igual que MIC/Línea
+    // y Backup (misma lógica de default en el backend, POST /:id/sub-ot).
+    equipoMarca: padre.equipoMarca || "", equipoModelo: padre.equipoModelo || "",
+    equipoCodigo: padre.equipoCodigo || "", equipoTag: padre.equipoTag || "",
+    equipoPotencia: padre.equipoPotencia || "", equipoSerie: padre.equipoSerie || "",
   });
   const [usuarios, setUsuarios] = useState([]);
   const [tecnicos, setTecnicos] = useState([]);
@@ -98,6 +103,36 @@ export default function ModalNuevaSubOT({ padre, onClose, onCreada }) {
             <div>
               <label className="text-xs text-gray-500 block mb-1">Backup</label>
               <input name="backup" value={form.backup} onChange={handleChange} className={`w-full ${INP}`} />
+            </div>
+          </div>
+
+          <div className="border border-gray-100 rounded-xl p-4 bg-gray-50/50">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Datos del equipo</p>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Equipo/Marca</label>
+                <input name="equipoMarca" value={form.equipoMarca} onChange={handleChange} className={`w-full ${INP}`} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Modelo</label>
+                <input name="equipoModelo" value={form.equipoModelo} onChange={handleChange} className={`w-full ${INP}`} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Código</label>
+                <input name="equipoCodigo" value={form.equipoCodigo} onChange={handleChange} className={`w-full ${INP}`} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Tag</label>
+                <input name="equipoTag" value={form.equipoTag} onChange={handleChange} className={`w-full ${INP}`} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Potencia</label>
+                <input name="equipoPotencia" value={form.equipoPotencia} onChange={handleChange} className={`w-full ${INP}`} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">S/N</label>
+                <input name="equipoSerie" value={form.equipoSerie} onChange={handleChange} className={`w-full ${INP}`} />
+              </div>
             </div>
           </div>
 

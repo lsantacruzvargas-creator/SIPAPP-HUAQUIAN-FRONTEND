@@ -18,6 +18,12 @@ const FORM_VACIO = {
   micLinea: "",
   backup: "",
   entregadoPor: "",
+  equipoMarca: "",
+  equipoModelo: "",
+  equipoCodigo: "",
+  equipoTag: "",
+  equipoPotencia: "",
+  equipoSerie: "",
   encargado: "",
   encargado2: "",
   numeroGuiaEmision: "",
@@ -112,6 +118,12 @@ export default function ModalNuevaOT({ onClose, onCreada }) {
       micLinea: form.micLinea,
       backup: form.backup,
       entregadoPor: form.entregadoPor,
+      equipoMarca: form.equipoMarca,
+      equipoModelo: form.equipoModelo,
+      equipoCodigo: form.equipoCodigo,
+      equipoTag: form.equipoTag,
+      equipoPotencia: form.equipoPotencia,
+      equipoSerie: form.equipoSerie,
       encargado: form.encargado,
       encargado2: form.encargado2,
       numeroGuiaEmision: form.numeroGuiaEmision,
@@ -236,6 +248,36 @@ export default function ModalNuevaOT({ onClose, onCreada }) {
           <div>
             <label className="text-xs text-gray-500 block mb-1">Título OT</label>
             <input name="titulo" value={form.titulo} onChange={handleChange} className={INP} placeholder="Título de la OT" />
+          </div>
+
+          <div className="border border-gray-100 rounded-xl p-4 bg-gray-50/50">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Datos del equipo</p>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Equipo/Marca</label>
+                <input name="equipoMarca" value={form.equipoMarca} onChange={handleChange} className={INP} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Modelo</label>
+                <input name="equipoModelo" value={form.equipoModelo} onChange={handleChange} className={INP} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Código</label>
+                <input name="equipoCodigo" value={form.equipoCodigo} onChange={handleChange} className={INP} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Tag</label>
+                <input name="equipoTag" value={form.equipoTag} onChange={handleChange} className={INP} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Potencia</label>
+                <input name="equipoPotencia" value={form.equipoPotencia} onChange={handleChange} className={INP} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">S/N</label>
+                <input name="equipoSerie" value={form.equipoSerie} onChange={handleChange} className={INP} />
+              </div>
+            </div>
           </div>
 
           <div hidden>

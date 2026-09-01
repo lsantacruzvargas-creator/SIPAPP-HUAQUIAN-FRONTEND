@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchAuth } from "../utils/fetchAuth";
+import { formatearFecha } from "../utils/fecha";
 import TablaScroll from "../components/TablaScroll";
 import {
   TIPO_GUIA,
@@ -150,12 +151,15 @@ export default function ListaGuias() {
       {/* Tabla */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         <TablaScroll className="overflow-x-auto">
-        <table className="erp-table w-full text-sm min-w-[700px]">
+        <table className="erp-table w-full text-sm min-w-[1050px]">
           <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-100">
             <tr>
               <th className="px-4 py-3 text-left">Serie-Correlativo</th>
               <th className="px-4 py-3 text-center">Tipo</th>
               <th className="px-4 py-3 text-left">Destinatario</th>
+              <th className="px-4 py-3 text-center">OT</th>
+              <th className="px-4 py-3 text-left">Descripción</th>
+              <th className="px-4 py-3 text-right">Cantidad</th>
               <th className="px-4 py-3 text-right">Peso bruto</th>
               <th className="px-4 py-3 text-center">Traslado</th>
               <th className="px-4 py-3 text-center">Estado</th>
@@ -163,9 +167,9 @@ export default function ListaGuias() {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {cargando ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">Cargando…</td></tr>
+              <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400">Cargando…</td></tr>
             ) : guias.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">Sin guías para los filtros aplicados</td></tr>
+              <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400">Sin guías para los filtros aplicados</td></tr>
             ) : (
               guias.map((g) => (
                 <tr key={g._id} className="hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => setSeleccionada(g)}>
@@ -176,8 +180,17 @@ export default function ListaGuias() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-gray-800">{g.destinatario?.nombre || "—"}</td>
+                  <td className="px-4 py-3 text-center font-mono text-xs text-gray-500">
+                    {g.ordenesTrabajo?.length ? g.ordenesTrabajo.map((o) => o.numeroOT || o.codigo).join(", ") : "—"}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {g.items?.length ? g.items.map((it) => it.descripcion).join(", ") : "—"}
+                  </td>
+                  <td className="px-4 py-3 text-right text-gray-600">
+                    {g.items?.length ? g.items.map((it) => `${it.cantidad} ${it.unidad || ""}`.trim()).join(", ") : "—"}
+                  </td>
                   <td className="px-4 py-3 text-right font-medium">{g.pesoBrutoTotal != null ? `${g.pesoBrutoTotal} ${g.unidadPeso || "KGM"}` : "—"}</td>
-                  <td className="px-4 py-3 text-center text-gray-500">{g.fechaTraslado ? new Date(g.fechaTraslado).toLocaleDateString("es-PE") : "—"}</td>
+                  <td className="px-4 py-3 text-center text-gray-500">{g.fechaTraslado ? formatearFecha(g.fechaTraslado) : "—"}</td>
                   <td className="px-4 py-3 text-center">
                     <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${estadoComprobanteClase(g.estado)}`}>
                       {g.estado}

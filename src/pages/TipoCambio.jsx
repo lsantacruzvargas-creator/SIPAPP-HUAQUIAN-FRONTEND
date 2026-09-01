@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
+import { formatearFechaHora } from "../utils/fecha";
 import TablaScroll from "../components/TablaScroll";
 
 const INP = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white";
@@ -83,7 +84,7 @@ export default function TipoCambio() {
           {tc?.actualizadoPor && (
             <p className="text-xs text-gray-400 mt-3">
               Actualizado por {tc.actualizadoPor}
-              {tc.fechaActualizacion && ` · ${new Date(tc.fechaActualizacion).toLocaleString("es-PE")}`}
+              {tc.fechaActualizacion && ` · ${formatearFechaHora(tc.fechaActualizacion)}`}
             </p>
           )}
         </div>
@@ -153,7 +154,7 @@ export default function TipoCambio() {
                     <td className="py-2 pr-3 text-gray-800 font-medium">S/ {Number(h.valorNuevo).toFixed(3)}</td>
                     <td className="py-2 pr-3 text-gray-600">{h.usuario || "—"}</td>
                     <td className="py-2 pr-3 text-gray-500 capitalize">{h.rol || "—"}</td>
-                    <td className="py-2 pr-3 text-gray-500">{h.fecha ? new Date(h.fecha).toLocaleString("es-PE") : "—"}</td>
+                    <td className="py-2 pr-3 text-gray-500">{h.fecha ? formatearFechaHora(h.fecha) : "—"}</td>
                   </tr>
                 ))}
               </tbody>

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { fetchAuth } from "../utils/fetchAuth";
+import { formatearFecha } from "../utils/fecha";
 import ModalServicioExterno from "./ModalServicioExterno";
 import TablaScroll from "./TablaScroll";
 
@@ -79,7 +80,7 @@ export default function TablaServiciosExternos({ ot, subOTs = [], servicios, pue
                       <td className="py-2 pr-3 text-right text-gray-700 tabular-nums">{s.cantidad}</td>
                       <td className="py-2 pr-3 text-right text-gray-700 tabular-nums">{s.costo > 0 ? money(s.costo) : "—"}</td>
                       <td className="py-2 pr-3 text-gray-500">
-                        {s.createdAt ? new Date(s.createdAt).toLocaleDateString("es-PE") : "—"}
+                        {s.createdAt ? formatearFecha(s.createdAt) : "—"}
                       </td>
                       {puedeEditar && (
                         <td className="py-2 pr-3">

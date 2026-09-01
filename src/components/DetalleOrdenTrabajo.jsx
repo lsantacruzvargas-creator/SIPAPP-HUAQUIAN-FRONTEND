@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
+import { formatearFecha } from "../utils/fecha";
 import ModalOrdenCompra from "./ModalOrdenCompra";
 import SelectorEmpresas from "./SelectorEmpresas";
 import ModalSeleccionarTipoInforme from "./ModalSeleccionarTipoInforme";
@@ -61,6 +62,12 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
     observaciones: inicial.observaciones || "",
     estado: inicial.estado || "pendiente",
     medioLlegadaEquipo: inicial.medioLlegadaEquipo || "",
+    equipoMarca: inicial.equipoMarca || "",
+    equipoModelo: inicial.equipoModelo || "",
+    equipoCodigo: inicial.equipoCodigo || "",
+    equipoTag: inicial.equipoTag || "",
+    equipoPotencia: inicial.equipoPotencia || "",
+    equipoSerie: inicial.equipoSerie || "",
   });
   const navigate = useNavigate();
   const rolActual = getUsuario()?.rol;
@@ -655,6 +662,36 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
               </div>
             </div>
 
+            <div className="border border-gray-100 rounded-xl p-4 bg-gray-50/50">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Datos del equipo</p>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Equipo/Marca</label>
+                  <input name="equipoMarca" value={form.equipoMarca} onChange={handleChange} className={INP} />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Modelo</label>
+                  <input name="equipoModelo" value={form.equipoModelo} onChange={handleChange} className={INP} />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Código</label>
+                  <input name="equipoCodigo" value={form.equipoCodigo} onChange={handleChange} className={INP} />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Tag</label>
+                  <input name="equipoTag" value={form.equipoTag} onChange={handleChange} className={INP} />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Potencia</label>
+                  <input name="equipoPotencia" value={form.equipoPotencia} onChange={handleChange} className={INP} />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">S/N</label>
+                  <input name="equipoSerie" value={form.equipoSerie} onChange={handleChange} className={INP} />
+                </div>
+              </div>
+            </div>
+
             <div hidden>
               <label className="text-xs text-gray-500 block mb-1">Condición</label>
               <input name="condicion" value={form.condicion} onChange={handleChange} className={INP} />
@@ -797,7 +834,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
               ) : (
                 ultimo?.fechaHoraGuardado && (
                   <p className="text-xs text-gray-500">
-                    Último: {new Date(ultimo.fechaHoraGuardado).toLocaleDateString("es-PE")}
+                    Último: {formatearFecha(ultimo.fechaHoraGuardado)}
                   </p>
                 )
               )}
@@ -881,7 +918,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
                             {esPrincipal ? "Principal" : (subOrigen?.numeroOT || inf.ordenTrabajo?.numeroOT || "—")}
                           </td>
                           <td className="py-2 pr-3 text-gray-500">
-                            {inf.fechaHoraGuardado ? new Date(inf.fechaHoraGuardado).toLocaleDateString("es-PE") : "—"}
+                            {inf.fechaHoraGuardado ? formatearFecha(inf.fechaHoraGuardado) : "—"}
                           </td>
                           <td className="py-2 pr-3" onClick={(e) => e.stopPropagation()}>
                             {puedeAprobarInforme ? (
@@ -966,7 +1003,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
                             </Chip>
                           </td>
                           <td className="py-2 pr-3 text-gray-500">
-                            {req.createdAt ? new Date(req.createdAt).toLocaleDateString("es-PE") : "—"}
+                            {req.createdAt ? formatearFecha(req.createdAt) : "—"}
                           </td>
                         </tr>
                       );

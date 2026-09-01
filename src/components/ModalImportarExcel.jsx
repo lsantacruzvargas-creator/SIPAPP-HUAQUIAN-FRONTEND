@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { fetchAuth } from "../utils/fetchAuth";
+import { formatearFecha } from "../utils/fecha";
 import * as XLSX from "xlsx";
 import TablaScroll from "./TablaScroll";
 
@@ -360,7 +361,7 @@ export default function ModalImportarExcel({ tipo, columnas, endpoint, color = "
                           {columnas.map(col => (
                             <td key={col.key} className="px-2 py-2 whitespace-nowrap text-gray-600">
                               {col.tipo === "fecha" && f.datos[col.key]
-                                ? new Date(f.datos[col.key]).toLocaleDateString("es-PE")
+                                ? formatearFecha(f.datos[col.key])
                                 : (f.datos[col.key] === "" || f.datos[col.key] == null
                                     ? <span className="text-gray-300">—</span>
                                     : String(f.datos[col.key]))}

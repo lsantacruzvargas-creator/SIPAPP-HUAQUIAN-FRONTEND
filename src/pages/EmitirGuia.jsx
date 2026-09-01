@@ -383,9 +383,15 @@ export default function EmitirGuia() {
           comprador: { numDoc: comprador.numDoc.trim(), nombre: comprador.nombre.trim(), schemeID: comprador.schemeID },
         } : {}),
         ...(modalidadTraslado === "01"
-          ? (esM1L ? { vehiculoM1L: { aplica: true, placa: normalizarPlaca(placaM1L) } } : { transportista })
+          ? (esM1L ? { vehiculoM1L: { aplica: true, placa: normalizarPlaca(placaM1L) } } : {
+              transportista: { ...transportista, ruc: transportista.ruc.trim(), razonSocial: transportista.razonSocial.trim(), registroMTC: transportista.registroMTC?.trim() },
+            })
           : {
-              vehiculo: { ...vehiculo, placa: normalizarPlaca(vehiculo.placa) }, conductor,
+              vehiculo: { ...vehiculo, placa: normalizarPlaca(vehiculo.placa) },
+              conductor: {
+                tipoDoc: conductor.tipoDoc, numDoc: conductor.numDoc.trim(),
+                nombres: conductor.nombres.trim(), apellidos: conductor.apellidos.trim(), licencia: conductor.licencia.trim(),
+              },
               ...(vehiculosSecundarios.length ? { vehiculosSecundarios: vehiculosSecundarios.map((v) => ({ placa: normalizarPlaca(v.placa) })) } : {}),
               ...(conductoresSecundarios.length ? {
                 conductoresSecundarios: conductoresSecundarios.map((c) => ({

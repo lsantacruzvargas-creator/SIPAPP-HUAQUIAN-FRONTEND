@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchAuth, uploadAuth, getUsuario } from "../utils/fetchAuth";
+import { formatearFecha } from "../utils/fecha";
 import { tipoInformePorValor, claveChecklist } from "../utils/informesTecnicos";
 import ImagenProtegida from "./ImagenProtegida";
 import TablaScroll from "./TablaScroll";
@@ -297,7 +298,7 @@ export default function FormInformeTecnico({ ordenTrabajo, tipo, informeExistent
   // autocompleta desde la OT para no volver a escribirla en cada informe.
   // Sigue siendo editable por si el informe puntual necesita un valor
   // distinto (ej. otro contacto para ese servicio específico).
-  const hoy = new Date().toLocaleDateString("es-PE");
+  const hoy = formatearFecha(new Date());
   const [campos, setCampos] = useState(() => informeExistente?.campos ?? {
     empresa: ordenTrabajo.empresa?.razonSocial || "",
     contacto: [ordenTrabajo.contactoNombre, ordenTrabajo.contactoTelefono].filter(Boolean).join(" — "),

@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { formatearFecha } from "./fecha";
 
 // Se cargan desde /public (no un import de módulo) para que, si el archivo
 // todavía no fue subido, solo falle la carga de esa imagen puntual en vez
@@ -137,7 +138,7 @@ export const exportarCotizacionPdf = async (cotizacion) => {
   yIzq += labelValor(M, yIzq, "TELÉFONO: ", HUAQUIAN.telefono) * 4.2;
   yIzq += labelValor(M, yIzq, "CORREO: ", HUAQUIAN.correo) * 4.2;
 
-  const fechaStr = cotizacion.fecha ? new Date(cotizacion.fecha).toLocaleDateString("es-PE") : "—";
+  const fechaStr = cotizacion.fecha ? formatearFecha(cotizacion.fecha) : "—";
   const filasDer = [
     ["FECHA:", fechaStr],
     ["TIEMPO DE ENTREGA DEL SERVICIO:", cotizacion.plazoEntrega],

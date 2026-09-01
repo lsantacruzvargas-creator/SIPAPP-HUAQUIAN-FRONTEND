@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
+import { formatearFecha } from "../utils/fecha";
 import ModalImportarExcel, { COLS_MATERIALES } from "../components/ModalImportarExcel";
 import BuscadorMaterialInline from "../components/BuscadorMaterialInline";
 import TablaScroll from "../components/TablaScroll";
@@ -1133,7 +1134,7 @@ function ModalEgreso({ onClose, onGuardado }) {
                       <div className="flex gap-4 mt-1 text-xs text-gray-400">
                         {l.proveedor && <span>{l.proveedor}</span>}
                         <span>Disponible: <strong>{l.cantidadDisponible}</strong></span>
-                        <span>{new Date(l.fecha).toLocaleDateString("es-PE")}</span>
+                        <span>{formatearFecha(l.fecha)}</span>
                       </div>
                     </button>
                   ))}
@@ -1221,7 +1222,7 @@ function SeccionMovimientos() {
   };
 
   const fmt = (n) => Number(n || 0).toFixed(2);
-  const fmtFecha = (d) => d ? new Date(d).toLocaleDateString("es-PE", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "—";
+  const fmtFecha = (d) => d ? formatearFecha(d, { day: "2-digit", month: "2-digit", year: "2-digit" }) : "—";
 
   // Mismas columnas de la tabla — una fila por movimiento.
   const filaMovimiento = (mv) => ({

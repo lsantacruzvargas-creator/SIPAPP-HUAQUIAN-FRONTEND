@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
+import { formatearFecha } from "../utils/fecha";
 import DetalleDocumento from "../components/DetalleDocumento";
 import ModalImportarExcel, { COLS_COT_OT, COLS_COTIZACIONES } from "../components/ModalImportarExcel";
 import ModalNuevaOT from "../components/ModalNuevaOT";
@@ -85,6 +86,7 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
               {mostrarEstadoServicio && <th className={`${TH} text-center`}>Fecha de salida</th>}
               {mostrarEstadoServicio && <th className={`${TH} text-center`}>Estado de servicio</th>}
               <th className={`${TH} text-left`}>Empresa</th>
+              <th className={`${TH} text-left`}>Contacto</th>
               <th className={`${TH} text-left`}>Título cotización</th>
               {mostrarTituloOT && <th className={`${TH} text-left`}>Título orden de trabajo</th>}
               <th className={`${TH} text-left`}>Planta</th>
@@ -99,7 +101,7 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
           <tbody className="divide-y divide-gray-100">
             {cotizaciones.length === 0 ? (
               <tr>
-                <td colSpan={7 + (puedeVerPrecios ? 2 : 0) + (mostrarDiasInforme ? 1 : 0) + (mostrarEstadoServicio ? 3 : 0) + (mostrarTituloOT ? 1 : 0)} className="px-4 py-8 text-center text-gray-400">{vacioMsg}</td>
+                <td colSpan={8 + (puedeVerPrecios ? 2 : 0) + (mostrarDiasInforme ? 1 : 0) + (mostrarEstadoServicio ? 3 : 0) + (mostrarTituloOT ? 1 : 0)} className="px-4 py-8 text-center text-gray-400">{vacioMsg}</td>
               </tr>
             ) : (
               cotizaciones.map((c) => {
@@ -136,7 +138,7 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
                   )}
                   {mostrarEstadoServicio && (
                     <td className="px-4 py-3.5 text-center text-gray-500 whitespace-nowrap">
-                      {otPrincipal?.fechaSalida ? new Date(otPrincipal.fechaSalida).toLocaleDateString("es-PE") : <span className="text-gray-300">—</span>}
+                      {otPrincipal?.fechaSalida ? formatearFecha(otPrincipal.fechaSalida) : <span className="text-gray-300">—</span>}
                     </td>
                   )}
                   {mostrarEstadoServicio && (
@@ -148,6 +150,9 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
                   )}
                   <td className="px-4 py-3.5 text-gray-700">
                     {c.empresa?.razonSocial || <span className="text-gray-300">—</span>}
+                  </td>
+                  <td className="px-4 py-3.5 text-gray-600">
+                    {c.personaContacto || c.contactoNombre || <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-4 py-3.5 text-gray-700">{c.titulo}</td>
                   {mostrarTituloOT && (
@@ -385,8 +390,9 @@ export default function ListaCotizaciones() {
     return {
       "N° OT":                  numerosOT(otsPorCot.get(c._id)) || "—",
       "N° Cotización":          c._esOT ? "Sin cotización" : (c.numeroCotizacion || "—"),
-      "Fecha recibida":         c.fechaRecibida ? new Date(c.fechaRecibida).toLocaleDateString("es-PE") : "—",
+      "Fecha recibida":         c.fechaRecibida ? formatearFecha(c.fechaRecibida) : "—",
       "Empresa":                c.empresa?.razonSocial || "—",
+      "Contacto":               c.personaContacto || c.contactoNombre || "—",
       "Título cotización":      c.titulo,
       "Título orden de trabajo": titulosOT(otsPorCot.get(c._id)) || "—",
       "Planta":                 c.planta || "—",

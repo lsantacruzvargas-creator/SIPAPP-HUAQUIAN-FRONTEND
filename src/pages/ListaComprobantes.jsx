@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchAuth } from "../utils/fetchAuth";
+import { formatearFecha } from "../utils/fecha";
 import TablaScroll from "../components/TablaScroll";
 import {
   TIPO_DOC_CPE,
@@ -153,7 +154,7 @@ export default function ListaComprobantes() {
                   </td>
                   <td className="px-4 py-3 text-gray-800">{c.receptor?.nombre || "—"}</td>
                   <td className="px-4 py-3 text-right font-medium">{c.totales?.totalPagar?.toFixed(2) ?? "—"}</td>
-                  <td className="px-4 py-3 text-center text-gray-500">{new Date(c.fechaEmision).toLocaleDateString("es-PE")}</td>
+                  <td className="px-4 py-3 text-center text-gray-500">{formatearFecha(c.fechaEmision)}</td>
                   <td className="px-4 py-3 text-center">
                     <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${estadoComprobanteClase(c.estado)}`}>
                       {c.estado}

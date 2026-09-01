@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
+import { formatearFecha } from "../utils/fecha";
 import DetalleDocumento from "../components/DetalleDocumento";
 import ModalCrearFactura  from "../components/ModalCrearFactura";
 import ModalImportarExcel, { COLS_FACTURAS } from "../components/ModalImportarExcel";
@@ -22,7 +23,7 @@ const ESTADOS_PAGO = [
 
 function BadgeCancelacion({ fecha, pagado }) {
   if (!fecha) return <span className="text-gray-300 text-xs">—</span>;
-  const str = new Date(fecha).toLocaleDateString("es-PE");
+  const str = formatearFecha(fecha);
 
   if (pagado) {
     return <span className="inline-flex flex-col items-center"><span className="text-xs font-medium text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full line-through">Vencimiento</span><span className="text-xs text-gray-300 line-through">{str}</span></span>;
@@ -164,7 +165,7 @@ function TablaFacturas({ titulo, acento, facturas, onSelect, handlePagoMonto, ha
                         </div>
                       </td>
                       <td className="px-3 py-3.5 text-center text-gray-500 whitespace-nowrap">
-                        {new Date(f.fechaEmision).toLocaleDateString("es-PE")}
+                        {formatearFecha(f.fechaEmision)}
                       </td>
                       <td className="px-3 py-3.5 text-center">
                         {tieneCuotas ? (
@@ -457,8 +458,8 @@ export default function ListaFacturas() {
   const filaFactura = (f) => ({
     "N° OT":             f._numeroOT || "—",
     "N° Factura":        f.numeroFactura || "—",
-    "Fecha emisión":     new Date(f.fechaEmision).toLocaleDateString("es-PE"),
-    "Fecha cancelación": f.fechaCancelacion ? new Date(f.fechaCancelacion).toLocaleDateString("es-PE") : "—",
+    "Fecha emisión":     formatearFecha(f.fechaEmision),
+    "Fecha cancelación": f.fechaCancelacion ? formatearFecha(f.fechaCancelacion) : "—",
     "Orden de Compra":   f.ordenCompra?.numeroOrden || f.numeroOrdenCompra || "—",
     "Empresa":           f.empresa?.razonSocial || "—",
     "Subtotal":          Number(f.subtotal ?? f.monto ?? 0).toFixed(2),

@@ -1,5 +1,6 @@
 import { useState, useEffect, Fragment } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
+import { formatearFecha } from "../utils/fecha";
 import { exportarCotizacionPdf } from "../utils/cotizacionPdf";
 import {
   calcSubtotal,
@@ -294,7 +295,7 @@ export default function Cotizaciones() {
                             {ie.fechaIngreso && (
                               <div>
                                 <label className="text-xs text-gray-400 block mb-1">Fecha de ingreso</label>
-                                <input value={new Date(ie.fechaIngreso).toLocaleDateString("es-PE")} disabled className={`w-full ${INP_RO}`} />
+                                <input value={formatearFecha(ie.fechaIngreso)} disabled className={`w-full ${INP_RO}`} />
                               </div>
                             )}
                             {ie.caracteristicasElectricas && (

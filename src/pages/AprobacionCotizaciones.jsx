@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
+import { formatearFecha } from "../utils/fecha";
 import DetalleDocumento from "../components/DetalleDocumento";
 import TablaScroll from "../components/TablaScroll";
 import { DotChip, badgeOT, dotOT } from "../components/detalleShared";
@@ -66,14 +67,14 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, otGroupMap, mostrarOT
                       <td className="px-4 py-3.5 text-gray-700">{c.titulo}</td>
                       <td className="px-4 py-3.5 text-right font-medium text-gray-700">{money(c.total)}</td>
                       <td className="px-4 py-3.5 text-center text-gray-500 whitespace-nowrap">
-                        {c.fecha ? new Date(c.fecha).toLocaleDateString("es-PE") : "—"}
+                        {c.fecha ? formatearFecha(c.fecha) : "—"}
                       </td>
                       {mostrarAprobacion && (
                         <td className="px-4 py-3.5 text-gray-500 whitespace-nowrap">
                           {c.aprobadoPor || "—"}
                           {c.fechaAprobacion && (
                             <span className="block text-xs text-gray-400">
-                              {new Date(c.fechaAprobacion).toLocaleDateString("es-PE")}
+                              {formatearFecha(c.fechaAprobacion)}
                             </span>
                           )}
                         </td>

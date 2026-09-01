@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchAuth } from "../utils/fetchAuth";
+import { formatearFecha } from "../utils/fecha";
 
 const INP     = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 w-full";
 const INP_RO  = "border border-gray-100 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500 w-full";
@@ -187,7 +188,7 @@ export default function ModalEditarFactura({ factura: inicial, onClose, onGuarda
             <div>
               <label className="text-xs text-gray-500 block mb-1">Fecha emisión</label>
               <input value={inicial.fechaEmision
-                ? new Date(inicial.fechaEmision).toLocaleDateString("es-PE") : "—"}
+                ? formatearFecha(inicial.fechaEmision) : "—"}
                 disabled className={INP_RO} />
             </div>
             <div>

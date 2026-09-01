@@ -1,4 +1,5 @@
 import { Fragment, useState } from "react";
+import { formatearFechaHora } from "../utils/fecha";
 
 /* ─── Iconos SVG (stroke, currentColor) ─────────────────────────── */
 const svg = "w-5 h-5";
@@ -354,7 +355,7 @@ export function BannerAnulado({ motivo, por, fecha }) {
         <p className="text-sm font-semibold text-red-700">Documento anulado</p>
         {motivo && <p className="text-xs text-red-600 mt-0.5">{motivo}</p>}
         <p className="text-xs text-red-400 mt-1">
-          {por && `Por ${por}`}{fecha && ` · ${new Date(fecha).toLocaleString("es-PE")}`}
+          {por && `Por ${por}`}{fecha && ` · ${formatearFechaHora(fecha)}`}
         </p>
       </div>
     </div>
