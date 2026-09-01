@@ -38,6 +38,11 @@ export const IconGRE = () => (
     <path d="M3 16V6a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v10M3 16h11m0 0h2.5m-2.5 0V9h3.5L21 12.5V16h-2.5M7 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm11 0a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />
   </svg>
 );
+export const IconServicio = () => (
+  <svg className={svg} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="7" width="18" height="13" rx="2" /><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 12h18" />
+  </svg>
+);
 
 /* ─── Paletas por entidad ───────────────────────────────────────── */
 export const TEMAS = {
@@ -47,6 +52,7 @@ export const TEMAS = {
   oc:         { icon: IconOC,         ring: "ring-blue-200",    dot: "bg-blue-500",    soft: "bg-blue-50",    text: "text-blue-700",    border: "border-blue-100",    label: "Orden de Compra" },
   factura:    { icon: IconFactura,    ring: "ring-emerald-200", dot: "bg-emerald-500", soft: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-100", label: "Factura" },
   gre:        { icon: IconGRE,        ring: "ring-purple-200",  dot: "bg-purple-500",  soft: "bg-purple-50",  text: "text-purple-700",  border: "border-purple-100",  label: "Guía de Remisión" },
+  servicio:   { icon: IconServicio,   ring: "ring-purple-200",  dot: "bg-purple-500",  soft: "bg-purple-50",  text: "text-purple-700",  border: "border-purple-100",  label: "Servicios Externos" },
 };
 
 /* ─── Stepper del flujo de negocio ──────────────────────────────── */

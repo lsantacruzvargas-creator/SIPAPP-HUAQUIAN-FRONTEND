@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
-import { calcSubtotalGloria, calcularGloria, itemInvalido, RUC_GLORIA } from "../utils/cotizacionItems";
+import { calcSubtotalGloria, calcularGloria, calcularAlicorp, itemInvalido, RUC_GLORIA, RUC_ALICORP } from "../utils/cotizacionItems";
 import TablaItemsCotizacion from "./TablaItemsCotizacion";
 import TablaItemsCotizacionGloria from "./TablaItemsCotizacionGloria";
+import TablaItemsCotizacionAlicorp from "./TablaItemsCotizacionAlicorp";
 import SelectorEmpresas from "./SelectorEmpresas";
 import { FlujoNegocio, TarjetaRelacion, money } from "./detalleShared";
 
@@ -35,6 +36,7 @@ const FORM_VACIO = {
   asesorComercial: "", numeroCelular: "", numeroSolicitudPedido: "",
   numeroPeticionOferta: "", tiempoGarantia: "",
   area: "", omAviso: "", numeroGuia: "", jefeSupervisorSolicitante: "", compradorResponsable: "",
+  textoBreveServicio: "",
   subtotal: "", descuentoPorcentaje: "", gastosGeneralesPorcentaje: "2", utilidadPorcentaje: "10", moneda: "PEN",
 };
 
@@ -88,6 +90,21 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
   const contactosPlanta = plantaSel?.contactos ?? [];
   const contactoSel = contactosPlanta.find(c => c.nombre === form.personaContacto);
   const esGloria = empresaSel?.ruc === RUC_GLORIA;
+  const esAlicorp = empresaSel?.ruc === RUC_ALICORP;
+
+  // Los defaults de Gastos/Utilidad difieren por formato (Gloria 2%/10%,
+  // Alicorp 10%/5%) — como acá la empresa recién se elige durante el
+  // llenado (a diferencia de DetalleCotizacion.jsx, que ya la conoce al
+  // montar), se ajustan reactivamente al detectar el formato, pero solo si
+  // el usuario no los tocó a mano (siguen en alguno de los 2 sets de default).
+  useEffect(() => {
+    const gastosEsDefault = ["2", "10", ""].includes(form.gastosGeneralesPorcentaje);
+    const utilidadEsDefault = ["5", "10", ""].includes(form.utilidadPorcentaje);
+    if (!gastosEsDefault || !utilidadEsDefault) return;
+    if (esAlicorp) setForm(f => ({ ...f, gastosGeneralesPorcentaje: "10", utilidadPorcentaje: "5" }));
+    else if (esGloria) setForm(f => ({ ...f, gastosGeneralesPorcentaje: "2", utilidadPorcentaje: "10" }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [esAlicorp, esGloria]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -124,6 +141,8 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
   const usarTotalesDeItems = items.length > 0;
   const totalesMostrados = esGloria
     ? calcularGloria(usarTotalesDeItems ? subtotalItems : form.subtotal, form.gastosGeneralesPorcentaje, form.utilidadPorcentaje)
+    : esAlicorp
+    ? calcularAlicorp(usarTotalesDeItems ? subtotalItems : form.subtotal, form.gastosGeneralesPorcentaje, form.utilidadPorcentaje)
     : calcular(usarTotalesDeItems ? subtotalItems : form.subtotal, form.descuentoPorcentaje);
 
   const guardar = async () => {
@@ -174,6 +193,7 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
       numeroGuia: form.numeroGuia,
       jefeSupervisorSolicitante: form.jefeSupervisorSolicitante,
       compradorResponsable: form.compradorResponsable,
+      textoBreveServicio: form.textoBreveServicio,
       items: items.map(i => {
         const it = {
           descripcion: i.descripcion, unidad: i.unidad || "und", cantidad: i.cantidad, precio: i.precio,
@@ -434,6 +454,14 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
                 <input name="titulo" value={form.titulo} onChange={handleChange} placeholder="Título de la cotización" className={INP} />
               </div>
 
+              {esAlicorp && (
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Texto breve del servicio</label>
+                  <input name="textoBreveServicio" value={form.textoBreveServicio} onChange={handleChange}
+                    placeholder="Ej. SERV. REP MANTTO ARRANC SIEMENS" className={INP} />
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs text-gray-500 block mb-1">Atención</label>
@@ -552,6 +580,45 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
                       <p className="font-bold text-gray-900 text-lg">{totalesMostrados.total.toFixed(2)}</p>
                     </div>
                   </>
+                ) : esAlicorp ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">Gastos administrativos (%)</label>
+                        <input type="number" name="gastosGeneralesPorcentaje" value={form.gastosGeneralesPorcentaje} onChange={handleChange}
+                          step="0.01" min="0" max="100" className={INP} />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">Utilidad (%)</label>
+                        <input type="number" name="utilidadPorcentaje" value={form.utilidadPorcentaje} onChange={handleChange}
+                          step="0.01" min="0" max="100" className={INP} />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div className="text-center">
+                        <p className="text-xs text-gray-400">Gastos administrativos</p>
+                        <p className="font-semibold text-gray-700">{totalesMostrados.gastosAdmin.toFixed(2)}</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs text-gray-400">Utilidad</p>
+                        <p className="font-semibold text-gray-700">{totalesMostrados.utilidad.toFixed(2)}</p>
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs text-gray-400">Total (sin IGV)</p>
+                      <p className="font-semibold text-gray-700">{totalesMostrados.totalSinIgv.toFixed(2)}</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div className="text-center">
+                        <p className="text-xs text-gray-400">IGV 18%</p>
+                        <p className="font-semibold text-gray-700">{totalesMostrados.igv.toFixed(2)}</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs text-gray-400">Valor total de la oferta</p>
+                        <p className="font-semibold text-gray-700">{totalesMostrados.total.toFixed(2)}</p>
+                      </div>
+                    </div>
+                  </>
                 ) : (
                   <>
                     <div>
@@ -604,6 +671,14 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
         <div className="max-w-6xl mx-auto px-8 pb-8">
           {esGloria ? (
             <TablaItemsCotizacionGloria
+              items={items}
+              onItemsChange={setItems}
+              puedeEditar
+              disabled={false}
+              puedeVerPrecios={puedeVerPrecios}
+            />
+          ) : esAlicorp ? (
+            <TablaItemsCotizacionAlicorp
               items={items}
               onItemsChange={setItems}
               puedeEditar

@@ -3,13 +3,18 @@ import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import { formatearFecha } from "../utils/fecha";
 import { exportarCotizacionPdf } from "../utils/cotizacionPdf";
 import { exportarCotizacionGloriaPdf } from "../utils/cotizacionGloriaPdf";
-import { calcSubtotalGloria, calcularGloria, itemDesdeDb, itemInvalido, RUC_GLORIA } from "../utils/cotizacionItems";
+import { exportarCotizacionAlicorpPdf } from "../utils/cotizacionAlicorpPdf";
+import {
+  calcSubtotalGloria, calcularGloria, calcSubtotal, calcularAlicorp,
+  itemDesdeDb, itemInvalido, RUC_GLORIA, RUC_ALICORP,
+} from "../utils/cotizacionItems";
 import ModalCrearOT from "./ModalCrearOT";
 import ModalOrdenCompra from "./ModalOrdenCompra";
 import BuscadorOrdenTrabajo from "./BuscadorOrdenTrabajo";
 import SelectorEmpresas from "./SelectorEmpresas";
 import TablaItemsCotizacion from "./TablaItemsCotizacion";
 import TablaItemsCotizacionGloria from "./TablaItemsCotizacionGloria";
+import TablaItemsCotizacionAlicorp from "./TablaItemsCotizacionAlicorp";
 import {
   FlujoNegocio, TarjetaRelacion, Chip,
   badgePago, badgeOT, money, BotonAnular, BotonCerrarCadena, BotonDesanular, BannerAnulado, bloqueadoPorCadenaCerrada,
@@ -39,11 +44,16 @@ function calcular(sub, descuentoPct = 0) {
 export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuardada, onNavegar }) {
   const [cot, setCot] = useState(inicial);
   const subtotalInicial = inicial.subtotal ?? 0;
+  // `inicial.empresa.ruc` ya viene poblado (ver GET/PUT /cotizaciones,
+  // populate("empresa", "razonSocial alias ruc")) — se puede resolver acá
+  // mismo, antes de que `empresas` (la lista completa) termine de cargar.
+  const esAlicorpInicial = inicial.empresa?.ruc === RUC_ALICORP;
   const [form, setForm] = useState({
     subtotal: subtotalInicial > 0 ? String(subtotalInicial) : "",
     descuentoPorcentaje: inicial.descuentoPorcentaje ? String(inicial.descuentoPorcentaje) : "",
-    gastosGeneralesPorcentaje: inicial.gastosGeneralesPorcentaje != null ? String(inicial.gastosGeneralesPorcentaje) : "2",
-    utilidadPorcentaje: inicial.utilidadPorcentaje != null ? String(inicial.utilidadPorcentaje) : "10",
+    gastosGeneralesPorcentaje: inicial.gastosGeneralesPorcentaje != null ? String(inicial.gastosGeneralesPorcentaje) : (esAlicorpInicial ? "10" : "2"),
+    utilidadPorcentaje: inicial.utilidadPorcentaje != null ? String(inicial.utilidadPorcentaje) : (esAlicorpInicial ? "5" : "10"),
+    textoBreveServicio: inicial.textoBreveServicio || "",
     empresa: inicial.empresa?._id || "",
     tipo: inicial.tipo || "venta",
     moneda: inicial.moneda || "PEN",
@@ -90,6 +100,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   const [informes, setInformes] = useState([]);
   const [oc, setOc] = useState(null);
   const [factura, setFactura] = useState(null);
+  const [servicios, setServicios] = useState([]);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
   const [crearOTOpen, setCrearOTOpen] = useState(false);
@@ -106,6 +117,9 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   // Precios: información sensible, solo Admin/Facturación/Jefatura los ven —
   // ni Asistente ni Planner, aunque puedan editar/ver el resto de la cotización.
   const puedeVerPrecios = ["admin", "facturacion", "jefatura"].includes(rolActual);
+  // Card de Servicios Externos — visible solo para este set de roles, a
+  // pedido explícito del usuario.
+  const puedeVerServicios = ["admin", "jefatura", "coordinadora", "planner", "asistente"].includes(rolActual);
   const puedeAprobar = ["admin", "jefatura"].includes(rolActual);
   const puedeEnviar = ["admin", "asistente", "jefatura"].includes(rolActual);
   const puedeConfirmarInformeEnviado = ["admin", "asistente", "facturacion", "jefatura"].includes(rolActual);
@@ -147,6 +161,18 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
       } else {
         setInformes([]);
       }
+      // Solo las OT padre (no sub-OTs, que ya heredan `cotizacion` del padre
+      // — ver POST /:id/sub-ot) — `?ordenTrabajoPadre=` en el backend ya
+      // agrega los servicios de sí misma + todas sus sub-OTs, así que pedirlo
+      // también por cada sub-OT duplicaría filas.
+      const otsPadre = otsFound.filter(o => !o.ordenPadre);
+      if (puedeVerServicios && otsPadre.length > 0) {
+        Promise.all(
+          otsPadre.map(o => fetchAuth(`/servicios-externos?ordenTrabajoPadre=${o._id}`).then(r => r.ok ? r.json() : []))
+        ).then(listas => setServicios(listas.flat()));
+      } else {
+        setServicios([]);
+      }
     });
   };
 
@@ -165,6 +191,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   const contactosPlanta = plantaSel?.contactos ?? [];
   const contactoSel = contactosPlanta.find(c => c.nombre === form.personaContacto);
   const esGloria = empresaSel?.ruc === RUC_GLORIA;
+  const esAlicorp = empresaSel?.ruc === RUC_ALICORP;
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -247,6 +274,8 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   const usarTotalesDeItems = items.length > 0;
   const totalesMostrados = esGloria
     ? calcularGloria(usarTotalesDeItems ? subtotalItems : form.subtotal, form.gastosGeneralesPorcentaje, form.utilidadPorcentaje)
+    : esAlicorp
+    ? calcularAlicorp(usarTotalesDeItems ? subtotalItems : form.subtotal, form.gastosGeneralesPorcentaje, form.utilidadPorcentaje)
     : calcular(usarTotalesDeItems ? subtotalItems : form.subtotal, form.descuentoPorcentaje);
 
   // Arma el objeto para el PDF con lo que hay en pantalla ahora mismo, sin
@@ -280,6 +309,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
     numeroGuia: form.numeroGuia,
     jefeSupervisorSolicitante: form.jefeSupervisorSolicitante,
     compradorResponsable: form.compradorResponsable,
+    textoBreveServicio: form.textoBreveServicio,
     gastosGeneralesPorcentaje: form.gastosGeneralesPorcentaje,
     utilidadPorcentaje: form.utilidadPorcentaje,
     items: items.map(i => ({
@@ -348,6 +378,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
       numeroGuia: form.numeroGuia,
       jefeSupervisorSolicitante: form.jefeSupervisorSolicitante,
       compradorResponsable: form.compradorResponsable,
+      textoBreveServicio: form.textoBreveServicio,
       gastosGeneralesPorcentaje: form.gastosGeneralesPorcentaje,
       utilidadPorcentaje: form.utilidadPorcentaje,
       items: items.map(i => {
@@ -523,7 +554,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
               <Chip className="mt-0.5 bg-white/20 text-white">{cot.tipo}</Chip>
             </div>
             {!["asistente", "coordinadora", "planner"].includes(rolActual) && (
-              <button onClick={() => (esGloria ? exportarCotizacionGloriaPdf : exportarCotizacionPdf)(datosParaPdf())}
+              <button onClick={() => (esGloria ? exportarCotizacionGloriaPdf : esAlicorp ? exportarCotizacionAlicorpPdf : exportarCotizacionPdf)(datosParaPdf())}
                 className="bg-white/15 text-white text-sm px-4 py-2 rounded-lg hover:bg-white/25 transition font-medium shrink-0">
                 Exportar PDF
               </button>
@@ -853,6 +884,14 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
                     placeholder="Título de la cotización" className={INP} />
                 </div>
 
+                {esAlicorp && (
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Texto breve del servicio</label>
+                    <input name="textoBreveServicio" value={form.textoBreveServicio} onChange={handleChange}
+                      placeholder="Ej. SERV. REP MANTTO ARRANC SIEMENS" className={INP} />
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs text-gray-500 block mb-1">Atención</label>
@@ -977,6 +1016,49 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
                         <p className="font-bold text-gray-900 text-lg">{totalesMostrados.total.toFixed(2)}</p>
                       </div>
                     </>
+                  ) : esAlicorp ? (
+                    <>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs text-gray-500 block mb-1">Gastos administrativos (%)</label>
+                          <input type="number" name="gastosGeneralesPorcentaje" value={form.gastosGeneralesPorcentaje} onChange={handleChange}
+                            step="0.01" min="0" max="100" className={INP} />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-500 block mb-1">Utilidad (%)</label>
+                          <input type="number" name="utilidadPorcentaje" value={form.utilidadPorcentaje} onChange={handleChange}
+                            step="0.01" min="0" max="100" className={INP} />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div className="text-center">
+                          <p className="text-xs text-gray-400">Gastos administrativos</p>
+                          <p className="font-semibold text-gray-700">{totalesMostrados.gastosAdmin.toFixed(2)}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xs text-gray-400">Utilidad</p>
+                          <p className="font-semibold text-gray-700">{totalesMostrados.utilidad.toFixed(2)}</p>
+                        </div>
+                      </div>
+                      {/* El PDF de Alicorp se corta acá (Total sin IGV) — IGV y
+                          Valor total de la oferta se siguen mostrando en pantalla
+                          (y guardando en cotizacion.total) para uso interno, pero
+                          no se imprimen; confirmado explícitamente por el usuario. */}
+                      <div className="text-center">
+                        <p className="text-xs text-gray-400">Total (sin IGV)</p>
+                        <p className="font-semibold text-gray-700">{totalesMostrados.totalSinIgv.toFixed(2)}</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div className="text-center">
+                          <p className="text-xs text-gray-400">IGV 18%</p>
+                          <p className="font-semibold text-gray-700">{totalesMostrados.igv.toFixed(2)}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xs text-gray-400">Valor total de la oferta</p>
+                          <p className="font-semibold text-gray-700">{totalesMostrados.total.toFixed(2)}</p>
+                        </div>
+                      </div>
+                    </>
                   ) : (
                     <>
                       <div>
@@ -1070,6 +1152,42 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
                 {factura?.estadoPago && <Chip className={badgePago(factura.estadoPago)}>{factura.estadoPago}</Chip>}
               </TarjetaRelacion>
             )}
+
+            {puedeVerServicios && (
+              <TarjetaRelacion
+                tipo="servicio"
+                codigo={servicios.length ? `${servicios.length} servicio${servicios.length !== 1 ? "s" : ""}` : null}
+                vacio={servicios.length === 0}>
+                {servicios.length > 0 && (
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="text-gray-400">
+                        <th className="text-left font-semibold pb-1">Descripción</th>
+                        <th className="text-right font-semibold pb-1">Costo</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {servicios.map(s => (
+                        <tr key={s._id} className="border-t border-white/60">
+                          <td className="py-1 pr-2 text-gray-600">
+                            {s.rucProveedor ? `${s.rucProveedor} — ` : ""}{s.nombreProveedor} · {s.tipoTrabajo} ({s.cantidad})
+                          </td>
+                          <td className="py-1 text-right text-gray-700 tabular-nums whitespace-nowrap">{money(s.costo)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t border-white/60 font-semibold">
+                        <td className="py-1 pr-2 text-gray-700">Total</td>
+                        <td className="py-1 text-right text-gray-800 tabular-nums whitespace-nowrap">
+                          {money(servicios.reduce((s, v) => s + (Number(v.costo) || 0), 0))}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                )}
+              </TarjetaRelacion>
+            )}
           </section>
         </div>
 
@@ -1077,6 +1195,21 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
         <div className="max-w-6xl mx-auto px-8 pb-8">
           {esGloria ? (
             <TablaItemsCotizacionGloria
+              items={items}
+              onItemsChange={setItems}
+              puedeEditar={puedeEditar}
+              disabled={cot.anulado || cot.enviado}
+              puedeVerPrecios={puedeVerPrecios}
+              seleccionables={puedeGenerarOT && !cot.anulado}
+              seleccionados={seleccionados}
+              onToggleSeleccion={toggleSeleccion}
+              onGenerarOT={generarOTSeleccionados}
+              generando={generandoOT}
+              onVerOT={(o) => onNavegar?.({ tipo: "ot", data: ots.find(x => x._id === o._id) || o })}
+              onQuitarOT={quitarOT}
+            />
+          ) : esAlicorp ? (
+            <TablaItemsCotizacionAlicorp
               items={items}
               onItemsChange={setItems}
               puedeEditar={puedeEditar}

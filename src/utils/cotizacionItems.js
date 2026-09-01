@@ -113,3 +113,48 @@ export function calcularGloria(subtotalItems, gastosPct = 2, utilidadPct = 10) {
     total: Math.round((totalPreIgv + igv) * 100) / 100,
   };
 }
+
+// ── Formato exclusivo de Alicorp (RUC 20100055237) ──────────────────────────
+// Mismo criterio de agrupación que Gloria (5 grupos fijos), pero acá los 5
+// comparten las mismas columnas — no hay variante de Mano de Obra por
+// personas/horas, todos usan cantidad × precio (calcSubtotal normal).
+export const RUC_ALICORP = "20100055237";
+export const GRUPOS_ALICORP = [
+  { clave: "materiales",          numero: 1, label: "Materiales" },
+  { clave: "materiales_consumibles", numero: 2, label: "Materiales Consumibles" },
+  { clave: "servicios",           numero: 3, label: "Servicios" },
+  { clave: "mano_obra_alicorp",   numero: 4, label: "Mano de Obra" },
+  { clave: "equipo_herramienta",  numero: 5, label: "Equipo/Herramienta" },
+];
+
+export const itemVacioAlicorp = (grupo) => ({
+  _key: Date.now() + Math.random(),
+  grupo,
+  descripcion: "",
+  unidad: "und",
+  cantidad: 1,
+  precio: 0,
+});
+
+// Fórmula de totales de Alicorp (confirmada por el usuario): a diferencia de
+// Gloria, el PDF exportado se corta en "Total (sin IGV)" — no imprime IGV ni
+// el valor con IGV — pero `total` acá sigue siendo el monto CON IGV para que
+// el resto de la cadena (OC/Factura) reciba el monto real a cobrar, igual
+// que el resto de la app. `totalSinIgv` es el que efectivamente se imprime.
+export function calcularAlicorp(subtotalItems, gastosAdminPct = 10, utilidadPct = 5) {
+  const subtotal = Math.round(Number(subtotalItems) * 100) / 100 || 0;
+  const gastosAdmin = Math.round(subtotal * (Number(gastosAdminPct) || 0) / 100 * 100) / 100;
+  const utilidad = Math.round(subtotal * (Number(utilidadPct) || 0) / 100 * 100) / 100;
+  const totalSinIgv = Math.round((subtotal + gastosAdmin + utilidad) * 100) / 100;
+  const igv = Math.round(totalSinIgv * 0.18 * 100) / 100;
+  return {
+    subtotal,
+    gastosAdminPorcentaje: Number(gastosAdminPct) || 0,
+    utilidadPorcentaje: Number(utilidadPct) || 0,
+    gastosAdmin,
+    utilidad,
+    totalSinIgv,
+    igv,
+    total: Math.round((totalSinIgv + igv) * 100) / 100,
+  };
+}
