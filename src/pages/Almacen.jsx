@@ -1183,8 +1183,13 @@ function ModalEgreso({ onClose, onGuardado }) {
 
 // ─── Sección Movimientos ────────────────────────────────────────────────────
 
+const LIMIT_MOVIMIENTOS = 50;
+
 function SeccionMovimientos() {
   const [movimientos, setMovimientos] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [cargandoMas, setCargandoMas] = useState(false);
   const [filtroTipo, setFiltroTipo] = useState("");
   const [filtroMaterial, setFiltroMaterial] = useState("");
   // Texto del buscador + nombre a mostrar del material elegido para filtrar
@@ -1193,17 +1198,36 @@ function SeccionMovimientos() {
   const [busquedaFiltro, setBusquedaFiltro] = useState("");
   const [modalIngreso, setModalIngreso] = useState(false);
   const [modalEgreso, setModalEgreso] = useState(false);
+  const [exportando, setExportando] = useState(false);
 
-  const cargar = useCallback(async () => {
+  const paramsFiltro = useCallback(() => {
     const params = new URLSearchParams();
     if (filtroTipo) params.set("tipo", filtroTipo);
     if (filtroMaterial) params.set("material", filtroMaterial);
-
-    const r = await fetchAuth(`/movimientos-almacen?${params}`);
-    if (r.ok) setMovimientos(await r.json());
+    return params;
   }, [filtroTipo, filtroMaterial]);
 
-  useEffect(() => { cargar(); }, [cargar]);
+  const cargarPagina = useCallback(async (paginaAPedir, reemplazar) => {
+    const params = paramsFiltro();
+    params.set("page", String(paginaAPedir));
+    params.set("limit", String(LIMIT_MOVIMIENTOS));
+    const r = await fetchAuth(`/movimientos-almacen?${params}`);
+    if (!r.ok) return;
+    const data = await r.json();
+    setTotal(data.total);
+    setMovimientos((prev) => (reemplazar ? data.items : [...prev, ...data.items]));
+    setPage(paginaAPedir);
+  }, [paramsFiltro]);
+
+  // Cambió algún filtro — reinicia desde la página 1 y reemplaza la lista
+  // acumulada, en vez de seguir agregando sobre resultados viejos.
+  useEffect(() => { cargarPagina(1, true); }, [cargarPagina]);
+
+  const cargarMas = async () => {
+    setCargandoMas(true);
+    await cargarPagina(page + 1, false);
+    setCargandoMas(false);
+  };
 
   const elegirFiltroMaterial = (m) => {
     setFiltroMaterial(m._id);
@@ -1218,7 +1242,7 @@ function SeccionMovimientos() {
   const onGuardado = async () => {
     setModalIngreso(false);
     setModalEgreso(false);
-    await cargar();
+    await cargarPagina(1, true);
   };
 
   const fmt = (n) => Number(n || 0).toFixed(2);
@@ -1244,11 +1268,20 @@ function SeccionMovimientos() {
     "Fecha":             fmtFecha(mv.fecha),
   });
 
-  const exportarExcel = () => {
-    const ws = XLSX.utils.json_to_sheet(movimientos.map(filaMovimiento));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Movimientos");
-    XLSX.writeFile(wb, "movimientos-almacen.xlsx");
+  // Exporta TODO lo que coincide con los filtros actuales, no solo lo que
+  // está paginado en pantalla — igual criterio que Almacén/Materiales
+  // (fetch aparte sin `page`, ver GET /movimientos-almacen).
+  const exportarExcel = async () => {
+    setExportando(true);
+    const r = await fetchAuth(`/movimientos-almacen?${paramsFiltro()}`);
+    if (r.ok) {
+      const todos = await r.json();
+      const ws = XLSX.utils.json_to_sheet(todos.map(filaMovimiento));
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Movimientos");
+      XLSX.writeFile(wb, "movimientos-almacen.xlsx");
+    }
+    setExportando(false);
   };
 
   return (
@@ -1284,9 +1317,9 @@ function SeccionMovimientos() {
           )}
         </div>
 
-        <button onClick={exportarExcel}
-          className="text-sm border border-gray-300 text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-50 transition ml-auto">
-          Exportar Excel
+        <button onClick={exportarExcel} disabled={exportando}
+          className="text-sm border border-gray-300 text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition ml-auto">
+          {exportando ? "Exportando…" : "Exportar Excel"}
         </button>
       </div>
 
@@ -1356,6 +1389,19 @@ function SeccionMovimientos() {
             </tbody>
           </table>
         </TablaScroll>
+
+        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 text-sm text-gray-400">
+          <span>Mostrando {movimientos.length} de {total} resultados</span>
+          {movimientos.length < total && (
+            <button
+              onClick={cargarMas}
+              disabled={cargandoMas}
+              className="border border-gray-300 text-gray-600 px-4 py-1.5 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50 transition"
+            >
+              {cargandoMas ? "Cargando…" : "Mostrar más"}
+            </button>
+          )}
+        </div>
       </div>
 
       {modalIngreso && (
