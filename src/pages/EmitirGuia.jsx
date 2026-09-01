@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { fetchAuth } from "../utils/fetchAuth";
 import TablaScroll from "../components/TablaScroll";
+import SelectorDireccionGuardada from "../components/SelectorDireccionGuardada";
+import { HUAQUIAN } from "../utils/cotizacionPdf";
 import {
   TIPO_GUIA,
   MODALIDAD_TRASLADO,
@@ -114,6 +116,11 @@ export default function EmitirGuia() {
   const [comprador, setComprador]       = useState(PARTE_VACIA);
   const [puntoPartida, setPuntoPartida] = useState(DIRECCION_VACIA);
   const [puntoLlegada, setPuntoLlegada] = useState(DIRECCION_VACIA);
+  // "Direcciones guardadas" del destinatario (ver SelectorDireccionGuardada) —
+  // empresas se traen recién al abrir el selector la primera vez, no en el
+  // mount de la página (esta vista no las necesita para nada más).
+  const [empresasGuardadas, setEmpresasGuardadas] = useState([]);
+  const [selectorDireccionOpen, setSelectorDireccionOpen] = useState(false);
   const [transportista, setTransportista] = useState(TRANSPORTISTA_VACIO);
   const [vehiculo, setVehiculo]           = useState(VEHICULO_VACIO);
   const [conductor, setConductor]         = useState(CONDUCTOR_VACIO);
@@ -174,13 +181,29 @@ export default function EmitirGuia() {
   };
 
   // Cuando el emisor traslada su propia mercadería (tipoGuia=REMITENTE), el punto de partida es
-  // su propio domicilio — se autocompleta con el mismo mecanismo que destinatario/remitente, sin
-  // que el usuario tenga que reescribir un RUC que ya seleccionó en el dropdown de empresa emisora.
+  // su propio domicilio — HUAQUIAN es la única empresa emisora de este ERP (RUC_EMISOR fijo, ver
+  // arriba), así que su dirección/ubigeo están hardcodeados (mismo dato que ya usan las
+  // cotizaciones, ver utils/cotizacionPdf.js) en vez de consultarlos a SUNAT en cada carga de la
+  // página — antes esto pegaba a /sunat/ruc/:ruc (2 consultas reales a apiperu.dev) por el propio
+  // RUC del emisor, que nunca cambia, y encima se disparaba 2 veces en dev por StrictMode.
   useEffect(() => {
-    if (!rucEmisor || tipoGuia !== "REMITENTE") return;
-    buscarRuc(rucEmisor, null, "nombre", setPuntoPartida);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rucEmisor, tipoGuia]);
+    if (tipoGuia !== "REMITENTE") return;
+    setPuntoPartida({ ubigeo: HUAQUIAN.ubigeo, direccion: HUAQUIAN.direccion });
+  }, [tipoGuia]);
+
+  const abrirSelectorDireccion = async () => {
+    if (empresasGuardadas.length === 0) {
+      const r = await fetchAuth("/empresas");
+      if (r.ok) setEmpresasGuardadas(await r.json());
+    }
+    setSelectorDireccionOpen(true);
+  };
+
+  const elegirDireccionGuardada = (empresa, planta) => {
+    setDestinatario((d) => ({ ...d, schemeID: "6", numDoc: empresa.ruc || "", nombre: empresa.razonSocial }));
+    setPuntoLlegada({ ubigeo: planta.ubigeo, direccion: planta.direccion });
+    setSelectorDireccionOpen(false);
+  };
 
   const ligarComprobante = async (id) => {
     setComprobanteId(id);
@@ -607,7 +630,15 @@ export default function EmitirGuia() {
 
         {/* Destinatario */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mb-5">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Destinatario</p>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Destinatario</p>
+            {!ro && (
+              <button type="button" onClick={abrirSelectorDireccion}
+                className="text-xs text-blue-600 hover:text-blue-800 underline">
+                Elegir de direcciones guardadas
+              </button>
+            )}
+          </div>
           <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Tipo de documento</label>
@@ -1258,6 +1289,14 @@ export default function EmitirGuia() {
             </div>
           </div>
         </div>
+      )}
+
+      {selectorDireccionOpen && (
+        <SelectorDireccionGuardada
+          empresas={empresasGuardadas}
+          onClose={() => setSelectorDireccionOpen(false)}
+          onSeleccionar={elegirDireccionGuardada}
+        />
       )}
     </div>
   );

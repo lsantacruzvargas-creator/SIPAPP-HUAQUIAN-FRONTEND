@@ -3,6 +3,16 @@ export const UNIDADES = ["und", "kg", "g", "L", "mL", "m", "cm", "m²", "caja", 
 export const calcSubtotal = (item) =>
   parseFloat((item.cantidad * item.precio).toFixed(2));
 
+// Descripción + sub-ítems (viñetas del catálogo, ver TablaItemsCotizacionGloria.jsx/
+// TablaItemsCotizacionAlicorp.jsx "agregarGrupoDesdeCatalogo") como un solo texto
+// con saltos de línea — usado al exportar a PDF, donde no hay una lista <ul>
+// aparte, solo la celda de descripción de la tabla de ítems.
+export const descripcionConSubItems = (item) => {
+  const subItems = (item.subItems || []).map((s) => (typeof s === "string" ? s : s.texto)).filter(Boolean);
+  if (!subItems.length) return item.descripcion || "";
+  return [item.descripcion || "", ...subItems.map((t) => `- ${t}`)].join("\n");
+};
+
 export const INP =
   "border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-gray-400";
 export const INP_RO = "bg-transparent border-transparent text-sm px-2 py-1";

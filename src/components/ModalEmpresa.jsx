@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { fetchAuth } from "../utils/fetchAuth";
 
 const FORM_VACIO = { razonSocial: "", ruc: "", direccion: "", alias: "", requiereHes: false, requiereActaConformidad: false, plantas: [] };
-const PLANTA_VACIA = { nombre: "", contactoNombre: "", contactoTelefono: "", contactoCorreo: "" };
+const PLANTA_VACIA = { nombre: "", ubigeo: "", direccion: "", contactoNombre: "", contactoTelefono: "", contactoCorreo: "" };
 const CONTACTO_VACIO = { nombre: "", telefono: "", correo: "" };
 
 export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
@@ -75,6 +75,8 @@ export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
   // "+ Agregar contacto" (ver agregarContacto).
   const agregarPlanta = () => {
     const nombre = plantaInput.nombre.trim();
+    const ubigeo = plantaInput.ubigeo.trim();
+    const direccion = plantaInput.direccion.trim();
     const contactoNombre = plantaInput.contactoNombre.trim();
     const contactoTelefono = plantaInput.contactoTelefono.trim();
     const contactoCorreo = plantaInput.contactoCorreo.trim();
@@ -85,7 +87,7 @@ export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
     setErrorPlanta("");
     setForm((f) => ({
       ...f,
-      plantas: [...f.plantas, { nombre, contactos: [{ nombre: contactoNombre, telefono: contactoTelefono, correo: contactoCorreo }] }],
+      plantas: [...f.plantas, { nombre, ubigeo, direccion, contactos: [{ nombre: contactoNombre, telefono: contactoTelefono, correo: contactoCorreo }] }],
     }));
     setPlantaInput(PLANTA_VACIA);
   };
@@ -242,6 +244,7 @@ export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
             <label className="block text-xs font-medium text-gray-600 mb-1">Plantas</label>
             <p className="text-xs text-gray-400 mb-2">
               Cada planta requiere al menos un contacto (nombre y teléfono) — se pueden agregar más después.
+              Ubigeo y dirección son opcionales, pero se usan para autocompletar el punto de llegada al emitir una guía hacia esta planta.
             </p>
             <div className="grid grid-cols-2 gap-2 mb-2">
               <input
@@ -250,6 +253,21 @@ export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
                 onChange={handlePlantaInputChange}
                 placeholder="Nombre de la planta…"
                 className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
+              />
+              <input
+                name="ubigeo"
+                value={plantaInput.ubigeo}
+                onChange={handlePlantaInputChange}
+                maxLength={6}
+                placeholder="Ubigeo (6 dígitos)…"
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
+              />
+              <input
+                name="direccion"
+                value={plantaInput.direccion}
+                onChange={handlePlantaInputChange}
+                placeholder="Dirección de la planta…"
+                className="col-span-2 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
               />
               <input
                 name="contactoNombre"
@@ -299,6 +317,11 @@ export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
                         ✕
                       </button>
                     </div>
+                    {(p.ubigeo || p.direccion) && (
+                      <p className="text-xs text-gray-400 pl-1">
+                        {p.ubigeo && <span className="font-mono">{p.ubigeo}</span>}{p.ubigeo && p.direccion ? " — " : ""}{p.direccion}
+                      </p>
+                    )}
                     {(p.contactos || []).length > 0 && (
                       <ul className="space-y-1">
                         {p.contactos.map((c, ci) => (

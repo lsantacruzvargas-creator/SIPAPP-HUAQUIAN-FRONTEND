@@ -1,4 +1,6 @@
+import { useState } from "react";
 import TablaScroll from "./TablaScroll";
+import SelectorCatalogoServicios from "./SelectorCatalogoServicios";
 import {
   GRUPOS_GLORIA, itemVacioGloria, calcSubtotalGloria, UNIDADES,
   descripcionInvalida,
@@ -28,6 +30,12 @@ export default function TablaItemsCotizacionGloria({
   seleccionables = false, seleccionados = new Set(), onToggleSeleccion, onGenerarOT, generando = false, onVerOT, onQuitarOT,
 }) {
   const editable = puedeEditar && !disabled;
+  // Qué grupo (clave de GRUPOS_GLORIA) recibe lo elegido en el catálogo —
+  // "grupo" acá es el de la cotización (Materiales, Mano de Obra, etc.), no
+  // el "grupo" propio del catálogo de servicios (categorías de texto libre,
+  // ver SelectorCatalogoServicios.jsx), que son dos taxonomías distintas.
+  const [catalogoOpen, setCatalogoOpen] = useState(false);
+  const [catalogoGrupo, setCatalogoGrupo] = useState(null);
 
   const handleItem = (key, campo, valor) =>
     onItemsChange(items.map((i) => (i._key === key ? { ...i, [campo]: valor } : i)));
@@ -35,6 +43,37 @@ export default function TablaItemsCotizacionGloria({
   const eliminarItem = (key) => onItemsChange(items.filter((i) => i._key !== key));
 
   const agregarItem = (grupo) => onItemsChange([...items, itemVacioGloria(grupo)]);
+
+  const agregarSubItem = (key) =>
+    onItemsChange(items.map((i) =>
+      i._key === key
+        ? { ...i, subItems: [...(i.subItems || []), { _subKey: Date.now() + Math.random(), texto: "" }] }
+        : i
+    ));
+  const eliminarSubItem = (key, subKey) =>
+    onItemsChange(items.map((i) =>
+      i._key === key ? { ...i, subItems: i.subItems.filter((s) => s._subKey !== subKey) } : i
+    ));
+  const handleSubItem = (key, subKey, valor) =>
+    onItemsChange(items.map((i) =>
+      i._key === key
+        ? { ...i, subItems: i.subItems.map((s) => (s._subKey === subKey ? { ...s, texto: valor } : s)) }
+        : i
+    ));
+
+  const abrirCatalogo = (grupo) => { setCatalogoGrupo(grupo); setCatalogoOpen(true); };
+  const cerrarCatalogo = () => { setCatalogoOpen(false); setCatalogoGrupo(null); };
+  // Un ítem puntual del catálogo se agrega tal cual, como un ítem propio del
+  // grupo (descripción = ese texto). El GRUPO completo del catálogo, en
+  // cambio, entra como UN solo ítem (descripción = nombre del grupo del
+  // catálogo) con sus textos como sub-ítems debajo — no un ítem por texto,
+  // mismo criterio que ya usa TablaItemsCotizacion.jsx para el flujo genérico.
+  const agregarDesdeCatalogo = (_catGrupo, texto) =>
+    onItemsChange([...items, { ...itemVacioGloria(catalogoGrupo), descripcion: texto }]);
+  const agregarGrupoDesdeCatalogo = (catGrupo, textos) => {
+    const nuevosSubItems = textos.map((texto) => ({ _subKey: Date.now() + Math.random(), texto }));
+    onItemsChange([...items, { ...itemVacioGloria(catalogoGrupo), descripcion: catGrupo, subItems: nuevosSubItems }]);
+  };
 
   const subtotalTotal = items.reduce((acc, i) => acc + calcSubtotalGloria(i), 0);
 
@@ -71,10 +110,16 @@ export default function TablaItemsCotizacionGloria({
                   </h3>
                 </div>
                 {editable && (
-                  <button type="button" onClick={() => agregarItem(grupo.clave)}
-                    className="border border-sky-200 text-sky-700 text-xs px-3 py-1.5 rounded-lg hover:bg-sky-50 transition font-medium">
-                    + Agregar
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={() => agregarItem(grupo.clave)}
+                      className="border border-sky-200 text-sky-700 text-xs px-3 py-1.5 rounded-lg hover:bg-sky-50 transition font-medium">
+                      + Agregar
+                    </button>
+                    <button type="button" onClick={() => abrirCatalogo(grupo.clave)}
+                      className="bg-sky-600 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-sky-700 transition font-medium">
+                      + Elegir del catálogo
+                    </button>
+                  </div>
                 )}
               </div>
 
@@ -146,6 +191,32 @@ export default function TablaItemsCotizacionGloria({
                                 className={`w-full border border-transparent rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-sky-300 focus:border-sky-300 ${descripcionInvalida(item) ? "border-red-200" : ""}`} />
                             ) : (
                               <p className="text-gray-700">{item.descripcion}</p>
+                            )}
+                            {item.subItems?.length > 0 && (
+                              <ul className="mt-1.5 space-y-1">
+                                {item.subItems.map((sub) => (
+                                  <li key={sub._subKey} className="flex items-start gap-1.5 text-xs text-gray-600">
+                                    <span className="text-sky-400 shrink-0">•</span>
+                                    {editable ? (
+                                      <>
+                                        <input value={sub.texto}
+                                          onChange={(e) => handleSubItem(item._key, sub._subKey, e.target.value)}
+                                          className="flex-1 border border-gray-200 rounded px-2 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-sky-300" />
+                                        <button type="button" onClick={() => eliminarSubItem(item._key, sub._subKey)}
+                                          className="text-gray-300 hover:text-red-500 shrink-0">✕</button>
+                                      </>
+                                    ) : (
+                                      <span className="flex-1">{sub.texto}</span>
+                                    )}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                            {editable && (
+                              <button type="button" onClick={() => agregarSubItem(item._key)}
+                                className="mt-1.5 text-xs text-gray-400 hover:text-sky-600 transition">
+                                + agregar sub ítem
+                              </button>
                             )}
                           </td>
                           {esManoObra ? (
@@ -228,6 +299,14 @@ export default function TablaItemsCotizacionGloria({
             Sub-total (los 5 grupos): <span className="font-bold text-gray-900 tabular-nums">{subtotalTotal.toFixed(2)}</span>
           </p>
         </div>
+      )}
+
+      {catalogoOpen && (
+        <SelectorCatalogoServicios
+          onSeleccionar={agregarDesdeCatalogo}
+          onSeleccionarGrupo={agregarGrupoDesdeCatalogo}
+          onClose={cerrarCatalogo}
+        />
       )}
     </div>
   );

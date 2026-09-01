@@ -1,7 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { HUAQUIAN } from "./cotizacionPdf";
-import { GRUPOS_ALICORP, calcSubtotal, calcularAlicorp } from "./cotizacionItems";
+import { GRUPOS_ALICORP, calcSubtotal, calcularAlicorp, descripcionConSubItems } from "./cotizacionItems";
 
 // Cargar así (no `import logo from "./logo.png"`) para que un archivo
 // todavía no subido solo falle esa imagen puntual en vez de romper todo el
@@ -27,7 +27,7 @@ const ALICORP = {
 const COLUMNAS_TABLA = {
   head: (grupo) => [grupo.label.toUpperCase(), "Unidad", "Precio Unitario", "Cantidad", "Parcial"],
   fila: (item) => [
-    item.descripcion || "",
+    descripcionConSubItems(item),
     item.unidad || "und",
     (Number(item.precio) || 0).toFixed(2),
     item.cantidad ?? 0,
@@ -108,18 +108,18 @@ export const exportarCotizacionAlicorpPdf = async (cotizacion) => {
     const ratio = logoHuaquian.naturalWidth / logoHuaquian.naturalHeight;
     let dw = logoW - pad * 2, dh = dw / ratio;
     if (dh > logoH - pad * 2) { dh = logoH - pad * 2; dw = dh * ratio; }
-    doc.addImage(logoHuaquian, "JPEG", M + (logoW - dw) / 2, y + (logoH - dh) / 2, dw, dh);
+    doc.addImage(logoHuaquian, "JPEG",M + (logoW - dw) / 2, y + (logoH - dh) / 2, dw, dh);
   }
   const xDatos = M + logoW + 6;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
   doc.setTextColor(0, 0, 0);
-  doc.text("HUAQUIAN SAC", xDatos, y + 5);
+  doc.text("HUAQUIAN SAC", xDatos + 20, y + 5);
   doc.setFontSize(9);
   let yDatos = y + 11;
   labelValor(xDatos, yDatos, "RUC: ", HUAQUIAN.ruc); yDatos += 4.2;
-  labelValor(xDatos, yDatos, "Dirección: ", HUAQUIAN.direccion); yDatos += 4.2;
-  labelValor(xDatos, yDatos, "Telefono: ", HUAQUIAN.telefono); yDatos += 4.2;
+  labelValor(xDatos, yDatos, "Dirección:  ", HUAQUIAN.direccion); yDatos += 4.2;
+  labelValor(xDatos, yDatos, "Telefono:  ", HUAQUIAN.telefono); yDatos += 4.2;
   labelValor(xDatos, yDatos, "Email: ", HUAQUIAN.correo); yDatos += 4.2;
   y = Math.max(y + logoH, yDatos) + 3;
   doc.setDrawColor(0);
@@ -137,9 +137,9 @@ export const exportarCotizacionAlicorpPdf = async (cotizacion) => {
   doc.setFont("helvetica", "bold");
   doc.text(ALICORP.razonSocial, M + doc.getTextWidth("Razón social : "), y);
   y += 4.2;
-  labelValor(M, y, "Dirección      : ", ALICORP.direccion); y += 4.2;
-  labelValor(M, y, "Contacto       : ", cotizacion.personaContacto); y += 4.2;
-  labelValor(M, y, "Aviso           : ", cotizacion.omAviso);
+  labelValor(M, y, "Dirección      :  ", ALICORP.direccion); y += 4.2;
+  labelValor(M, y, "Contacto       :  ", cotizacion.personaContacto); y += 4.2;
+  labelValor(M, y, "Aviso             :  ", cotizacion.omAviso);
   labelValor(M + 110, y, "Guía : ", cotizacion.numeroGuia);
   y += 6;
 
@@ -149,9 +149,9 @@ export const exportarCotizacionAlicorpPdf = async (cotizacion) => {
   // guarda en el documento.
   const anioYY = String(new Date().getFullYear()).slice(-2);
   const codigoCotizacion = `${cotizacion.numeroCotizacion || cotizacion.codigo || "—"}-${anioYY}`;
-  labelValor(M, y, "Código de cotización: ", codigoCotizacion); y += 4.2;
+  labelValor(M, y, "Código de cotización:    ", codigoCotizacion); y += 4.2;
   if (cotizacion.textoBreveServicio) {
-    labelValor(M, y, "Texto breve del servicio: ", cotizacion.textoBreveServicio);
+    labelValor(M, y, "Texto breve del servicio:    ", cotizacion.textoBreveServicio);
     y += 4.2;
   }
   y += 2;
@@ -285,9 +285,9 @@ export const exportarCotizacionAlicorpPdf = async (cotizacion) => {
     doc.text(valor || "—", M + 2 + doc.getTextWidth(label), y);
     y += 4.5;
   };
-  clausula("Tiempo de entrega : ", cotizacion.plazoEntrega);
-  clausula("Tiempo de pago      : ", cotizacion.condicionPago);
-  clausula("Garantia                     : ", cotizacion.tiempoGarantia);
+  clausula("Tiempo de entrega  :   ", cotizacion.plazoEntrega);
+  clausula("Tiempo de pago      :   ", cotizacion.condicionPago);
+  clausula("Garantia                    :  ", cotizacion.tiempoGarantia);
 
   doc.save(`Cotización Alicorp N° ${codigoCotizacion}.pdf`);
 };

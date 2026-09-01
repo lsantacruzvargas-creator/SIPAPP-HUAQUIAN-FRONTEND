@@ -2,7 +2,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { HUAQUIAN } from "./cotizacionPdf";
 import { formatearFecha } from "./fecha";
-import { GRUPOS_GLORIA, calcSubtotalGloria, calcularGloria } from "./cotizacionItems";
+import { GRUPOS_GLORIA, calcSubtotalGloria, calcularGloria, descripcionConSubItems } from "./cotizacionItems";
 
 // Cargar así (no `import logo from "./logo.png"`) para que un archivo
 // todavía no subido solo falle esa imagen puntual en vez de romper todo el
@@ -38,7 +38,7 @@ const COLUMNAS_TABLA = {
     head: (grupo) => [String(grupo.numero), grupo.label.toUpperCase(), "UND", "CANT.", "P. UNIT.", "VALOR TOTAL S/."],
     fila: (item, numero) => [
       numero,
-      item.descripcion || "",
+      descripcionConSubItems(item),
       item.unidad || "und",
       item.cantidad ?? 0,
       (Number(item.precio) || 0).toFixed(2),
@@ -49,7 +49,7 @@ const COLUMNAS_TABLA = {
     head: (grupo) => [String(grupo.numero), grupo.label.toUpperCase(), "N° PERSONAS", "N° HORAS", "S/. POR HORA", "VALOR TOTAL S/."],
     fila: (item, numero) => [
       numero,
-      item.descripcion || "",
+      descripcionConSubItems(item),
       item.personas ?? 0,
       item.horas ?? 0,
       (Number(item.tarifaHora) || 0).toFixed(2),

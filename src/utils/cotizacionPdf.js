@@ -26,6 +26,10 @@ export const HUAQUIAN = {
   razonSocial: "HUAQUIAN S.A.C.",
   ruc: "20601565235",
   direccion: "MZ.A LT1. ASOCIACIÓN VILLA TALAVERA CAMPOY, SAN JUAN DE LURIGANCHO - LIMA.",
+  // Código INEI del domicilio fiscal (San Juan de Lurigancho, Lima, Lima) —
+  // usado como "Punto de partida" fijo en EmitirGuia.jsx, para no consultar
+  // SUNAT por el RUC propio (fijo, siempre el mismo) en cada carga de la página.
+  ubigeo: "150132",
   representante: "JOSE LIDER MATEO MUCHA",
   telefono: "966 -757 - 528.",
   correo: "ventas@huaquian.com",

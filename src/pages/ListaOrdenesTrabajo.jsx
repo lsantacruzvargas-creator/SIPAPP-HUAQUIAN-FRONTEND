@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
+import { formatearFecha } from "../utils/fecha";
 import DetalleDocumento from "../components/DetalleDocumento";
 import ModalNuevaOT from "../components/ModalNuevaOT";
 import ModalImportarExcel, { COLS_OT } from "../components/ModalImportarExcel";
@@ -7,7 +8,7 @@ import TablaScroll from "../components/TablaScroll";
 import { DotChip, badgeOT, dotOT, badgeInformes, dotInformes, badgeGeneral, dotGeneral } from "../components/detalleShared";
 import * as XLSX from "xlsx";
 
-const FILTROS_VACIO = { empresa: "", planta: "", busqueda: "", estadoInformes: "" };
+const FILTROS_VACIO = { empresa: "", planta: "", busqueda: "", estadoInformes: "", fechaDesde: "", fechaHasta: "" };
 
 const SORTS = [
   { valor: "fecha",             label: "Más reciente" },
@@ -48,6 +49,18 @@ const diasDesdeRecibido = (fecha) => {
   return Math.max(0, Math.floor(ms / 86400000));
 };
 
+// Rango de fechas (Fecha de Ingreso) del filtro — "desde"/"hasta" son fechas
+// sin hora (input type=date) ancladas al día calendario de Lima (UTC-5 fijo),
+// mismo criterio que el filtro de Movimientos de Almacén.
+const dentroDeRangoFecha = (fecha, desde, hasta) => {
+  if (!desde && !hasta) return true;
+  if (!fecha) return false;
+  const t = new Date(fecha).getTime();
+  if (desde && t < new Date(`${desde}T00:00:00-05:00`).getTime()) return false;
+  if (hasta && t > new Date(`${hasta}T23:59:59.999-05:00`).getTime()) return false;
+  return true;
+};
+
 function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg }) {
   return (
     <div className="mb-6">
@@ -73,12 +86,13 @@ function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg }) {
                 <th className={`${TH} text-left`}>Técnico de intervención</th>
                 <th className={`${TH} text-center`}>Estado Informes</th>
                 <th className={`${TH} text-center`}>Días desde recibido</th>
+                <th className={`${TH} text-center`}>Fecha de Ingreso</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {ordenes.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="px-4 py-8 text-center text-gray-400">{vacioMsg}</td>
+                  <td colSpan={13} className="px-4 py-8 text-center text-gray-400">{vacioMsg}</td>
                 </tr>
               ) : (
                 ordenes.flatMap((o) => [
@@ -124,6 +138,9 @@ function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg }) {
                     <td className="px-4 py-3.5 text-center text-gray-600 whitespace-nowrap">
                       {diasDesdeRecibido(o.fechaRecibida) ?? <span className="text-gray-300">—</span>}
                     </td>
+                    <td className="px-4 py-3.5 text-center text-gray-600 whitespace-nowrap">
+                      {o.fechaRecibida ? formatearFecha(o.fechaRecibida) : <span className="text-gray-300">—</span>}
+                    </td>
                   </tr>,
                   ...(o.subOTs || []).map((s) => (
                     <tr
@@ -158,6 +175,9 @@ function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg }) {
                       </td>
                       <td className="px-4 py-3 text-center text-gray-600 whitespace-nowrap">
                         {diasDesdeRecibido(s.fechaRecibida ?? o.fechaRecibida) ?? <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-4 py-3 text-center text-gray-600 whitespace-nowrap">
+                        {(s.fechaRecibida ?? o.fechaRecibida) ? formatearFecha(s.fechaRecibida ?? o.fechaRecibida) : <span className="text-gray-300">—</span>}
                       </td>
                     </tr>
                   )),
@@ -275,6 +295,7 @@ export default function ListaOrdenesTrabajo() {
       (!filtros.empresa || o.empresa?._id === filtros.empresa) &&
       (!filtros.planta || o.planta === filtros.planta) &&
       (!filtros.estadoInformes || o.estadoInformes === filtros.estadoInformes) &&
+      dentroDeRangoFecha(o.fechaRecibida, filtros.fechaDesde, filtros.fechaHasta) &&
       (!q ||
         o.titulo?.toLowerCase().includes(q) ||
         o.numeroOT?.toLowerCase().includes(q) ||
@@ -425,6 +446,7 @@ export default function ListaOrdenesTrabajo() {
     "Técnico de intervención":  o.encargado2 || "—",
     "Estado Informes":          o.estadoInformes || "—",
     "Días desde recibido":      diasDesdeRecibido(o.fechaRecibida) ?? "—",
+    "Fecha de Ingreso":         o.fechaRecibida ? formatearFecha(o.fechaRecibida) : "—",
   });
 
   const exportarExcel = () => {
@@ -544,6 +566,14 @@ export default function ListaOrdenesTrabajo() {
             <option key={e} value={e} className="capitalize">{e}</option>
           ))}
         </select>
+
+        <div className="flex items-center gap-1.5">
+          <input type="date" name="fechaDesde" value={filtros.fechaDesde} onChange={handleFiltro}
+            className={SELECT} title="Fecha de ingreso desde" />
+          <span className="text-gray-400 text-xs">a</span>
+          <input type="date" name="fechaHasta" value={filtros.fechaHasta} onChange={handleFiltro}
+            className={SELECT} title="Fecha de ingreso hasta" />
+        </div>
 
         {/* Botón dedicado (a pedido del usuario) — planner/coordinadora/
             asistente comparten esta misma vista de OTs, y las 3 lo usan para
