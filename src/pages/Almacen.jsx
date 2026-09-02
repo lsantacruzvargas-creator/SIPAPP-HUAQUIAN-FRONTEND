@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
-import { formatearFecha } from "../utils/fecha";
+import { formatearFecha, fechaHoyLima } from "../utils/fecha";
 import ModalImportarExcel, { COLS_MATERIALES } from "../components/ModalImportarExcel";
 import BuscadorMaterialInline from "../components/BuscadorMaterialInline";
 import TablaScroll from "../components/TablaScroll";
@@ -868,6 +868,12 @@ function SeccionComponentes() {
 
 // ─── Modal Ingreso ──────────────────────────────────────────────────────────
 
+// Una fila de material del "Ingreso en masa" — mismos 3 campos que el
+// ingreso individual (material/cantidad/precioUnitario), el resto de datos
+// (lote, proveedor, guía, OC, notas) vive una sola vez en `form` y se copia
+// a cada fila recién al guardar (ver guardarMasa).
+const filaIngresoVacia = () => ({ _key: Date.now() + Math.random(), material: "", busqueda: "", cantidad: "", precioUnitario: "" });
+
 function ModalIngreso({ materialInicial, onClose, onGuardado }) {
   const [form, setForm] = useState({
     material: materialInicial?._id || "",
@@ -878,7 +884,9 @@ function ModalIngreso({ materialInicial, onClose, onGuardado }) {
     ordenCompra: "",
     proveedor: "",
     notas: "",
-    fecha: new Date().toISOString().slice(0, 10),
+    // Solo para mostrarla en el input (deshabilitado, siempre "hoy") — no se
+    // manda al guardar, ver guardar() más abajo.
+    fecha: fechaHoyLima(),
   });
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
@@ -888,8 +896,25 @@ function ModalIngreso({ materialInicial, onClose, onGuardado }) {
   // se busca en un array local de ~9000 materiales, viene directo de lo que
   // devolvió la búsqueda server-side (ver BuscadorMaterialInline).
   const [materialSel, setMaterialSel] = useState(materialInicial || null);
+  // Ingreso en masa: N SKUs distintos, cada uno con su propia cantidad y
+  // precio, pero compartiendo lote/proveedor/guía/OC/notas de `form` — cada
+  // fila se guarda como un movimiento de ingreso independiente (mismo
+  // endpoint que el ingreso individual, uno por fila, en secuencia).
+  const [modoMasa, setModoMasa] = useState(false);
+  const [filasMasa, setFilasMasa] = useState([filaIngresoVacia()]);
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  const cambiarFilaMasa = (key, patch) =>
+    setFilasMasa((prev) => prev.map((f) => (f._key === key ? { ...f, ...patch } : f)));
+  const agregarFilaMasa = () => setFilasMasa((prev) => [...prev, filaIngresoVacia()]);
+  const quitarFilaMasa = (key) => setFilasMasa((prev) => prev.filter((f) => f._key !== key));
+  const elegirMaterialFilaMasa = (key, m) =>
+    cambiarFilaMasa(key, { material: m._id, busqueda: `${m.sku} — ${m.nombre}` });
+  const buscarFilaMasa = (key, texto) => {
+    const fila = filasMasa.find((f) => f._key === key);
+    cambiarFilaMasa(key, { busqueda: texto, ...(fila?.material ? { material: "" } : {}) });
+  };
 
   const seleccionarMaterial = (m) => {
     setForm((prev) => ({ ...prev, material: m._id }));
@@ -926,10 +951,18 @@ function ModalIngreso({ materialInicial, onClose, onGuardado }) {
     }
     if (!window.confirm(`¿Confirmas el ingreso de ${form.cantidad} ${materialSel?.unidad || ""} de "${materialSel?.nombre || "este material"}"?`)) return;
     setGuardando(true);
+    // `fecha` NO se manda — el input está deshabilitado (siempre "hoy"), así
+    // que se deja que el backend use su propio `Date.now` (instante real,
+    // sin el bug de mandar un "YYYY-MM-DD" suelto que Mongoose interpreta
+    // como medianoche UTC — eso sí puede caer en el día anterior en hora Lima).
     const r = await fetchAuth("/movimientos-almacen", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, tipo: "ingreso" }),
+      body: JSON.stringify({
+        material: form.material, cantidad: form.cantidad, precioUnitario: form.precioUnitario,
+        lote: form.lote, guiaProveedor: form.guiaProveedor, ordenCompra: form.ordenCompra,
+        proveedor: form.proveedor, notas: form.notas, tipo: "ingreso",
+      }),
     });
     if (r.ok) {
       const movimiento = await r.json();
@@ -941,18 +974,101 @@ function ModalIngreso({ materialInicial, onClose, onGuardado }) {
     setGuardando(false);
   };
 
+  // Un POST /movimientos-almacen por fila, en secuencia (no Promise.all) —
+  // mismo criterio que otros guardados en lote de este proyecto (ver
+  // descargarSeleccionados en DetalleOrdenTrabajo.jsx): evita disparar N
+  // requests de golpe y, sobre todo, evita una condición de carrera real en
+  // el `codigo` auto-generado del movimiento (su pre-save hook busca "el
+  // último código" antes de guardar — en paralelo, dos filas podrían leer el
+  // mismo "último" y terminar con el mismo código).
+  const guardarMasa = async () => {
+    const filasCompletas = filasMasa.filter((f) => f.material && f.cantidad && f.precioUnitario);
+    if (filasCompletas.length === 0) {
+      setError("Agrega al menos un SKU con material, cantidad y precio.");
+      return;
+    }
+    if (filasCompletas.length !== filasMasa.length) {
+      setError("Hay filas sin completar (material, cantidad o precio) — complétalas o quítalas antes de guardar.");
+      return;
+    }
+    if (!window.confirm(`¿Confirmas el ingreso de ${filasCompletas.length} SKU(s)?`)) return;
+    setGuardando(true);
+    setError("");
+    for (const f of filasCompletas) {
+      const r = await fetchAuth("/movimientos-almacen", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          material: f.material, cantidad: f.cantidad, precioUnitario: f.precioUnitario,
+          lote: form.lote, guiaProveedor: form.guiaProveedor, ordenCompra: form.ordenCompra,
+          proveedor: form.proveedor, notas: form.notas, tipo: "ingreso",
+        }),
+      });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        setError(`"${f.busqueda}": ${d.mensaje || "Error al guardar"}`);
+        setGuardando(false);
+        return;
+      }
+    }
+    setGuardando(false);
+    onGuardado();
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+      <div className={`bg-white rounded-2xl shadow-2xl w-full flex flex-col max-h-[85vh] ${modoMasa ? "max-w-2xl" : "max-w-lg"}`}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
           <h3 className="font-semibold text-gray-800">Nuevo ingreso</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl leading-none">✕</button>
+          <div className="flex items-center gap-3">
+            <button type="button" onClick={() => setModoMasa((m) => !m)}
+              className="text-xs text-blue-600 hover:text-blue-800 underline">
+              {modoMasa ? "Ingreso individual" : "Ingreso en masa"}
+            </button>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl leading-none">✕</button>
+          </div>
         </div>
 
-        <div className="p-6 space-y-4">
+        <div className="p-6 space-y-4 overflow-y-auto flex-1">
           {error && <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {modoMasa ? (
+            <div className="space-y-2">
+              <label className="text-xs text-gray-500 block mb-1">SKUs a ingresar *</label>
+              <div className="space-y-2">
+                {filasMasa.map((f, i) => (
+                  <div key={f._key} className="flex gap-2 items-start">
+                    <div className="flex-1 min-w-0">
+                      <BuscadorMaterialInline
+                        value={f.busqueda}
+                        onChange={(texto) => buscarFilaMasa(f._key, texto)}
+                        onSelect={(m) => elegirMaterialFilaMasa(f._key, m)}
+                        placeholder={`SKU ${i + 1}…`}
+                      />
+                    </div>
+                    <input type="number" value={f.cantidad}
+                      onChange={(e) => cambiarFilaMasa(f._key, { cantidad: e.target.value })}
+                      min={0.01} step="any" placeholder="Cant." className={`w-24 shrink-0 ${INP}`} />
+                    <input type="number" value={f.precioUnitario}
+                      onChange={(e) => cambiarFilaMasa(f._key, { precioUnitario: e.target.value })}
+                      min={0} step="0.01" placeholder="P. unit." className={`w-24 shrink-0 ${INP}`} />
+                    <button type="button" onClick={() => quitarFilaMasa(f._key)}
+                      disabled={filasMasa.length === 1}
+                      className="shrink-0 text-gray-300 hover:text-red-500 disabled:opacity-30 disabled:hover:text-gray-300 transition mt-2.5">
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button type="button" onClick={agregarFilaMasa}
+                className="text-xs text-blue-600 hover:text-blue-800 underline">
+                + Agregar SKU
+              </button>
+              <p className="text-xs text-gray-400">
+                Lote, proveedor, guía, orden de compra y notas de abajo se copian a cada SKU como un ingreso independiente.
+              </p>
+            </div>
+          ) : (
             <div className="md:col-span-2">
               <label className="text-xs text-gray-500 block mb-1">Material *</label>
               <BuscadorMaterialInline
@@ -961,16 +1077,23 @@ function ModalIngreso({ materialInicial, onClose, onGuardado }) {
                 onSelect={seleccionarMaterial}
               />
             </div>
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">Cantidad *</label>
-              <input type="number" name="cantidad" value={form.cantidad} onChange={handleChange}
-                min={0.01} step="any" className={`w-full ${INP}`} placeholder="0" />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">Precio unitario (S/) *</label>
-              <input type="number" name="precioUnitario" value={form.precioUnitario} onChange={handleChange}
-                min={0} step="0.01" className={`w-full ${INP}`} placeholder="0.00" />
-            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {!modoMasa && (
+              <>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Cantidad *</label>
+                  <input type="number" name="cantidad" value={form.cantidad} onChange={handleChange}
+                    min={0.01} step="any" className={`w-full ${INP}`} placeholder="0" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Precio unitario (S/) *</label>
+                  <input type="number" name="precioUnitario" value={form.precioUnitario} onChange={handleChange}
+                    min={0} step="0.01" className={`w-full ${INP}`} placeholder="0.00" />
+                </div>
+              </>
+            )}
             <div>
               <label className="text-xs text-gray-500 block mb-1">Lote / Identificador</label>
               <input name="lote" value={form.lote} onChange={handleChange}
@@ -978,7 +1101,8 @@ function ModalIngreso({ materialInicial, onClose, onGuardado }) {
             </div>
             <div>
               <label className="text-xs text-gray-500 block mb-1">Fecha</label>
-              <input type="date" name="fecha" value={form.fecha} onChange={handleChange} className={`w-full ${INP}`} />
+              <input type="date" name="fecha" value={form.fecha} disabled
+                className={`w-full ${INP} bg-gray-50 text-gray-500 cursor-not-allowed`} />
             </div>
             <div>
               <label className="text-xs text-gray-500 block mb-1">Proveedor</label>
@@ -1011,14 +1135,14 @@ function ModalIngreso({ materialInicial, onClose, onGuardado }) {
           )}
         </div>
 
-        <div className="flex gap-2 justify-end px-6 py-4 border-t border-gray-100">
+        <div className="flex gap-2 justify-end px-6 py-4 border-t border-gray-100 shrink-0">
           <button onClick={onClose}
             className="text-sm border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 transition">
             Cancelar
           </button>
-          <button onClick={guardar} disabled={guardando}
+          <button onClick={modoMasa ? guardarMasa : guardar} disabled={guardando}
             className="text-sm bg-emerald-600 text-white px-5 py-2 rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition font-medium">
-            {guardando ? "Guardando…" : "Registrar ingreso"}
+            {guardando ? "Guardando…" : modoMasa ? `Registrar ${filasMasa.length} ingreso${filasMasa.length !== 1 ? "s" : ""}` : "Registrar ingreso"}
           </button>
         </div>
       </div>
@@ -1034,7 +1158,9 @@ function ModalEgreso({ onClose, onGuardado }) {
     cantidad: "",
     loteOrigen: "",
     notas: "",
-    fecha: new Date().toISOString().slice(0, 10),
+    // Solo para mostrarla en el input (deshabilitado, siempre "hoy") — no se
+    // manda al guardar, ver guardar() más abajo.
+    fecha: fechaHoyLima(),
   });
   const [lotes, setLotes] = useState([]);
   const [precioAuto, setPrecioAuto] = useState(0);
@@ -1080,10 +1206,17 @@ function ModalEgreso({ onClose, onGuardado }) {
     }
     if (!window.confirm(`¿Confirmas el egreso de ${form.cantidad} ${materialSel?.unidad || ""} de "${materialSel?.nombre || "este material"}"?`)) return;
     setGuardando(true);
+    // `fecha` NO se manda — el input está deshabilitado (siempre "hoy"), así
+    // que se deja que el backend use su propio `Date.now` (instante real,
+    // sin el bug de mandar un "YYYY-MM-DD" suelto que Mongoose interpreta
+    // como medianoche UTC — eso sí puede caer en el día anterior en hora Lima).
     const r = await fetchAuth("/movimientos-almacen", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, tipo: "egreso", precioUnitario: precioAuto }),
+      body: JSON.stringify({
+        material: form.material, cantidad: form.cantidad, loteOrigen: form.loteOrigen, notas: form.notas,
+        tipo: "egreso", precioUnitario: precioAuto,
+      }),
     });
     if (r.ok) {
       onGuardado(await r.json());
@@ -1156,7 +1289,8 @@ function ModalEgreso({ onClose, onGuardado }) {
             </div>
             <div>
               <label className="text-xs text-gray-500 block mb-1">Fecha</label>
-              <input type="date" name="fecha" value={form.fecha} onChange={handleChange} className={`w-full ${INP}`} />
+              <input type="date" name="fecha" value={form.fecha} disabled
+                className={`w-full ${INP} bg-gray-50 text-gray-500 cursor-not-allowed`} />
             </div>
             <div className="md:col-span-2">
               <label className="text-xs text-gray-500 block mb-1">Notas</label>
