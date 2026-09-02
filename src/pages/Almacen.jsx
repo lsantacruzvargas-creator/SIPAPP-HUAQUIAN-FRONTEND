@@ -9,6 +9,34 @@ import * as XLSX from "xlsx";
 const INP =
   "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white";
 
+// Confirmación propia (NO window.confirm) — en la app de Electron, el
+// diálogo nativo de window.confirm() puede dejar la ventana sin foco de
+// teclado/mouse al cerrarse (bug conocido de Electron con BrowserWindow: la
+// devolución de foco a los webContents tras un diálogo nativo no siempre
+// ocurre), congelando el formulario hasta que algún otro evento del SO le
+// devuelve el foco — reportado en Ingreso/Egreso de Almacén, solo dentro de
+// la app de escritorio, nunca en el navegador normal. Este panel vive dentro
+// de la misma página, sin esa capa nativa.
+function ConfirmacionAccion({ mensaje, onCancelar, onConfirmar, procesando, textoConfirmar = "Confirmar" }) {
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm">
+        <p className="text-sm text-gray-700 mb-6">{mensaje}</p>
+        <div className="flex justify-end gap-3">
+          <button onClick={onCancelar} disabled={procesando}
+            className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition disabled:opacity-50">
+            Cancelar
+          </button>
+          <button onClick={onConfirmar} disabled={procesando}
+            className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-700 transition disabled:opacity-50">
+            {procesando ? "Guardando…" : textoConfirmar}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const UNIDADES = ["und", "kg", "g", "L", "mL", "m", "cm", "m²", "caja", "rollo", "par", "juego", "bolsa"];
 
 function useDebounce(value, delay = 350) {
@@ -902,6 +930,7 @@ function ModalIngreso({ materialInicial, onClose, onGuardado }) {
   // endpoint que el ingreso individual, uno por fila, en secuencia).
   const [modoMasa, setModoMasa] = useState(false);
   const [filasMasa, setFilasMasa] = useState([filaIngresoVacia()]);
+  const [confirmando, setConfirmando] = useState(false);
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -944,12 +973,17 @@ function ModalIngreso({ materialInicial, onClose, onGuardado }) {
     });
   }, [form.material]);
 
-  const guardar = async () => {
+  const intentarGuardar = () => {
     if (!form.material || !form.cantidad || !form.precioUnitario) {
       setError("Material, cantidad y precio son obligatorios.");
       return;
     }
-    if (!window.confirm(`¿Confirmas el ingreso de ${form.cantidad} ${materialSel?.unidad || ""} de "${materialSel?.nombre || "este material"}"?`)) return;
+    setError("");
+    setConfirmando(true);
+  };
+
+  const guardar = async () => {
+    setConfirmando(false);
     setGuardando(true);
     // `fecha` NO se manda — el input está deshabilitado (siempre "hoy"), así
     // que se deja que el backend use su propio `Date.now` (instante real,
@@ -981,19 +1015,26 @@ function ModalIngreso({ materialInicial, onClose, onGuardado }) {
   // el `codigo` auto-generado del movimiento (su pre-save hook busca "el
   // último código" antes de guardar — en paralelo, dos filas podrían leer el
   // mismo "último" y terminar con el mismo código).
-  const guardarMasa = async () => {
-    const filasCompletas = filasMasa.filter((f) => f.material && f.cantidad && f.precioUnitario);
-    if (filasCompletas.length === 0) {
+  const filasCompletasMasa = filasMasa.filter((f) => f.material && f.cantidad && f.precioUnitario);
+
+  const intentarGuardarMasa = () => {
+    if (filasCompletasMasa.length === 0) {
       setError("Agrega al menos un SKU con material, cantidad y precio.");
       return;
     }
-    if (filasCompletas.length !== filasMasa.length) {
+    if (filasCompletasMasa.length !== filasMasa.length) {
       setError("Hay filas sin completar (material, cantidad o precio) — complétalas o quítalas antes de guardar.");
       return;
     }
-    if (!window.confirm(`¿Confirmas el ingreso de ${filasCompletas.length} SKU(s)?`)) return;
+    setError("");
+    setConfirmando(true);
+  };
+
+  const guardarMasa = async () => {
+    setConfirmando(false);
     setGuardando(true);
     setError("");
+    const filasCompletas = filasCompletasMasa;
     for (const f of filasCompletas) {
       const r = await fetchAuth("/movimientos-almacen", {
         method: "POST",
@@ -1140,12 +1181,24 @@ function ModalIngreso({ materialInicial, onClose, onGuardado }) {
             className="text-sm border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 transition">
             Cancelar
           </button>
-          <button onClick={modoMasa ? guardarMasa : guardar} disabled={guardando}
+          <button onClick={modoMasa ? intentarGuardarMasa : intentarGuardar} disabled={guardando}
             className="text-sm bg-emerald-600 text-white px-5 py-2 rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition font-medium">
             {guardando ? "Guardando…" : modoMasa ? `Registrar ${filasMasa.length} ingreso${filasMasa.length !== 1 ? "s" : ""}` : "Registrar ingreso"}
           </button>
         </div>
       </div>
+
+      {confirmando && (
+        <ConfirmacionAccion
+          mensaje={modoMasa
+            ? `¿Confirmas el ingreso de ${filasCompletasMasa.length} SKU(s)?`
+            : `¿Confirmas el ingreso de ${form.cantidad} ${materialSel?.unidad || ""} de "${materialSel?.nombre || "este material"}"?`}
+          onCancelar={() => setConfirmando(false)}
+          onConfirmar={modoMasa ? guardarMasa : guardar}
+          procesando={guardando}
+          textoConfirmar="Confirmar ingreso"
+        />
+      )}
     </div>
   );
 }
@@ -1170,6 +1223,7 @@ function ModalEgreso({ onClose, onGuardado }) {
   // Igual que en ModalIngreso: ya no se busca en un array local de ~9000
   // materiales, la búsqueda es server-side (ver BuscadorMaterialInline).
   const [materialSel, setMaterialSel] = useState(null);
+  const [confirmando, setConfirmando] = useState(false);
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -1199,12 +1253,17 @@ function ModalEgreso({ onClose, onGuardado }) {
     setPrecioAuto(lote.precioUnitario);
   };
 
-  const guardar = async () => {
+  const intentarGuardar = () => {
     if (!form.material || !form.cantidad) {
       setError("Material y cantidad son obligatorios.");
       return;
     }
-    if (!window.confirm(`¿Confirmas el egreso de ${form.cantidad} ${materialSel?.unidad || ""} de "${materialSel?.nombre || "este material"}"?`)) return;
+    setError("");
+    setConfirmando(true);
+  };
+
+  const guardar = async () => {
+    setConfirmando(false);
     setGuardando(true);
     // `fecha` NO se manda — el input está deshabilitado (siempre "hoy"), así
     // que se deja que el backend use su propio `Date.now` (instante real,
@@ -1305,12 +1364,22 @@ function ModalEgreso({ onClose, onGuardado }) {
             className="text-sm border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 transition">
             Cancelar
           </button>
-          <button onClick={guardar} disabled={guardando}
+          <button onClick={intentarGuardar} disabled={guardando}
             className="text-sm bg-rose-600 text-white px-5 py-2 rounded-lg hover:bg-rose-700 disabled:opacity-50 transition font-medium">
             {guardando ? "Guardando…" : "Registrar egreso"}
           </button>
         </div>
       </div>
+
+      {confirmando && (
+        <ConfirmacionAccion
+          mensaje={`¿Confirmas el egreso de ${form.cantidad} ${materialSel?.unidad || ""} de "${materialSel?.nombre || "este material"}"?`}
+          onCancelar={() => setConfirmando(false)}
+          onConfirmar={guardar}
+          procesando={guardando}
+          textoConfirmar="Confirmar egreso"
+        />
+      )}
     </div>
   );
 }
