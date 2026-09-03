@@ -159,8 +159,6 @@ const EVIDENCIA_PRUEBA_EQUIPO = (variante, prefijo) => ({
 // el texto que ve el técnico en el formulario.
 const SLOTS_FIJOS_LETRAS = ["A", "B", "C", "D"].map((letra) => ({ clave: letra, label: `Foto ${letra}` }));
 
-const PIEZAS_A_REEMPLAZAR = BULLETS_ESTANDAR("piezasAReemplazar", "Piezas a reemplazar", "🔩");
-
 // Variante de "Piezas a reemplazar" en filas de 2 columnas (Cantidad /
 // Descripción) en vez de una sola línea de texto libre — usa el tipo
 // "filas" del renderer genérico (lista dinámica de objetos, "+ agregar
@@ -184,7 +182,12 @@ export const TIPOS_INFORME = [
           { clave: "potenciaComponente", label: "Potencia" }, { clave: "cantidadComponente", label: "Cantidad" },
         ],
       },
-      EVIDENCIAS_ESTANDAR,
+      // Miniatura grande y 1 sola foto por cuadro (pedido explícito del
+      // usuario) — ver SeccionEvidencias en FormInformeTecnico.jsx. Esto es
+      // solo el tamaño de la vista previa en el formulario: la exportación a
+      // Excel de este tipo sigue pegando la foto a su tamaño real, sin
+      // estirar (ver "esSuministro" en informeTecnicoExcel.js), sin cambios.
+      { ...EVIDENCIAS_ESTANDAR, miniaturaGrande: true, maxImagenes: 1 },
       checklistOkNok("Checklist de verificación técnica", [
         "Estado visual del componente",
         "Verificación visual de tarjetas y conectores",
@@ -230,18 +233,26 @@ export const TIPOS_INFORME = [
       { tipo: "campos", titulo: "Datos del equipo", campos: [...CAMPOS_EQUIPO_ESTANDAR, ...CAMPOS_OPERARIO] },
       // 8 recuadros fijos impresos en la plantilla — ver SLOTS_FOTOS.diagnostico_equipo
       // en informeTecnicoExcel.js, que ubica cada foto por la clave del slot,
-      // no por orden de subida.
+      // no por orden de subida. Los rótulos impresos sobre cada recuadro son
+      // editables desde el propio card de cada foto (`campoTitulo`, ver
+      // SeccionEvidencias en FormInformeTecnico.jsx) — "Estado interno del
+      // equipo" está repetido a propósito (2 recuadros independientes con el
+      // mismo rótulo impreso en la plantilla, no comparten celda).
       {
         ...EVIDENCIAS_ESTANDAR, titulo: "Fotos del diagnóstico",
+        // 3 columnas, miniatura grande y 1 sola foto por cuadro (pedido
+        // explícito del usuario) — ver SeccionEvidencias en
+        // FormInformeTecnico.jsx.
+        columnas: 3, miniaturaGrande: true, maxImagenes: 1,
         slotsFijos: [
-          { clave: "vistaFrontal", label: "Vista frontal del equipo" },
-          { clave: "placa", label: "Placa" },
-          { clave: "estadoInterno1", label: "Estado interno del equipo (1)" },
-          { clave: "estadoInterno2", label: "Estado interno del equipo (2)" },
-          { clave: "estadoCarcasa", label: "Estado de la carcasa del equipo" },
-          { clave: "estadoTarjeta", label: "Estado de la tarjeta electrónica" },
-          { clave: "componentesMalEstado", label: "Componentes en mal estado" },
-          { clave: "estadoVentiladores", label: "Estado de los ventiladores" },
+          { clave: "vistaFrontal", label: "Vista frontal del equipo", campoTitulo: "tituloVistaFrontal" },
+          { clave: "placa", label: "Placa", campoTitulo: "tituloPlaca" },
+          { clave: "estadoInterno1", label: "Estado interno del equipo (1)", campoTitulo: "tituloEstadoInterno1" },
+          { clave: "estadoInterno2", label: "Estado interno del equipo (2)", campoTitulo: "tituloEstadoInterno2" },
+          { clave: "estadoCarcasa", label: "Estado de la carcasa del equipo", campoTitulo: "tituloEstadoCarcasa" },
+          { clave: "estadoTarjeta", label: "Estado de la tarjeta electrónica", campoTitulo: "tituloEstadoTarjeta" },
+          { clave: "componentesMalEstado", label: "Componentes en mal estado", campoTitulo: "tituloComponentesMalEstado" },
+          { clave: "estadoVentiladores", label: "Estado de los ventiladores", campoTitulo: "tituloEstadoVentiladores" },
         ],
       },
       {
@@ -253,7 +264,11 @@ export const TIPOS_INFORME = [
         ],
       },
       BULLETS_ESTANDAR("observacionesIgbt", "Observaciones de la medición"),
-      PIEZAS_A_REEMPLAZAR,
+      // La plantilla real ahora trae una tabla propia Cantidad/Descripción
+      // (al lado de "Medición de diodos de IGBT") — antes era texto libre
+      // sin celda propia. Mismo tipo "filas" que arrancador/plc, habilita el
+      // botón "Traer de requerimientos".
+      PIEZAS_A_REEMPLAZAR_TABLA,
       checklistOkNok("Checklist de verificación técnica", [
         "Estado general del gabinete y carcasa",
         "Estado visual de tarjetas y conectores",
@@ -354,13 +369,19 @@ export const TIPOS_INFORME = [
       },
       // 3 recuadros fijos impresos en la plantilla — ver
       // SLOTS_FOTOS.tarjetas en informeTecnicoExcel.js, que ubica cada foto
-      // por la clave del slot, no por orden de subida.
+      // por la clave del slot, no por orden de subida. Los rótulos impresos
+      // sobre cada recuadro son editables desde el propio card de cada foto
+      // (`campoTitulo`, ver SeccionEvidencias en FormInformeTecnico.jsx).
       {
         ...EVIDENCIAS_ESTANDAR, titulo: "Imágenes",
+        // 3 columnas, miniatura grande y 1 sola foto por cuadro (pedido
+        // explícito del usuario) — ver SeccionEvidencias en
+        // FormInformeTecnico.jsx.
+        columnas: 3, miniaturaGrande: true, maxImagenes: 1,
         slotsFijos: [
-          { clave: "imagenA", label: "VISTA INICIAL DE TARJETA" },
-          { clave: "imagenB", label: "CAMBIO DE COMPONENTES" },
-          { clave: "imagenC", label: "ESTADO FINAL DE TARJETA" },
+          { clave: "imagenA", label: "VISTA INICIAL DE TARJETA", campoTitulo: "tituloImagenA" },
+          { clave: "imagenB", label: "CAMBIO DE COMPONENTES", campoTitulo: "tituloImagenB" },
+          { clave: "imagenC", label: "ESTADO FINAL DE TARJETA", campoTitulo: "tituloImagenC" },
         ],
       },
       PIEZAS_A_REEMPLAZAR_TABLA,
@@ -402,8 +423,8 @@ export const TIPOS_INFORME = [
           { clave: "placaEquipo", label: "Placa Equipo", campoTitulo: "tituloPlacaEquipo" },
           { clave: "carcasaContaminada", label: "Carcasa contaminada", campoTitulo: "tituloCarcasaContaminada" },
           { clave: "carcasaDescontaminada", label: "Carcasa descontaminada", campoTitulo: "tituloCarcasaDescontaminada" },
-          { clave: "limpiezaTarjetaInicial", label: "Limpieza de tarjeta inicial", campoTitulo: "tituloLimpiezaTarjeta" },
-          { clave: "limpiezaTarjetaFinal", label: "Limpieza de tarjeta final", campoTitulo: "tituloLimpiezaTarjeta" },
+          { clave: "limpiezaTarjetaInicial", label: "Limpieza de tarjeta inicial", campoTitulo: "tituloLimpiezaTarjetaInicial" },
+          { clave: "limpiezaTarjetaFinal", label: "Limpieza de tarjeta final", campoTitulo: "tituloLimpiezaTarjetaFinal" },
           { clave: "cambioVentilador", label: "Cambio de ventilador", campoTitulo: "tituloCambioVentilador" },
         ],
       },
@@ -448,14 +469,14 @@ export const TIPOS_INFORME = [
         slotsFijos: [
           { clave: "vistaFrontal", label: "Vista frontal del equipo", campoTitulo: "tituloVistaFrontal" },
           { clave: "placaEquipo", label: "Placa Equipo", campoTitulo: "tituloPlacaEquipo" },
-          { clave: "carcasaContaminada", label: "Carcasa contaminada", campoTitulo: "tituloCarcasaContaminadaDescontaminada" },
-          { clave: "carcasaDescontaminada", label: "Carcasa descontaminada", campoTitulo: "tituloCarcasaContaminadaDescontaminada" },
-          { clave: "limpiezaTarjetaInicial", label: "Limpieza de tarjeta inicial", campoTitulo: "tituloLimpiezaTarjeta" },
-          { clave: "limpiezaTarjetaFinal", label: "Limpieza de tarjeta Final", campoTitulo: "tituloLimpiezaTarjeta" },
-          { clave: "cambioLcdInicial", label: "Cambio de LCD", campoTitulo: "tituloCambioLcd" },
-          { clave: "cambioLcdFinal", label: "Cambio de LCD", campoTitulo: "tituloCambioLcd" },
-          { clave: "cambioTouchInicial", label: "Cambio de Touch", campoTitulo: "tituloCambioTouch" },
-          { clave: "cambioTouchFinal", label: "Cambio de Touch", campoTitulo: "tituloCambioTouch" },
+          { clave: "carcasaContaminada", label: "Carcasa contaminada", campoTitulo: "tituloCarcasaContaminada" },
+          { clave: "carcasaDescontaminada", label: "Carcasa descontaminada", campoTitulo: "tituloCarcasaDescontaminada" },
+          { clave: "limpiezaTarjetaInicial", label: "Limpieza de tarjeta inicial", campoTitulo: "tituloLimpiezaTarjetaInicial" },
+          { clave: "limpiezaTarjetaFinal", label: "Limpieza de tarjeta Final", campoTitulo: "tituloLimpiezaTarjetaFinal" },
+          { clave: "cambioLcdInicial", label: "Cambio de LCD", campoTitulo: "tituloCambioLcdInicial" },
+          { clave: "cambioLcdFinal", label: "Cambio de LCD", campoTitulo: "tituloCambioLcdFinal" },
+          { clave: "cambioTouchInicial", label: "Cambio de Touch", campoTitulo: "tituloCambioTouchInicial" },
+          { clave: "cambioTouchFinal", label: "Cambio de Touch", campoTitulo: "tituloCambioTouchFinal" },
         ],
       },
       PIEZAS_A_REEMPLAZAR_TABLA,
@@ -548,8 +569,8 @@ export const TIPOS_INFORME = [
           { clave: "placaEquipo", label: "Placa Equipo", campoTitulo: "tituloPlacaEquipo" },
           { clave: "carcasaContaminada", label: "Carcasa contaminada", campoTitulo: "tituloCarcasaContaminada" },
           { clave: "carcasaDescontaminada", label: "Carcasa descontaminada", campoTitulo: "tituloCarcasaDescontaminada" },
-          { clave: "limpiezaTarjetaInicial", label: "Limpieza de tarjeta inicial", campoTitulo: "tituloLimpiezaTarjeta" },
-          { clave: "limpiezaTarjetaFinal", label: "Limpieza de tarjeta Final", campoTitulo: "tituloLimpiezaTarjeta" },
+          { clave: "limpiezaTarjetaInicial", label: "Limpieza de tarjeta inicial", campoTitulo: "tituloLimpiezaTarjetaInicial" },
+          { clave: "limpiezaTarjetaFinal", label: "Limpieza de tarjeta Final", campoTitulo: "tituloLimpiezaTarjetaFinal" },
           { clave: "cambioComponentes", label: "Cambio de componentes", campoTitulo: "tituloCambioComponentes" },
         ],
       },
@@ -593,9 +614,11 @@ export const TIPOS_INFORME = [
       // propio card de cada foto (`campoTitulo`, ver SeccionEvidencias en
       // FormInformeTecnico.jsx) — si el técnico no los toca, escribir() en
       // informeTecnicoExcel.js no sobrescribe la celda y queda el texto
-      // impreso. "Cambio de componentes"/"Medición de SCR"/"Tarjeta.../
-      // Pasta térmica..." comparten 1 solo rótulo entre sus 2 recuadros
-      // (antes/después) — no hay 2 celdas separadas en la plantilla.
+      // impreso. Cada recuadro tiene su PROPIO campo de título (nunca
+      // comparten input) aunque "Cambio de componentes"/"Medición de SCR"/
+      // "Tarjeta.../Pasta térmica..." compartan 1 sola celda impresa entre
+      // sus 2 recuadros — si ambos se llenan, se combinan con " / " al
+      // exportar (ver el agrupamiento por celda en informeTecnicoExcel.js).
       {
         ...EVIDENCIAS_ESTANDAR, titulo: "Fotos del mantenimiento",
         // 3 columnas, miniatura grande y 1 sola foto por cuadro (pedido
@@ -607,15 +630,15 @@ export const TIPOS_INFORME = [
           { clave: "placaEquipo", label: "Placa Equipo", campoTitulo: "tituloPlacaEquipo" },
           { clave: "carcasaContaminada", label: "Carcasa contaminada", campoTitulo: "tituloCarcasaContaminada" },
           { clave: "carcasaDescontaminada", label: "Carcasa descontaminada", campoTitulo: "tituloCarcasaDescontaminada" },
-          { clave: "limpiezaContaminada", label: "Limpieza Contaminada", campoTitulo: "tituloTarjeta" },
-          { clave: "limpiezaDescontaminada", label: "Limpieza Descontaminada", campoTitulo: "tituloTarjeta" },
-          { clave: "pastaTermicaSeca", label: "Pasta térmica seca", campoTitulo: "tituloPastaTermica" },
-          { clave: "pastaTermicaNueva", label: "Pasta térmica nueva", campoTitulo: "tituloPastaTermica" },
+          { clave: "limpiezaContaminada", label: "Limpieza Contaminada", campoTitulo: "tituloLimpiezaContaminada" },
+          { clave: "limpiezaDescontaminada", label: "Limpieza Descontaminada", campoTitulo: "tituloLimpiezaDescontaminada" },
+          { clave: "pastaTermicaSeca", label: "Pasta térmica seca", campoTitulo: "tituloPastaTermicaSeca" },
+          { clave: "pastaTermicaNueva", label: "Pasta térmica nueva", campoTitulo: "tituloPastaTermicaNueva" },
           { clave: "cambioVentilador", label: "Cambio ventilador", campoTitulo: "tituloCambioVentilador" },
-          { clave: "cambioComponentesInicial", label: "Cambio de componentes", campoTitulo: "tituloCambioComponentes" },
-          { clave: "cambioComponentesFinal", label: "Cambio de componentes", campoTitulo: "tituloCambioComponentes" },
-          { clave: "medicionScrInicial", label: "Medición de SCR", campoTitulo: "tituloMedicionScr" },
-          { clave: "medicionScrFinal", label: "Medición de SCR", campoTitulo: "tituloMedicionScr" },
+          { clave: "cambioComponentesInicial", label: "Cambio de componentes", campoTitulo: "tituloCambioComponentesInicial" },
+          { clave: "cambioComponentesFinal", label: "Cambio de componentes", campoTitulo: "tituloCambioComponentesFinal" },
+          { clave: "medicionScrInicial", label: "Medición de SCR", campoTitulo: "tituloMedicionScrInicial" },
+          { clave: "medicionScrFinal", label: "Medición de SCR", campoTitulo: "tituloMedicionScrFinal" },
         ],
       },
       {
@@ -652,10 +675,15 @@ export const TIPOS_INFORME = [
     secciones: [
       { tipo: "campos", titulo: "Datos generales", campos: CAMPOS_HEADER_SERVICIO },
       { tipo: "campos", titulo: "Datos del equipo", campos: [...CAMPOS_EQUIPO_ESTANDAR, ...CAMPOS_OPERARIO] },
-      PROTOCOLO_PRUEBA(PROTOCOLO_ITEMS_ESTANDAR, "inicial", "protoInicial"),
-      EVIDENCIA_PRUEBA_EQUIPO("inicial", "protoInicial"),
-      PROTOCOLO_PRUEBA(PROTOCOLO_ITEMS_ESTANDAR, "final", "protoFinal"),
-      EVIDENCIA_PRUEBA_EQUIPO("final", "protoFinal"),
+      // `parPosicion` — solo para este tipo (pedido explícito del usuario,
+      // mismo patrón que arrancador/ups/servomotor): rompe el apilado
+      // lineal por defecto y pone la card de foto a la derecha de su card
+      // de protocolo correspondiente (ver el agrupamiento por parPosicion
+      // en FormInformeTecnico.jsx).
+      { ...PROTOCOLO_PRUEBA(PROTOCOLO_ITEMS_ESTANDAR, "inicial", "protoInicial"), parPosicion: "izquierda" },
+      { ...EVIDENCIA_PRUEBA_EQUIPO("inicial", "protoInicial"), parPosicion: "derecha", miniaturaGrande: true, maxImagenes: 1 },
+      { ...PROTOCOLO_PRUEBA(PROTOCOLO_ITEMS_ESTANDAR, "final", "protoFinal"), parPosicion: "izquierda" },
+      { ...EVIDENCIA_PRUEBA_EQUIPO("final", "protoFinal"), parPosicion: "derecha", miniaturaGrande: true, maxImagenes: 1 },
       // 13 recuadros fijos impresos en la plantilla — ver
       // SLOTS_FOTOS.variador_reparacion en informeTecnicoExcel.js, que
       // ubica cada foto por la clave del slot, no por orden de subida.
@@ -663,23 +691,29 @@ export const TIPOS_INFORME = [
       // propósito (antes/después de la intervención). El rótulo impreso de
       // este último dice "MEDICION DE IGBT" (no "SCR" — ese componente es
       // de arrancador, no de variador), corregido acá aunque el usuario
-      // pidió "Medición de SCR" copiando el texto del informe anterior.
+      // pidió "Medición de SCR" copiando el texto del informe anterior. Los
+      // rótulos impresos son editables desde el propio card de cada foto
+      // (`campoTitulo`, ver SeccionEvidencias en FormInformeTecnico.jsx).
       {
         ...EVIDENCIAS_ESTANDAR, titulo: "Fotos del mantenimiento",
+        // 3 columnas, miniatura grande y 1 sola foto por cuadro (pedido
+        // explícito del usuario) — ver SeccionEvidencias en
+        // FormInformeTecnico.jsx.
+        columnas: 3, miniaturaGrande: true, maxImagenes: 1,
         slotsFijos: [
-          { clave: "vistaFrontal", label: "Vista frontal del equipo" },
-          { clave: "placaEquipo", label: "Placa Equipo" },
-          { clave: "carcasaContaminada", label: "Carcasa contaminada" },
-          { clave: "carcasaDescontaminada", label: "Carcasa descontaminada" },
-          { clave: "tarjetaContaminada", label: "Tarjeta Contaminada" },
-          { clave: "tarjetaDescontaminada", label: "Tarjeta Descontaminada" },
-          { clave: "pastaTermicaSeca", label: "Pasta térmica seca" },
-          { clave: "pastaTermicaNueva", label: "Pasta térmica nueva" },
-          { clave: "cambioVentilador", label: "Cambio ventilador" },
-          { clave: "cambioComponentesInicial", label: "Cambio de componentes" },
-          { clave: "cambioComponentesFinal", label: "Cambio de componentes" },
-          { clave: "medicionIgbtFotoInicial", label: "Medición de IGBT" },
-          { clave: "medicionIgbtFotoFinal", label: "Medición de IGBT" },
+          { clave: "vistaFrontal", label: "Vista frontal del equipo", campoTitulo: "tituloVistaFrontal" },
+          { clave: "placaEquipo", label: "Placa Equipo", campoTitulo: "tituloPlacaEquipo" },
+          { clave: "carcasaContaminada", label: "Carcasa contaminada", campoTitulo: "tituloCarcasaContaminada" },
+          { clave: "carcasaDescontaminada", label: "Carcasa descontaminada", campoTitulo: "tituloCarcasaDescontaminada" },
+          { clave: "tarjetaContaminada", label: "Tarjeta Contaminada", campoTitulo: "tituloTarjetaContaminada" },
+          { clave: "tarjetaDescontaminada", label: "Tarjeta Descontaminada", campoTitulo: "tituloTarjetaDescontaminada" },
+          { clave: "pastaTermicaSeca", label: "Pasta térmica seca", campoTitulo: "tituloPastaTermicaSeca" },
+          { clave: "pastaTermicaNueva", label: "Pasta térmica nueva", campoTitulo: "tituloPastaTermicaNueva" },
+          { clave: "cambioVentilador", label: "Cambio ventilador", campoTitulo: "tituloCambioVentilador" },
+          { clave: "cambioComponentesInicial", label: "Cambio de componentes", campoTitulo: "tituloCambioComponentesInicial" },
+          { clave: "cambioComponentesFinal", label: "Cambio de componentes", campoTitulo: "tituloCambioComponentesFinal" },
+          { clave: "medicionIgbtFotoInicial", label: "Medición de IGBT", campoTitulo: "tituloMedicionIgbtInicial" },
+          { clave: "medicionIgbtFotoFinal", label: "Medición de IGBT", campoTitulo: "tituloMedicionIgbtFinal" },
         ],
       },
       {
@@ -745,15 +779,15 @@ export const TIPOS_INFORME = [
           { clave: "placaEquipo", label: "Placa Equipo", campoTitulo: "tituloPlacaEquipo" },
           { clave: "carcasaContaminada", label: "Carcasa contaminada", campoTitulo: "tituloCarcasaContaminada" },
           { clave: "carcasaDescontaminada", label: "Carcasa descontaminada", campoTitulo: "tituloCarcasaDescontaminada" },
-          { clave: "tarjetaContaminada", label: "Tarjeta contaminada", campoTitulo: "tituloTarjeta" },
-          { clave: "tarjetaDescontaminada", label: "Tarjeta descontaminada", campoTitulo: "tituloTarjeta" },
-          { clave: "bateriasContaminadas", label: "Baterías contaminadas", campoTitulo: "tituloBaterias" },
-          { clave: "bateriasDescontaminadas", label: "Baterías descontaminadas", campoTitulo: "tituloBaterias" },
+          { clave: "tarjetaContaminada", label: "Tarjeta contaminada", campoTitulo: "tituloTarjetaContaminada" },
+          { clave: "tarjetaDescontaminada", label: "Tarjeta descontaminada", campoTitulo: "tituloTarjetaDescontaminada" },
+          { clave: "bateriasContaminadas", label: "Baterías contaminadas", campoTitulo: "tituloBateriasContaminadas" },
+          { clave: "bateriasDescontaminadas", label: "Baterías descontaminadas", campoTitulo: "tituloBateriasDescontaminadas" },
           { clave: "cambioVentilador", label: "Cambio ventilador", campoTitulo: "tituloCambioVentilador" },
-          { clave: "cambioComponentesInicial", label: "Cambio de componentes", campoTitulo: "tituloCambioComponentes" },
-          { clave: "cambioComponentesFinal", label: "Cambio de componentes", campoTitulo: "tituloCambioComponentes" },
-          { clave: "medicionBateriasInicial", label: "Medición de baterías", campoTitulo: "tituloMedicionBaterias" },
-          { clave: "medicionBateriasFinal", label: "Medición de baterías", campoTitulo: "tituloMedicionBaterias" },
+          { clave: "cambioComponentesInicial", label: "Cambio de componentes", campoTitulo: "tituloCambioComponentesInicial" },
+          { clave: "cambioComponentesFinal", label: "Cambio de componentes", campoTitulo: "tituloCambioComponentesFinal" },
+          { clave: "medicionBateriasInicial", label: "Medición de baterías", campoTitulo: "tituloMedicionBateriasInicial" },
+          { clave: "medicionBateriasFinal", label: "Medición de baterías", campoTitulo: "tituloMedicionBateriasFinal" },
         ],
       },
       {
@@ -800,10 +834,15 @@ export const TIPOS_INFORME = [
           ...CAMPOS_OPERARIO,
         ],
       },
-      PROTOCOLO_PRUEBA(PROTOCOLO_ITEMS_SERVOMOTOR, "inicial", "protoInicial"),
-      EVIDENCIA_PRUEBA_EQUIPO("inicial", "protoInicial"),
-      PROTOCOLO_PRUEBA(PROTOCOLO_ITEMS_SERVOMOTOR, "final", "protoFinal"),
-      EVIDENCIA_PRUEBA_EQUIPO("final", "protoFinal"),
+      // `parPosicion` — solo para este tipo (pedido explícito del usuario,
+      // mismo patrón que arrancador/ups): rompe el apilado lineal por
+      // defecto y pone la card de foto a la derecha de su card de protocolo
+      // correspondiente (ver el agrupamiento por parPosicion en
+      // FormInformeTecnico.jsx).
+      { ...PROTOCOLO_PRUEBA(PROTOCOLO_ITEMS_SERVOMOTOR, "inicial", "protoInicial"), parPosicion: "izquierda" },
+      { ...EVIDENCIA_PRUEBA_EQUIPO("inicial", "protoInicial"), parPosicion: "derecha", miniaturaGrande: true, maxImagenes: 1 },
+      { ...PROTOCOLO_PRUEBA(PROTOCOLO_ITEMS_SERVOMOTOR, "final", "protoFinal"), parPosicion: "izquierda" },
+      { ...EVIDENCIA_PRUEBA_EQUIPO("final", "protoFinal"), parPosicion: "derecha", miniaturaGrande: true, maxImagenes: 1 },
       PIEZAS_A_REEMPLAZAR_TABLA,
       checklistOkNok("Checklist — Inspección visual y medición básica", [
         "Pernos completos",
@@ -933,40 +972,46 @@ export const TIPOS_INFORME = [
         ],
       },
       BULLETS_ESTANDAR("herramientasMateriales", "Herramientas y materiales utilizados", "🔧"),
-      // 14 recuadros fijos impresos en la plantilla, en 4 bandas (filas
-      // 128-139, 141-154, 169-188, 190-209) — ver SLOTS_FOTOS.servomotor en
-      // informeTecnicoExcel.js, que ubica cada foto por la clave del slot,
-      // no por orden de subida. "EVIDENCIAS DE MANTENIMIENTO" (impreso en
-      // la fila 168) es el título de esta sección completa, no una
+      // 14 recuadros fijos impresos en la plantilla, en 4 bandas — ver
+      // SLOTS_FOTOS.servomotor en informeTecnicoExcel.js, que ubica cada
+      // foto por la clave del slot, no por orden de subida. "EVIDENCIAS DE
+      // MANTENIMIENTO" es el título de esta sección completa, no una
       // etiqueta de foto — confirmado con el usuario tras encontrar un
-      // posible malentendido (los rótulos de fila 128-154 SÍ son
+      // posible malentendido (los rótulos de las otras 3 bandas SÍ son
       // específicos: eje del rotor, rodamientos, chavetero/chaveta, etc.,
-      // no genéricos A/B/C/D).
+      // no genéricos A/B/C/D). Los rótulos específicos son editables desde
+      // el propio card de cada foto (`campoTitulo`, ver SeccionEvidencias
+      // en FormInformeTecnico.jsx) — los 4 recuadros genéricos A/B/C/D no
+      // tienen rótulo propio que editar.
       {
         ...EVIDENCIAS_ESTANDAR, titulo: "Evidencias de mantenimiento",
+        // 3 columnas, miniatura grande y 1 sola foto por cuadro (pedido
+        // explícito del usuario) — ver SeccionEvidencias en
+        // FormInformeTecnico.jsx.
+        columnas: 3, miniaturaGrande: true, maxImagenes: 1,
         slotsFijos: [
-          { clave: "estadoEjeRotor", label: "Estado del eje del rotor" },
-          { clave: "asientoRodamientoDelantero", label: "Asiento de rodamiento delantero" },
-          { clave: "estadoNucleoRotor", label: "Estado del núcleo del rotor" },
-          { clave: "asientoTrasero", label: "Asiento trasero" },
-          { clave: "estadoChaveteroChaveta", label: "Estado de chavetero/chaveta" },
-          { clave: "rodamientoDelantero", label: "Rodamiento delantero" },
-          { clave: "fotoOriginalRotor", label: "Foto original del rotor" },
-          { clave: "rodamientoTrasero", label: "Rodamiento trasero" },
+          { clave: "estadoEjeRotor", label: "Estado del eje del rotor", campoTitulo: "tituloEstadoEjeRotor" },
+          { clave: "asientoRodamientoDelantero", label: "Asiento de rodamiento delantero", campoTitulo: "tituloAsientoRodamientoDelantero" },
+          { clave: "estadoNucleoRotor", label: "Estado del núcleo del rotor", campoTitulo: "tituloEstadoNucleoRotor" },
+          { clave: "asientoTrasero", label: "Asiento trasero", campoTitulo: "tituloAsientoTrasero" },
+          { clave: "estadoChaveteroChaveta", label: "Estado de chavetero/chaveta", campoTitulo: "tituloEstadoChaveteroChaveta" },
+          { clave: "rodamientoDelantero", label: "Rodamiento delantero", campoTitulo: "tituloRodamientoDelantero" },
+          { clave: "fotoOriginalRotor", label: "Foto original del rotor", campoTitulo: "tituloFotoOriginalRotor" },
+          { clave: "rodamientoTrasero", label: "Rodamiento trasero", campoTitulo: "tituloRodamientoTrasero" },
           // 4 recuadros genéricos A/B/C/D, captionados en la plantilla real
-          // por el título "EVIDENCIAS DE MANTENIMIENTO" (fila 168) — a
+          // por el título de sección "EVIDENCIAS DE MANTENIMIENTO" — a
           // diferencia de las bandas anteriores, esta sí usa letras
           // genéricas en vez de rótulos específicos.
           { clave: "evidenciaA", label: "A", separador: "Evidencias del mantenimiento" },
           { clave: "evidenciaB", label: "B" },
           { clave: "evidenciaC", label: "C" },
           { clave: "evidenciaD", label: "D" },
-          { clave: "vistaFrontalEquipo", label: "Vista frontal del equipo" },
-          { clave: "placaEquipoFoto", label: "Placa del equipo" },
-          { clave: "fotoEncoder", label: "Foto encoder" },
-          { clave: "cambioRodamientosFoto", label: "Cambio de rodamientos" },
-          { clave: "estadoInternoEquipoInicial", label: "Estado interno del equipo inicial" },
-          { clave: "estadoInternoEquipoFinal", label: "Estado interno del equipo final" },
+          { clave: "vistaFrontalEquipo", label: "Vista frontal del equipo", campoTitulo: "tituloVistaFrontalEquipo" },
+          { clave: "placaEquipoFoto", label: "Placa del equipo", campoTitulo: "tituloPlacaEquipoFoto" },
+          { clave: "fotoEncoder", label: "Foto encoder", campoTitulo: "tituloFotoEncoder" },
+          { clave: "cambioRodamientosFoto", label: "Cambio de rodamientos", campoTitulo: "tituloCambioRodamientosFoto" },
+          { clave: "estadoInternoEquipoInicial", label: "Estado interno del equipo inicial", campoTitulo: "tituloEstadoInternoEquipoInicial" },
+          { clave: "estadoInternoEquipoFinal", label: "Estado interno del equipo final", campoTitulo: "tituloEstadoInternoEquipoFinal" },
         ],
       },
       {

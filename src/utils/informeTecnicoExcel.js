@@ -27,6 +27,50 @@ const dimensionesImagen = (buffer, extension) =>
     img.src = url;
   });
 
+// Comprime/redimensiona cada foto justo antes de insertarla en el Excel —
+// las fotos de celular vienen a menudo en 3-8MB c/u, y con 10-20 fotos por
+// informe el .xlsx resultante se vuelve pesadísimo para descargar (pedido
+// explícito del usuario, 2026-09-03). Solo afecta la copia que se pega en
+// ESTE Excel puntual — el archivo guardado en el servidor (fetchUpload)
+// nunca se toca, sigue disponible a resolución original para ver/hacer zoom
+// en la app. Se reescala (nunca se agranda) al lado más largo, se recodifica
+// siempre como JPEG a calidad 0.75 vía canvas (mismo patrón que
+// dimensionesImagen/cargarImagen en los exports de PDF) — un fondo blanco
+// evita que un PNG con transparencia salga negro al perder el canal alfa.
+// Si falla la decodificación (formato raro, buffer corrupto), cae al buffer
+// original sin comprimir en vez de perder la foto.
+const MAX_LADO_FOTO_EXCEL = 1600;
+const CALIDAD_JPEG_EXCEL = 0.75;
+const comprimirImagenParaExcel = (buffer, extension) =>
+  new Promise((resolve) => {
+    const blob = new Blob([buffer], { type: `image/${extension}` });
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const escala = Math.min(1, MAX_LADO_FOTO_EXCEL / Math.max(img.naturalWidth, img.naturalHeight));
+      const w = Math.max(1, Math.round(img.naturalWidth * escala));
+      const h = Math.max(1, Math.round(img.naturalHeight * escala));
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      canvas.toBlob(
+        (blobComprimido) => {
+          if (!blobComprimido) { resolve(null); return; }
+          blobComprimido.arrayBuffer().then((buf) => resolve({ buffer: buf, extension: "jpeg" }));
+        },
+        "image/jpeg",
+        CALIDAD_JPEG_EXCEL
+      );
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+    img.src = url;
+  });
+
 // exceljs pierde varios metadatos de la hoja al recargar y regrabar el
 // archivo, todos ajenos a los datos del informe (nunca cambian entre
 // exportaciones de la misma plantilla), así que se restauran byte a byte
@@ -250,31 +294,41 @@ const CAMPOS_PROTOCOLO_ESTANDAR = (() => {
 // H19:I31), no texto — ver EVIDENCIAS_PRUEBA_EQUIPO en informesTecnicos.js
 // y SLOTS_FOTOS.<tipo> más abajo.
 const RANGOS_PRUEBA_EQUIPO = { protoInicialPrueba: "C19:D31", protoFinalPrueba: "H19:I31" };
+// Re-mapeado completo (2026-09-03): la plantilla real ya no trae el bloque de
+// encabezado — todo el contenido subió 8 filas (confirmado celda por celda
+// contra la plantilla real, mismo offset que el resto de tipos remapeados
+// hoy).
 const CAMPOS_PROTOCOLO_SERVOMOTOR = {
-  protoInicialEncendido: "B19", protoInicialTemperatura: "B20", protoInicialVentilador: "B21", protoInicialTiempoPrueba: "B22",
-  protoInicialTensionAc: "B23", protoInicialVelocidadRpm: "B24", protoInicialVibracion: "B25", protoInicialCorrienteFases: "B26",
-  protoInicialCorrienteLu: "B28", protoInicialCorrienteLv: "B29", protoInicialCorrienteLw: "B30", protoInicialMedicionPolos: "B31",
-  protoInicialObservacion: "A33",
-  protoFinalEncendido: "G19", protoFinalTemperatura: "G20", protoFinalVentilador: "G21", protoFinalTiempoPrueba: "G22",
-  protoFinalTensionAc: "G23", protoFinalVelocidadRpm: "G24", protoFinalVibracion: "G25", protoFinalCorrienteFases: "G26",
-  protoFinalCorrienteLu: "G28", protoFinalCorrienteLv: "G29", protoFinalCorrienteLw: "G30", protoFinalMedicionPolos: "G31",
-  protoFinalObservacion: "F33",
+  protoInicialEncendido: "B11", protoInicialTemperatura: "B12", protoInicialVentilador: "B13", protoInicialTiempoPrueba: "B14",
+  protoInicialTensionAc: "B15", protoInicialVelocidadRpm: "B16", protoInicialVibracion: "B17", protoInicialCorrienteFases: "B18",
+  protoInicialCorrienteLu: "B20", protoInicialCorrienteLv: "B21", protoInicialCorrienteLw: "B22", protoInicialMedicionPolos: "B23",
+  protoInicialObservacion: "A25",
+  protoFinalEncendido: "G11", protoFinalTemperatura: "G12", protoFinalVentilador: "G13", protoFinalTiempoPrueba: "G14",
+  protoFinalTensionAc: "G15", protoFinalVelocidadRpm: "G16", protoFinalVibracion: "G17", protoFinalCorrienteFases: "G18",
+  protoFinalCorrienteLu: "G20", protoFinalCorrienteLv: "G21", protoFinalCorrienteLw: "G22", protoFinalMedicionPolos: "G23",
+  protoFinalObservacion: "F25",
 };
 
 const MAPEOS = {
+  // Re-mapeada completa (2026-09-03): la plantilla real ya no trae el bloque
+  // de encabezado — A3 recibe la descripción (título de la OT). El recuadro
+  // de foto subió con el resto del contenido y ahora es mucho más alto (el
+  // hueco libre entre la fila 8 y el rótulo "VISTA FRONTAL COMPONENTE" en
+  // la fila 36, igual patrón que "adicional" — rótulo DEBAJO del recuadro,
+  // no encima como en las demás plantillas).
   suministro: {
     campos: {
-      ...CAMPOS_ENCABEZADO_SERVICIO,
-      equipoMarca: "A15", modelo: "C15", potenciaComponente: "E15", cantidadComponente: "F15",
+      descripcion: "A3",
+      equipoMarca: "A7", modelo: "C7", potenciaComponente: "E7", cantidadComponente: "F7",
     },
     checklist: {
       "Checklist de verificación técnica": {
         items: {
-          item1: "F47", item2: "F48", item3: "F49", item4: "F50", item5: "F51", item6: "F52", item7: "F53",
+          item1: "F39", item2: "F40", item3: "F41", item4: "F42", item5: "F43", item6: "F44", item7: "F45",
         },
       },
     },
-    bullets: { recomendaciones: { col: "A", fila: 55, max: 2 } },
+    bullets: { recomendaciones: { col: "A", fila: 47, max: 5 } },
   },
 
   soporte: {
@@ -290,26 +344,49 @@ const MAPEOS = {
     },
   },
 
+  // Re-mapeada completa (2026-09-03): la plantilla real ya no trae el bloque
+  // de encabezado — A3 recibe la descripción (título de la OT). "Datos del
+  // equipo" usa fila 7 (Equipo/Marca y Modelo fusionados a 2 columnas,
+  // Código/Tag/Potencia/S-N sueltos), Operario/Observación comparten la fila
+  // 8 (mismo patrón que diagnostico_servomotor). "Medición de diodos de
+  // IGBT" y "Piezas a reemplazar" ahora SÍ tienen celda propia (antes caían
+  // al anexo) — ver el cambio de PIEZAS_A_REEMPLAZAR a
+  // PIEZAS_A_REEMPLAZAR_TABLA para este tipo en informesTecnicos.js.
   diagnostico_equipo: {
     campos: {
-      ...CAMPOS_ENCABEZADO_SERVICIO,
-      equipoMarca: "C15", modelo: "D15", codigo: "E15", tag: "F15", potencia: "G15", serie: "H15",
-      observacionIngreso: "G16",
+      descripcion: "A3",
+      equipoMarca: "A7", modelo: "C7", codigo: "E7", tag: "F7", potencia: "G7", serie: "H7",
+      operario: "B8", observacionIngreso: "E8",
+      // Rótulos editables sobre los recuadros de "Fotos del diagnóstico" (ver
+      // sección con `campoTitulo` en informesTecnicos.js).
+      tituloVistaFrontal: "A22", tituloPlaca: "C22", tituloEstadoInterno1: "E22", tituloEstadoInterno2: "G22",
+      tituloEstadoCarcasa: "A35", tituloEstadoTarjeta: "C35", tituloComponentesMalEstado: "E35", tituloEstadoVentiladores: "G35",
+    },
+    filas: {
+      piezasAReemplazar: { colCantidad: "E", colDescripcion: "F", filaInicial: 39, max: 9 },
+    },
+    tabla: {
+      medicionDiodosIgbt: {
+        l1__dcMenos: "B39", l1__dcMas: "C39",
+        l2__dcMenos: "B40", l2__dcMas: "C40",
+        l3__dcMenos: "B41", l3__dcMas: "C41",
+        u__dcMenos: "B43", u__dcMas: "C43",
+        v__dcMenos: "B44", v__dcMas: "C44",
+        w__dcMenos: "B45", w__dcMas: "C45",
+      },
     },
     checklist: {
       "Checklist de verificación técnica": {
-        items: Object.fromEntries(Array.from({ length: 12 }, (_, i) => [`item${i + 1}`, `H${58 + i}`])),
+        items: Object.fromEntries(Array.from({ length: 12 }, (_, i) => [`item${i + 1}`, `H${50 + i}`])),
       },
     },
     bullets: {
-      observacionFallas: { col: "A", fila: 71, max: 3 },
-      recomendacion: { col: "A", fila: 75, max: 4 },
+      observacionesIgbt: { col: "B", fila: 46, max: 1 },
+      observacionFallas: { col: "A", fila: 63, max: 5 },
+      recomendacion: { col: "A", fila: 69, max: 5 },
     },
     // "Estado general" ya no es texto libre — se migró a 8 slots de foto
-    // fijos, ver SLOTS_FOTOS.diagnostico_equipo. La medición de diodos IGBT
-    // y piezas a reemplazar (con sus observaciones) siguen sin celda
-    // confirmada — caen al bloque anexo (no se pierde el dato, solo no
-    // queda en su celda "de papel").
+    // fijos, ver SLOTS_FOTOS.diagnostico_equipo.
   },
 
   // Re-mapeada completa (2026-09-03): la plantilla real ya no trae el bloque
@@ -349,21 +426,34 @@ const MAPEOS = {
     // fijos, ver SLOTS_FOTOS.diagnostico_servomotor.
   },
 
+  // Re-mapeada completa (2026-09-03): la plantilla real ya no trae el bloque
+  // de encabezado — A3 recibe la descripción (título de la OT), mismo
+  // patrón de fila 7 que plc/panel/pc (Equipo/Marca-Modelo-Código fusionados
+  // a 2 columnas). Operario/Observación con celdas propias (A9/D8), distinto
+  // patrón que otros tipos. Conclusiones/Recomendaciones con caja de 5
+  // líneas cada una.
   tarjetas: {
-    campos: { ...CAMPOS_ENCABEZADO_SERVICIO, ...CAMPOS_EQUIPO_9COL },
+    campos: {
+      descripcion: "A3",
+      equipoMarca: "A7", modelo: "C7", codigo: "E7", tag: "G7", potencia: "H7", serie: "I7",
+      operario: "A9", observacionIngreso: "D8",
+      // Rótulos editables sobre los 3 recuadros de "Imágenes" (ver sección
+      // con `campoTitulo` en informesTecnicos.js).
+      tituloImagenA: "A31", tituloImagenB: "D31", tituloImagenC: "G31",
+    },
     filas: {
-      piezasAReemplazar: { colCantidad: "A", colDescripcion: "B", filaInicial: 43, max: 4 },
+      piezasAReemplazar: { colCantidad: "A", colDescripcion: "B", filaInicial: 35, max: 4 },
     },
     tabla: {
       checklistTecnico: Object.fromEntries(
-        Array.from({ length: 8 }, (_, i) => [i, 49 + i]).flatMap(([i, fila]) => [
+        Array.from({ length: 8 }, (_, i) => [i, 41 + i]).flatMap(([i, fila]) => [
           [`item${i + 1}__inicial`, `H${fila}`], [`item${i + 1}__final`, `I${fila}`],
         ])
       ),
     },
     bullets: {
-      conclusiones: { col: "A", fila: 58, max: 2 },
-      recomendaciones: { col: "A", fila: 61, max: 2 },
+      conclusiones: { col: "A", fila: 50, max: 5 },
+      recomendaciones: { col: "A", fila: 56, max: 5 },
     },
   },
 
@@ -381,7 +471,9 @@ const MAPEOS = {
       // Rótulos editables sobre los recuadros de "Fotos del mantenimiento"
       // (ver sección con `campoTitulo` en informesTecnicos.js).
       tituloVistaFrontal: "A31", tituloPlacaEquipo: "D31", tituloCarcasaContaminada: "G31",
-      tituloCarcasaDescontaminada: "A52", tituloLimpiezaTarjeta: "D52", tituloCambioVentilador: "G52",
+      tituloCarcasaDescontaminada: "A52",
+      tituloLimpiezaTarjetaInicial: "D52", tituloLimpiezaTarjetaFinal: "D52",
+      tituloCambioVentilador: "G52",
     },
     filas: {
       piezasAReemplazar: { colCantidad: "A", colDescripcion: "B", filaInicial: 56, max: 5 },
@@ -411,8 +503,11 @@ const MAPEOS = {
       operario: "A9", observacionIngreso: "C8",
       // Rótulos editables sobre los recuadros de "Fotos del mantenimiento"
       // (ver sección con `campoTitulo` en informesTecnicos.js).
-      tituloVistaFrontal: "A31", tituloPlacaEquipo: "D31", tituloCarcasaContaminadaDescontaminada: "G31",
-      tituloLimpiezaTarjeta: "A52", tituloCambioLcd: "D52", tituloCambioTouch: "G52",
+      tituloVistaFrontal: "A31", tituloPlacaEquipo: "D31",
+      tituloCarcasaContaminada: "G31", tituloCarcasaDescontaminada: "G31",
+      tituloLimpiezaTarjetaInicial: "A52", tituloLimpiezaTarjetaFinal: "A52",
+      tituloCambioLcdInicial: "D52", tituloCambioLcdFinal: "D52",
+      tituloCambioTouchInicial: "G52", tituloCambioTouchFinal: "G52",
     },
     filas: {
       piezasAReemplazar: { colCantidad: "A", colDescripcion: "B", filaInicial: 56, max: 5 },
@@ -471,7 +566,9 @@ const MAPEOS = {
       // Rótulos editables sobre los recuadros de "Fotos del mantenimiento"
       // (ver sección "Títulos de las fotos" en informesTecnicos.js).
       tituloVistaFrontal: "A31", tituloPlacaEquipo: "D31", tituloCarcasaContaminada: "G31",
-      tituloCarcasaDescontaminada: "A52", tituloLimpiezaTarjeta: "D52", tituloCambioComponentes: "G52",
+      tituloCarcasaDescontaminada: "A52",
+      tituloLimpiezaTarjetaInicial: "D52", tituloLimpiezaTarjetaFinal: "D52",
+      tituloCambioComponentes: "G52",
     },
     filas: {
       piezasAReemplazar: { colCantidad: "A", colDescripcion: "B", filaInicial: 56, max: 4 },
@@ -523,8 +620,12 @@ const MAPEOS = {
       // (ver sección "Títulos de las fotos" en informesTecnicos.js) — celda
       // master de cada rótulo fusionado, confirmada contra la plantilla real.
       tituloVistaFrontal: "A47", tituloPlacaEquipo: "D47", tituloCarcasaContaminada: "G47",
-      tituloCarcasaDescontaminada: "A68", tituloTarjeta: "D68", tituloPastaTermica: "G68",
-      tituloCambioVentilador: "A89", tituloCambioComponentes: "D89", tituloMedicionScr: "G89",
+      tituloCarcasaDescontaminada: "A68",
+      tituloLimpiezaContaminada: "D68", tituloLimpiezaDescontaminada: "D68",
+      tituloPastaTermicaSeca: "G68", tituloPastaTermicaNueva: "G68",
+      tituloCambioVentilador: "A89",
+      tituloCambioComponentesInicial: "D89", tituloCambioComponentesFinal: "D89",
+      tituloMedicionScrInicial: "G89", tituloMedicionScrFinal: "G89",
     },
     filas: {
       piezasAReemplazar: { colCantidad: "F", colDescripcion: "G", filaInicial: 93, max: 3 },
@@ -549,25 +650,57 @@ const MAPEOS = {
     },
   },
 
+  // Re-mapeada completa (2026-09-03): la plantilla real ya no trae el bloque
+  // de encabezado — layout prácticamente idéntico a arrancador (mismas filas
+  // exactas para protocolo/fotos: 47/68/89). Piezas a reemplazar (F:I) ocupa
+  // exactamente la misma altura que la tabla de medición IGBT al lado (7
+  // filas: L1/L2/L3/divisor SALIDA/U/V/W), no el bloque típico de 5.
   variador_reparacion: {
-    campos: { ...CAMPOS_ENCABEZADO_SERVICIO, ...CAMPOS_EQUIPO_9COL, ...CAMPOS_PROTOCOLO_ESTANDAR },
+    campos: {
+      descripcion: "A3",
+      equipoMarca: "A7", modelo: "C7", codigo: "E7", tag: "G7", potencia: "H7", serie: "I7",
+      operario: "A9", observacionIngreso: "D8",
+      protoInicialEncendido: "B11", protoFinalEncendido: "G11",
+      protoInicialBackup: "B12", protoFinalBackup: "G12",
+      protoInicialTemperatura: "B13", protoFinalTemperatura: "G13",
+      protoInicialVentilador: "B14", protoFinalVentilador: "G14",
+      protoInicialTiempoPrueba: "B15", protoFinalTiempoPrueba: "G15",
+      protoInicialCorrienteSalida: "B16", protoFinalCorrienteSalida: "G16",
+      protoInicialCorrienteSoftware: "B17", protoFinalCorrienteSoftware: "G17",
+      protoInicialVoltajeSalida: "B18", protoFinalVoltajeSalida: "G18",
+      protoInicialVoltajeSoftware: "B19", protoFinalVoltajeSoftware: "G19",
+      protoInicialMedicionBusDc: "B20", protoFinalMedicionBusDc: "G20",
+      protoInicialMedicionLineaTierra: "B21", protoFinalMedicionLineaTierra: "G21",
+      protoInicialProtocoloComunicacion: "B22", protoFinalProtocoloComunicacion: "G22",
+      protoInicialIdProtocolo: "B23", protoFinalIdProtocolo: "G23",
+      protoInicialObservacion: "A25", protoFinalObservacion: "F25",
+      // Rótulos editables sobre los recuadros de "Fotos del mantenimiento"
+      // (ver sección con `campoTitulo` en informesTecnicos.js).
+      tituloVistaFrontal: "A47", tituloPlacaEquipo: "D47", tituloCarcasaContaminada: "G47",
+      tituloCarcasaDescontaminada: "A68",
+      tituloTarjetaContaminada: "D68", tituloTarjetaDescontaminada: "D68",
+      tituloPastaTermicaSeca: "G68", tituloPastaTermicaNueva: "G68",
+      tituloCambioVentilador: "A89",
+      tituloCambioComponentesInicial: "D89", tituloCambioComponentesFinal: "D89",
+      tituloMedicionIgbtInicial: "G89", tituloMedicionIgbtFinal: "G89",
+    },
     filas: {
-      piezasAReemplazar: { colCantidad: "F", colDescripcion: "G", filaInicial: 101, max: 7 },
+      piezasAReemplazar: { colCantidad: "F", colDescripcion: "G", filaInicial: 93, max: 7 },
     },
     tabla: {
-      medicionIgbtIngreso: { l1__dcMenos: "B101", l1__dcMas: "C101", l2__dcMenos: "B102", l2__dcMas: "C102", l3__dcMenos: "B103", l3__dcMas: "C103" },
-      medicionIgbtSalida: { u__dcMenos: "B105", u__dcMas: "C105", v__dcMenos: "B106", v__dcMas: "C106", w__dcMenos: "B107", w__dcMas: "C107" },
+      medicionIgbtIngreso: { l1__dcMenos: "B93", l1__dcMas: "C93", l2__dcMenos: "B94", l2__dcMas: "C94", l3__dcMenos: "B95", l3__dcMas: "C95" },
+      medicionIgbtSalida: { u__dcMenos: "B97", u__dcMas: "C97", v__dcMenos: "B98", v__dcMas: "C98", w__dcMenos: "B99", w__dcMas: "C99" },
       checklistTecnico: Object.fromEntries(
-        Array.from({ length: 12 }, (_, i) => [i, 112 + i]).flatMap(([i, fila]) => [
+        Array.from({ length: 12 }, (_, i) => [i, 104 + i]).flatMap(([i, fila]) => [
           [`item${i + 1}__inicial`, `H${fila}`], [`item${i + 1}__final`, `I${fila}`],
         ])
       ),
     },
     bullets: {
-      observacionesIgbt: { col: "A", fila: 109, max: 1 },
-      observaciones: { col: "A", fila: 125, max: 1 },
-      conclusiones: { col: "A", fila: 127, max: 3 },
-      recomendaciones: { col: "A", fila: 131, max: 2 },
+      observacionesIgbt: { col: "B", fila: 100, max: 1 },
+      observaciones: { col: "A", fila: 117, max: 5 },
+      conclusiones: { col: "A", fila: 123, max: 5 },
+      recomendaciones: { col: "A", fila: 129, max: 5 },
     },
   },
 
@@ -599,8 +732,12 @@ const MAPEOS = {
       protoInicialIdProtocolo: "B23", protoFinalIdProtocolo: "G23",
       protoInicialObservacion: "A25", protoFinalObservacion: "F25",
       tituloVistaFrontal: "A47", tituloPlacaEquipo: "D47", tituloCarcasaContaminada: "G47",
-      tituloCarcasaDescontaminada: "A68", tituloTarjeta: "D68", tituloBaterias: "G68",
-      tituloCambioVentilador: "A89", tituloCambioComponentes: "D89", tituloMedicionBaterias: "G89",
+      tituloCarcasaDescontaminada: "A68",
+      tituloTarjetaContaminada: "D68", tituloTarjetaDescontaminada: "D68",
+      tituloBateriasContaminadas: "G68", tituloBateriasDescontaminadas: "G68",
+      tituloCambioVentilador: "A89",
+      tituloCambioComponentesInicial: "D89", tituloCambioComponentesFinal: "D89",
+      tituloMedicionBateriasInicial: "G89", tituloMedicionBateriasFinal: "G89",
     },
     filas: {
       piezasAReemplazar: { colCantidad: "F", colDescripcion: "G", filaInicial: 93, max: 10 },
@@ -632,17 +769,66 @@ const MAPEOS = {
   // verificación visual contra el Excel real antes de mapearse — todos esos
   // campos SÍ existen en el formulario de la app, solo caen al bloque anexo
   // al exportar en vez de quedar en su celda exacta de la plantilla.
+  // Re-mapeado completo (2026-09-03): la plantilla real ya no trae el bloque
+  // de encabezado — A3 recibe la descripción (título de la OT). "Datos del
+  // equipo" en fila 7 (Equipo/Marca y Modelo fusionados a 2 columnas, Tag/
+  // Potencia/Voltaje/RPM/S-N sueltos). A diferencia del resto de tipos,
+  // Operario SÍ tiene celda de valor propia acá (A9, fila aparte de la
+  // etiqueta) — antes caía al anexo. "Piezas a reemplazar" ocupa todo el
+  // ancho (sin otra tabla al lado, a diferencia de arrancador/ups).
+  //
+  // Pruebas eléctricas/mecánicas (filas 96-119, confirmado celda por celda
+  // valor+merge, no solo texto): termistor/aislamiento/bobina del estator
+  // SÍ tienen celda propia ahora. "Tolerancia norma EASA AR100" (Desde/
+  // Hasta, delantero y trasero) trae un valor DE FÁBRICA impreso
+  // ("0.000mm"/"0.025mm", el estándar) — se mapea igual (mismo criterio que
+  // "categoria": si el técnico no lo toca, el valor impreso queda). La
+  // lista de "Herramientas y materiales" (filas 112-119, columnas G:I) es
+  // un checklist FIJO ya impreso en la plantilla (nombres de herramientas
+  // reales, no celdas en blanco) — no hay dónde meter el texto libre del
+  // técnico sin pisar ese checklist, así que `herramientasMateriales`
+  // sigue sin celda y cae al anexo.
   servomotor: {
     campos: {
-      ...CAMPOS_ENCABEZADO_SERVICIO,
-      equipoMarca: "C15", modelo: "D15", tag: "E15", potencia: "F15", voltaje: "G15", rpm: "H15", serie: "I15",
+      descripcion: "A3",
+      equipoMarca: "A7", modelo: "C7", tag: "E7", potencia: "F7", voltaje: "G7", rpm: "H7", serie: "I7",
+      operario: "A9", observacionIngreso: "C9",
       ...CAMPOS_PROTOCOLO_SERVOMOTOR,
-      // "MARCA"/"MODELO"/"VOLTAJE" ya vienen impresos en G186/G187/G188 —
-      // solo hace falta el valor, en la celda merge H186:I186 etc.
-      placaMarca: "H186", placaModelo: "H187", placaVoltaje: "H188",
+      termistorValor: "B99", termistorSituacion: "B100", termistorEstado: "B101",
+      aislamientoTempAmbiente: "D99", aislamientoTensionPrueba: "D100", aislamientoTiempoPrueba: "D101", aislamientoEstado: "E102",
+      modeloRodamientoDelantero: "C108", toleranciaDelanteroDesde: "A111", toleranciaDelanteroHasta: "B111",
+      modeloRodamientoTrasero: "C116", toleranciaTraseroDesde: "A119", toleranciaTraseroHasta: "B119",
+      deflexionDiametro: "G106", deflexionValor: "H106", deflexionEstado: "I106",
+      deflexionToleranciaDesde: "F109", deflexionToleranciaHasta: "H109",
+      // "MARCA"/"MODELO"/"VOLTAJE" ya vienen impresos en G178/G179/G180 —
+      // solo hace falta el valor, en la celda merge H178:I178 etc.
+      placaMarca: "H178", placaModelo: "H179", placaVoltaje: "H180",
+      // Rótulos editables sobre los recuadros de "Evidencias de
+      // mantenimiento" (ver sección con `campoTitulo` en informesTecnicos.js)
+      // — los 4 recuadros genéricos A/B/C/D no tienen rótulo propio (comparten
+      // el título de sección "EVIDENCIAS DE MANTENIMIENTO"), no son editables.
+      tituloEstadoEjeRotor: "A132", tituloAsientoRodamientoDelantero: "C132", tituloEstadoNucleoRotor: "E132", tituloAsientoTrasero: "H132",
+      tituloEstadoChaveteroChaveta: "A147", tituloRodamientoDelantero: "C147", tituloFotoOriginalRotor: "E147", tituloRodamientoTrasero: "H147",
+      tituloVistaFrontalEquipo: "A181", tituloPlacaEquipoFoto: "D181", tituloFotoEncoder: "G181",
+      tituloCambioRodamientosFoto: "A202", tituloEstadoInternoEquipoInicial: "D202", tituloEstadoInternoEquipoFinal: "G202",
     },
     filas: {
-      piezasAReemplazar: { colCantidad: "A", colDescripcion: "B", filaInicial: 37, max: 4 },
+      piezasAReemplazar: { colCantidad: "A", colDescripcion: "B", filaInicial: 29, max: 4 },
+    },
+    tabla: {
+      medicionBobinaEstator: {
+        faseUV__resistencia: "G99", faseUV__inductancia: "I99",
+        faseVW__resistencia: "G100", faseVW__inductancia: "I100",
+        faseUW__resistencia: "G101", faseUW__inductancia: "I101",
+      },
+      medicionesMecanicasDelanteras: {
+        alojamiento__diametro: "B106", alojamiento__estado: "C106",
+        asiento__diametro: "B107", asiento__estado: "C107",
+      },
+      medicionesMecanicasTraseras: {
+        alojamiento__diametro: "B114", alojamiento__estado: "C114",
+        asiento__diametro: "B115", asiento__estado: "C115",
+      },
     },
     // Los 3 checklists confirmados celda por celda contra la plantilla
     // real: etiqueta fusionada A:H, valor en la columna I (única celda sin
@@ -651,19 +837,21 @@ const MAPEOS = {
     // prefijo pasado a `checklistOkNok` en informesTecnicos.js.
     checklist: {
       "Checklist — Inspección visual y medición básica": {
-        items: Object.fromEntries(Array.from({ length: 22 }, (_, i) => [`insp_item${i + 1}`, `I${43 + i}`])),
+        items: Object.fromEntries(Array.from({ length: 22 }, (_, i) => [`insp_item${i + 1}`, `I${35 + i}`])),
       },
       "Checklist del proceso desarmado": {
-        items: Object.fromEntries(Array.from({ length: 21 }, (_, i) => [`desarme_item${i + 1}`, `I${66 + i}`])),
+        items: Object.fromEntries(Array.from({ length: 21 }, (_, i) => [`desarme_item${i + 1}`, `I${58 + i}`])),
       },
       "Checklist del proceso de armado": {
-        items: Object.fromEntries(Array.from({ length: 15 }, (_, i) => [`armado_item${i + 1}`, `I${88 + i}`])),
+        items: Object.fromEntries(Array.from({ length: 15 }, (_, i) => [`armado_item${i + 1}`, `I${80 + i}`])),
       },
     },
-    // "Operario"/"Observación de ingreso" (fila 16) no tienen una celda de
-    // input distinguible del rótulo en esta plantilla (D16:I16 es todo el
-    // rótulo "OBSERVACION" fusionado, sin una celda en blanco aparte) —
-    // caen al anexo, igual que el resto del formulario de este tipo.
+    bullets: {
+      observacionesArmado: { col: "C", fila: 95, max: 1 },
+      observaciones: { col: "A", fila: 204, max: 5 },
+      conclusiones: { col: "A", fila: 210, max: 5 },
+      recomendaciones: { col: "A", fila: 216, max: 5 },
+    },
   },
 };
 
@@ -696,11 +884,18 @@ const SIN_TEXTO_ANEXO_EVIDENCIAS_FIRMA = new Set([]);
 //   nombrado ocupa su slot — si el técnico sube más de una foto al mismo
 //   recuadro, las de más caen al área genérica, igual que un tipo sin slots.
 const SLOTS_FOTOS = {
-  suministro: ["B23:E34"],
+  // El recuadro subió y se agrandó con el resto del contenido — confirmado
+  // celda por celda 2026-09-03 (filas 9-35 completamente vacías antes del
+  // rótulo "VISTA FRONTAL COMPONENTE" en la fila 36). Solo importa la
+  // esquina superior-izquierda acá (ver "esSuministro" en
+  // exportarInformeTecnicoExcel, la foto entra a tamaño real sin estirar).
+  suministro: ["B9:E35"],
   soporte: { A: "A23:B37", B: "C23:D37", C: "E23:F37", D: "G23:H37" },
+  // 8 filas más arriba por la eliminación del encabezado (confirmado celda
+  // por celda 2026-09-03).
   diagnostico_equipo: {
-    vistaFrontal: "A18:B29", placa: "C18:D29", estadoInterno1: "E18:F29", estadoInterno2: "G18:H29",
-    estadoCarcasa: "A31:B42", estadoTarjeta: "C31:D42", componentesMalEstado: "E31:F42", estadoVentiladores: "G31:H42",
+    vistaFrontal: "A10:B21", placa: "C10:D21", estadoInterno1: "E10:F21", estadoInterno2: "G10:H21",
+    estadoCarcasa: "A23:B34", estadoTarjeta: "C23:D34", componentesMalEstado: "E23:F34", estadoVentiladores: "G23:H34",
   },
   // 8 filas más arriba por la eliminación del encabezado (confirmado celda
   // por celda 2026-09-03).
@@ -708,7 +903,9 @@ const SLOTS_FOTOS = {
     vistaFrontal: "A10:B21", placa: "C10:D21", estadoCarcasa: "E10:F21", estadoEncoder: "G10:H21",
     estadoInterno: "A23:B34", conectores: "C23:D34", estadoRodamientos: "E23:F34", pruebaEquipo: "G23:H34",
   },
-  tarjetas: { imagenA: "A19:C38", imagenB: "D19:F38", imagenC: "G19:I38" },
+  // 8 filas más arriba por la eliminación del encabezado (confirmado celda
+  // por celda 2026-09-03).
+  tarjetas: { imagenA: "A11:C30", imagenB: "D11:F30", imagenC: "G11:I30" },
   // 8 filas más arriba por la eliminación del encabezado (confirmado celda
   // por celda 2026-09-03).
   pc: {
@@ -751,13 +948,17 @@ const SLOTS_FOTOS = {
     medicionScrInicial: "G69:I78", medicionScrFinal: "G79:I88",
     protoInicialPrueba: "C11:D23", protoFinalPrueba: "H11:I23",
   },
+  // Mismas filas exactas que arrancador (confirmado celda por celda
+  // 2026-09-03), "Prueba de equipo inicial/final" también reubicada a toda
+  // la altura de su tabla de protocolo (pedido explícito del usuario) en
+  // vez del recuadro chico impreso.
   variador_reparacion: {
-    vistaFrontal: "A35:C54", placaEquipo: "D35:F54", carcasaContaminada: "G35:I54",
-    carcasaDescontaminada: "A56:C75", tarjetaContaminada: "D56:F65", tarjetaDescontaminada: "D66:F75",
-    pastaTermicaSeca: "G56:I65", pastaTermicaNueva: "G66:I75",
-    cambioVentilador: "A77:C96", cambioComponentesInicial: "D77:F86", cambioComponentesFinal: "D87:F96",
-    medicionIgbtFotoInicial: "G77:I86", medicionIgbtFotoFinal: "G87:I96",
-    ...RANGOS_PRUEBA_EQUIPO,
+    vistaFrontal: "A27:C46", placaEquipo: "D27:F46", carcasaContaminada: "G27:I46",
+    carcasaDescontaminada: "A48:C67", tarjetaContaminada: "D48:F57", tarjetaDescontaminada: "D58:F67",
+    pastaTermicaSeca: "G48:I57", pastaTermicaNueva: "G58:I67",
+    cambioVentilador: "A69:C88", cambioComponentesInicial: "D69:F78", cambioComponentesFinal: "D79:F88",
+    medicionIgbtFotoInicial: "G69:I78", medicionIgbtFotoFinal: "G79:I88",
+    protoInicialPrueba: "C11:D23", protoFinalPrueba: "H11:I23",
   },
   // 9 recuadros de foto (13 slots contando las variantes antes/después) —
   // mismas filas exactas que arrancador (confirmado celda por celda
@@ -771,13 +972,18 @@ const SLOTS_FOTOS = {
     medicionBateriasInicial: "G69:I78", medicionBateriasFinal: "G79:I88",
     protoInicialPrueba: "C11:D23", protoFinalPrueba: "H11:I23",
   },
+  // 8 filas más arriba por la eliminación del encabezado (confirmado celda
+  // por celda 2026-09-03). "Prueba de equipo inicial/final" reubicada a
+  // toda la altura de su tabla de protocolo (pedido explícito del usuario,
+  // mismo criterio que arrancador/ups) en vez del recuadro chico C24:D25/
+  // H24:I25 impreso en la plantilla.
   servomotor: {
-    estadoEjeRotor: "A128:B139", asientoRodamientoDelantero: "C128:D139", estadoNucleoRotor: "E128:G139", asientoTrasero: "H128:I139",
-    estadoChaveteroChaveta: "A141:B154", rodamientoDelantero: "C141:D154", fotoOriginalRotor: "E141:G154", rodamientoTrasero: "H141:I154",
-    evidenciaA: "A156:B167", evidenciaB: "C156:D167", evidenciaC: "E156:G167", evidenciaD: "H156:I167",
-    vistaFrontalEquipo: "A169:C188", placaEquipoFoto: "D169:F188", fotoEncoder: "G169:I185",
-    cambioRodamientosFoto: "A190:C209", estadoInternoEquipoInicial: "D190:F209", estadoInternoEquipoFinal: "G190:I209",
-    ...RANGOS_PRUEBA_EQUIPO,
+    estadoEjeRotor: "A120:B131", asientoRodamientoDelantero: "C120:D131", estadoNucleoRotor: "E120:G131", asientoTrasero: "H120:I131",
+    estadoChaveteroChaveta: "A133:B146", rodamientoDelantero: "C133:D146", fotoOriginalRotor: "E133:G146", rodamientoTrasero: "H133:I146",
+    evidenciaA: "A148:B159", evidenciaB: "C148:D159", evidenciaC: "E148:G159", evidenciaD: "H148:I159",
+    vistaFrontalEquipo: "A161:C180", placaEquipoFoto: "D161:F180", fotoEncoder: "G161:I177",
+    cambioRodamientosFoto: "A182:C201", estadoInternoEquipoInicial: "D182:F201", estadoInternoEquipoFinal: "G182:I201",
+    protoInicialPrueba: "C11:D23", protoFinalPrueba: "H11:I23",
   },
 };
 
@@ -930,15 +1136,24 @@ export async function exportarInformeTecnicoExcel(informe, ot) {
     } else if (seccion.tipo === "evidencias") {
       // Rótulos editables de cada recuadro (`campoTitulo` en el slot, ver
       // informesTecnicos.js) — viven en mapa.campos (misma celda que si
-      // fueran una sección "campos" normal), no en mapa.evidencias. Un Set
-      // evita escribir 2 veces un campoTitulo compartido por 2 slots (ej.
-      // "Cambio de componentes" antes/después).
-      const titulosEscritos = new Set();
+      // fueran una sección "campos" normal), no en mapa.evidencias. Cada
+      // slot tiene su PROPIO campoTitulo (inputs siempre independientes en
+      // el formulario, nunca comparten estado) — pero 2 slots "antes/
+      // después" a veces mapean a la MISMA celda impresa (un solo rótulo
+      // físico para las 2 fotos, ej. "CAMBIO DE COMPONENTES"). Se agrupa por
+      // dirección de celda (no por nombre de campo) y, si ambos técnicos
+      // llenaron su versión, se combinan con " / " — si solo uno lo llenó,
+      // se usa ese; si ninguno, la celda no se toca y queda el texto impreso.
+      const valoresPorCelda = new Map();
       (seccion.slotsFijos || []).forEach((slot) => {
-        if (!slot.campoTitulo || titulosEscritos.has(slot.campoTitulo)) return;
-        titulosEscritos.add(slot.campoTitulo);
-        escribir(mapa.campos?.[slot.campoTitulo], campos[slot.campoTitulo]);
+        if (!slot.campoTitulo) return;
+        const addr = mapa.campos?.[slot.campoTitulo];
+        const valor = campos[slot.campoTitulo];
+        if (!addr || !valor) return;
+        if (!valoresPorCelda.has(addr)) valoresPorCelda.set(addr, []);
+        valoresPorCelda.get(addr).push(valor);
       });
+      valoresPorCelda.forEach((valores, addr) => escribir(addr, valores.join(" / ")));
       const slots = mapa.evidencias?.[seccion.clave];
       if (!slots) return;
       const grupos = campos[seccion.clave] || [];
@@ -1094,8 +1309,14 @@ export async function exportarInformeTecnicoExcel(informe, ot) {
       if (!extension) { console.warn("Formato de imagen no soportado para Excel:", ruta); continue; }
       try {
         const resImg = await fetchUpload(ruta);
-        const bufferImg = await resImg.arrayBuffer();
-        const imageId = wb.addImage({ buffer: bufferImg, extension });
+        const bufferImgOriginal = await resImg.arrayBuffer();
+        // Comprimida para ESTE Excel puntual — el archivo guardado en el
+        // servidor no se toca (ver comprimirImagenParaExcel arriba). Si la
+        // compresión falla, se usa el buffer original tal cual.
+        const comprimida = await comprimirImagenParaExcel(bufferImgOriginal, extension);
+        const bufferImg = comprimida?.buffer || bufferImgOriginal;
+        const extensionFinal = comprimida?.extension || extension;
+        const imageId = wb.addImage({ buffer: bufferImg, extension: extensionFinal });
         // Tamaño original (sin estirar a la celda) — pedido explícitamente
         // solo para INFORME DE SUMINISTRO. El resto de informes sigue
         // estirando la foto al recuadro completo de la plantilla (comportamiento
@@ -1107,7 +1328,10 @@ export async function exportarInformeTecnicoExcel(informe, ot) {
         if (esSuministro) {
           // Si no se puede decodificar la imagen (formato raro, buffer corrupto),
           // cae al tamaño fijo de antes en vez de insertarla con ext undefined.
-          const dim = await dimensionesImagen(bufferImg, extension);
+          // Usa el buffer YA comprimido — el "tamaño real" ahora es el
+          // reescalado (nunca más grande que MAX_LADO_FOTO_EXCEL), no el
+          // tamaño original de la foto del celular.
+          const dim = await dimensionesImagen(bufferImg, extensionFinal);
           ext = dim || ext;
         }
         let slot = null;
@@ -1148,7 +1372,11 @@ export async function exportarInformeTecnicoExcel(informe, ot) {
     }
   }
 
-  const nombreArchivo = `${def.label} - ${ot?.codigo || informe.codigo || "informe"}.xlsx`;
+  // Nombre + N° de informe + N° de OT (nunca el _id de Mongo, pedido
+  // explícito del usuario) — si la OT no tiene numeroOT cargado (campo
+  // manual, no todas lo tienen), cae a su código interno en vez de omitirlo.
+  const numeroOT = ot?.numeroOT || ot?.codigo || "";
+  const nombreArchivo = `${def.label} - ${informe.codigo || "informe"}${numeroOT ? ` - OT ${numeroOT}` : ""}.xlsx`;
   const bufferSalidaSinMetadatos = await wb.xlsx.writeBuffer();
   const bufferSalida = await restaurarMetadatosDePagina(buf, bufferSalidaSinMetadatos);
   const blob = new Blob([bufferSalida], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
