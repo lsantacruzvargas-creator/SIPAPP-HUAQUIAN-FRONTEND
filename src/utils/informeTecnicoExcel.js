@@ -1200,7 +1200,15 @@ export async function exportarInformeTecnicoExcel(informe, ot) {
 
   const bloques = [];
   def.secciones.forEach((seccion) => {
-    if (["campos", "checklist", "tabla"].includes(seccion.tipo)) {
+    // "campos" queda afuera a propósito: en los 12 tipos sin encabezado
+    // (TIPOS_SIN_ENCABEZADO en FormInformeTecnico.jsx), Empresa/Contacto/OC/
+    // COT/Línea-Área/Tipo/Cantidad no tienen celda porque el usuario pidió
+    // sacar ese bloque de la plantilla — no es un hueco de mapeo, es una
+    // exclusión de diseño. Antes se volcaban igual acá como texto,
+    // reapareciendo el bloque que se había pedido quitar (reportado por el
+    // usuario, 2026-09-03). "checklist"/"tabla" sí se quedan: ahí un ítem sin
+    // celda sería un hueco real de mapeo, no una exclusión a propósito.
+    if (["checklist", "tabla"].includes(seccion.tipo)) {
       const faltan = elementosSinMapear(seccion, mapa, campos);
       if (faltan.length) bloques.push([seccion.titulo, faltan]);
       return;
@@ -1248,18 +1256,11 @@ export async function exportarInformeTecnicoExcel(informe, ot) {
     }
   });
 
-  // Firma: si la plantilla de este tipo no tiene un bloque de "Hecho por /
-  // V.B. / Fecha" impreso (ninguna de las 13 plantillas nuevas lo trae), no
-  // se pierde el dato — cae acá igual que cualquier otro campo sin celda
-  // mapeada. SIN_TEXTO_ANEXO_EVIDENCIAS_FIRMA permite excluir un tipo de
-  // este texto anexo puntualmente si algún tipo lo pidiera más adelante.
-  if (!SIN_TEXTO_ANEXO_EVIDENCIAS_FIRMA.has(informe.tipo)) {
-    const faltanFirma = [];
-    if (!mapa.footer?.hechoPor) faltanFirma.push(["Hecho por", informe.hechoPor || ""]);
-    if (!mapa.footer?.vB) faltanFirma.push(["V.B.", informe.vB || ""]);
-    if (!mapa.footer?.fecha) faltanFirma.push(["Fecha", fechaFormateada]);
-    if (faltanFirma.length) bloques.push(["Firma", faltanFirma]);
-  }
+  // Firma (Hecho por/V.B./Fecha): ninguna de las 13 plantillas nuevas trae
+  // un bloque impreso para esto — no es un hueco de mapeo, la firma
+  // simplemente no forma parte de estos formatos. Antes caía igual como
+  // texto anexo, reapareciendo un bloque no pedido por el usuario
+  // (reportado 2026-09-03).
 
   if (bloques.length) {
     escribirFila("B", fila, `DATOS ADICIONALES — ${def.label}`);
