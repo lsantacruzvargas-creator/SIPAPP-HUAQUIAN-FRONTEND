@@ -1224,14 +1224,26 @@ export async function exportarInformeTecnicoExcel(informe, ot) {
         bloques.push([`${seccion.titulo} (filas adicionales)`, filas.slice(m.max).map(par)]);
       }
     } else if (seccion.tipo === "evidencias") {
-      const slots = mapa.evidencias?.[seccion.clave];
+      // La posición real de cada foto la decide SLOTS_FOTOS (por tipo de
+      // informe), no `mapa.evidencias` — esa clave nunca existió en MAPEOS,
+      // así que este bloque trataba TODAS las fotos como "sin celda" y las
+      // volvía a listar como texto en el anexo aunque ya estuvieran pegadas
+      // en su recuadro real. Bug transversal a los 13 tipos, no puntual de
+      // variador (detectado por el usuario revisando ese informe puntual,
+      // 2026-09-03).
+      const slotsConfigTipo = SLOTS_FOTOS[informe.tipo];
       const grupos = campos[seccion.clave] || [];
-      if (!slots) {
-        if (!SIN_TEXTO_ANEXO_EVIDENCIAS_FIRMA.has(informe.tipo)) {
-          bloques.push([seccion.titulo, grupos.map((g) => [tituloGrupo(seccion, g) || "(sin título)", `${g.imagenes?.length || 0} foto(s)`])]);
+      const listar = (lista) => {
+        if (lista.length && !SIN_TEXTO_ANEXO_EVIDENCIAS_FIRMA.has(informe.tipo)) {
+          bloques.push([seccion.titulo, lista.map((g) => [tituloGrupo(seccion, g) || "(sin título)", `${g.imagenes?.length || 0} foto(s)`])]);
         }
-      } else if (grupos.length > slots.length) {
-        bloques.push([`${seccion.titulo} (grupos adicionales)`, grupos.slice(slots.length).map((g) => [tituloGrupo(seccion, g) || "(sin título)", `${g.imagenes?.length || 0} foto(s)`])]);
+      };
+      if (!slotsConfigTipo) {
+        listar(grupos);
+      } else if (Array.isArray(slotsConfigTipo)) {
+        listar(grupos.slice(slotsConfigTipo.length));
+      } else {
+        listar(grupos.filter((g) => !slotsConfigTipo[g.titulo]));
       }
     }
   });
