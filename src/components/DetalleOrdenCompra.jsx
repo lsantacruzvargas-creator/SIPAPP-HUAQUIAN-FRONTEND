@@ -56,9 +56,11 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
   const esAdmin = rolActual === "admin";
   const cadenaCerrada = bloqueadoPorCadenaCerrada(orden.estadoCadena, rolActual);
   const puedeConfirmarHesActa = ["admin", "asistente", "facturacion", "jefatura"].includes(rolActual);
-  // Montos/cálculos ocultos para Administración y Coordinadora — ninguno de
-  // los dos ve/edita precios en OC (ver mismo criterio en ListaOrdenesCompra.jsx).
-  const puedeVerPrecios = !["asistente", "coordinadora"].includes(rolActual);
+  // Montos/cálculos exclusivos de admin/jefatura/facturación — mismo criterio
+  // que ListaOrdenesCompra.jsx y que precios de Cotización (Fase 16). Antes
+  // era una lista de bloqueo (solo excluía asistente/coordinadora) que
+  // dejaba pasar a planner y otros roles por error.
+  const puedeVerPrecios = ["admin", "facturacion", "jefatura"].includes(rolActual);
   // Generar factura es libre (ya no exige confirmar HES/Acta antes) y queda
   // exclusivo para Facturación y Jefatura — Admin ya no puede (mismo gate en
   // el backend, POST /facturas puedeCrear en routes/facturas.js).
