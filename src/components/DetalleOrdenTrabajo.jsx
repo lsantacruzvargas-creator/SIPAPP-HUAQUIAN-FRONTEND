@@ -856,12 +856,12 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
                 <TarjetaRelacion tipo="oc" codigo={oc?.codigo} numero={oc?.numeroOrden} vacio={!oc}
                   onClick={oc ? () => onNavegar?.({ tipo: "oc", data: oc, extra: factura }) : undefined}
                   onCrear={!oc && cot && !ot.anulado ? () => setCrearOCOpen(true) : undefined} crearLabel="OC">
-                  {oc?.monto > 0 && <p className="text-xs text-gray-500">{money(oc.monto)}</p>}
+                  {puedeVerPrecios && oc?.monto > 0 && <p className="text-xs text-gray-500">{money(oc.monto)}</p>}
                 </TarjetaRelacion>
 
                 <TarjetaRelacion tipo="factura" codigo={factura?.codigo} numero={factura?.numeroFactura} vacio={!factura}
                   onClick={factura ? () => onNavegar?.({ tipo: "factura", data: factura }) : undefined}>
-                  {(factura?.totalAPagar || factura?.total) > 0 && (
+                  {puedeVerPrecios && (factura?.totalAPagar || factura?.total) > 0 && (
                     <p className="text-xs text-gray-500">{money(factura.totalAPagar ?? factura.total)}</p>
                   )}
                   {factura?.estadoPago && <Chip className={badgePago(factura.estadoPago)}>{factura.estadoPago}</Chip>}

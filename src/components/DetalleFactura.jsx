@@ -91,6 +91,10 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
   // (routes/facturas.js `puedeEditar`) — se había quedado desactualizado.
   const rolActual = getUsuario()?.rol;
   const puedeEditar = ["admin", "facturacion", "jefatura"].includes(rolActual);
+  // Montos de las cards de "Relaciones" (Cotización/OC) — mismo criterio que
+  // el resto de vistas de detalle (ver DetalleOrdenTrabajo/DetalleCotizacion/
+  // DetalleOrdenCompra.jsx).
+  const puedeVerPrecios = ["admin", "facturacion", "jefatura"].includes(rolActual);
   const cadenaCerrada = bloqueadoPorCadenaCerrada(inicial.estadoCadena, rolActual);
 
   const abrirOC = async () => {
@@ -445,7 +449,7 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
             <TarjetaRelacion tipo="cotizacion" codigo={cot?.codigo} numero={cot?.numeroCotizacion} vacio={!cot}
               onClick={cot ? () => onNavegar?.({ tipo: "cotizacion", data: cot }) : undefined}>
               <p className="text-sm text-gray-700 line-clamp-2">{cot?.titulo}</p>
-              {cot?.total > 0 && <p className="text-xs text-gray-500">{money(cot.total)}</p>}
+              {puedeVerPrecios && cot?.total > 0 && <p className="text-xs text-gray-500">{money(cot.total)}</p>}
             </TarjetaRelacion>
 
             <TarjetaRelacion tipo="ot" codigo={ot?.codigo} numero={ot?.numeroOT} vacio={!ot}
@@ -473,7 +477,7 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
             <TarjetaRelacion tipo="oc" codigo={oc?.codigo} numero={oc?.numeroOrden} vacio={!oc}
               onClick={oc ? abrirOC : undefined} cargando={cargandoOC}>
               {oc?.titulo && <p className="text-xs text-gray-500 line-clamp-2">{oc.titulo}</p>}
-              {(oc?.monto || oc?.total) > 0 && <p className="text-xs text-gray-500">{money(oc.monto ?? oc.total)}</p>}
+              {puedeVerPrecios && (oc?.monto || oc?.total) > 0 && <p className="text-xs text-gray-500">{money(oc.monto ?? oc.total)}</p>}
             </TarjetaRelacion>
 
             <TarjetaRelacion tipo="factura" codigo={inicial.codigo} numero={inicial.numeroFactura} actual>

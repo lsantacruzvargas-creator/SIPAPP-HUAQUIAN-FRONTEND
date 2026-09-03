@@ -444,7 +444,7 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
             <TarjetaRelacion tipo="cotizacion" codigo={cot?.codigo} numero={cot?.numeroCotizacion} vacio={!cot}
               onClick={cot ? abrirCotizacion : undefined} cargando={cargandoCot}>
               <p className="text-sm text-gray-700 line-clamp-2">{cot?.titulo}</p>
-              {cot?.total > 0 && <p className="text-xs text-gray-500">{money(cot.total)}</p>}
+              {puedeVerPrecios && cot?.total > 0 && <p className="text-xs text-gray-500">{money(cot.total)}</p>}
             </TarjetaRelacion>
 
             <TarjetaRelacion tipo="ot" codigo={ot?.codigo} numero={ot?.numeroOT} vacio={!ot}
@@ -474,7 +474,7 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
             <TarjetaRelacion tipo="factura" codigo={factura?.codigo} numero={factura?.numeroFactura} vacio={!factura}
               onClick={factura ? abrirFactura : undefined} cargando={cargandoFactura}
               onCrear={!factura && !orden.anulado && puedeCrearFacturaRol ? () => setCrearFacturaOpen(true) : undefined} crearLabel="Factura">
-              {(factura?.totalAPagar || factura?.total) > 0 && (
+              {puedeVerPrecios && (factura?.totalAPagar || factura?.total) > 0 && (
                 <p className="text-xs text-gray-500">{money(factura.totalAPagar ?? factura.total)}</p>
               )}
               {factura?.estadoPago && <Chip className={badgePago(factura.estadoPago)}>{factura.estadoPago}</Chip>}
