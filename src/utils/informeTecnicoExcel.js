@@ -1063,7 +1063,16 @@ export async function exportarInformeTecnicoExcel(informe, ot) {
   const def = tipoInformePorValor(informe.tipo);
   if (!def) throw new Error("Tipo de informe desconocido");
 
-  const res = await fetch(`/informes-templates/${encodeURIComponent(def.archivoExcel)}`);
+  // Cache-buster: estas plantillas viven en public/ y se sirven con el MISMO
+  // nombre de archivo en cada deploy (a diferencia del JS/CSS, que sí llevan
+  // hash de contenido en el nombre) — sin esto, el navegador y/o el CDN de
+  // Cloudflare pueden seguir sirviendo la versión vieja desde esa misma URL
+  // después de un deploy nuevo (reportado por el usuario, 2026-09-03: la web
+  // seguía exportando con la plantilla anterior tras el deploy). `cache:
+  // "no-store"` evita el caché HTTP del propio navegador; el query param
+  // fuerza además una clave de caché distinta en el CDN si este ignora el
+  // header de la petición.
+  const res = await fetch(`/informes-templates/${encodeURIComponent(def.archivoExcel)}?v=${Date.now()}`, { cache: "no-store" });
   const buf = await res.arrayBuffer();
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(buf);
