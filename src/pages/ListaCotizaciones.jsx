@@ -69,7 +69,7 @@ const totalesDuales = (c, tipoCambio) => {
 const diasDesdeInforme = (c) =>
   c.fechaInformeEnviado ? Math.floor((Date.now() - new Date(c.fechaInformeEnviado).getTime()) / 86400000) : null;
 
-function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, tipoCambio, mostrarDiasInforme, puedeVerPrecios, mostrarEstadoServicio, mostrarTituloOT, otsPorCot }) {
+function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, tipoCambio, mostrarDiasInforme, puedeVerPrecios, mostrarEstadoServicio, mostrarTituloOT, otsPorCot, colOtEstrecha }) {
   return (
     <div className="mb-6">
       <div className="flex items-center gap-2 mb-3">
@@ -83,7 +83,7 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
           <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-200">
             <tr>
               <th className={`${TH} text-left`}>N° Cotización</th>
-              {mostrarEstadoServicio && <th className={`${TH} text-left`}>N° OT</th>}
+              {mostrarEstadoServicio && <th className={`${TH} text-left ${colOtEstrecha ? "w-20" : ""}`}>N° OT</th>}
               {mostrarEstadoServicio && <th className={`${TH} text-center`}>Fecha de salida</th>}
               {mostrarEstadoServicio && <th className={`${TH} text-center`}>Estado de servicio</th>}
               <th className={`${TH} text-left`}>Empresa</th>
@@ -133,7 +133,8 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
                     </div>
                   </td>
                   {mostrarEstadoServicio && (
-                    <td className="px-4 py-3.5 text-gray-600 whitespace-nowrap">
+                    <td className={`px-4 py-3.5 text-gray-600 whitespace-nowrap ${colOtEstrecha ? "w-20 max-w-[5rem] truncate" : ""}`}
+                      title={colOtEstrecha ? numerosOT(otsDeCot) || "" : undefined}>
                       {numerosOT(otsDeCot) || <span className="text-gray-300">—</span>}
                     </td>
                   )}
@@ -231,7 +232,7 @@ export default function ListaCotizaciones() {
   const [ocPorCot, setOcPorCot] = useState(new Map());
   const [ocPorNumDoc, setOcPorNumDoc] = useState(new Map());
   const [facturaPorNumDoc, setFacturaPorNumDoc] = useState(new Map());
-  const [sortBy, setSortBy] = useState("numeroOT");
+  const [sortBy, setSortBy] = useState("numeroCotizacion");
   // "Todas las cotizaciones" (tabla única, sin categorizar por estado) es la
   // vista por defecto al abrir la página — pedido explícito del usuario.
   const [vista, setVista] = useState("todasLasCotizaciones");
@@ -541,6 +542,7 @@ export default function ListaCotizaciones() {
           mostrarTituloOT
           otsPorCot={otsPorCot}
           mostrarDiasInforme
+          colOtEstrecha
         />
       )}
 
