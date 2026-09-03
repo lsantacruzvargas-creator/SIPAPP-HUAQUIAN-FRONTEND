@@ -289,21 +289,35 @@ export const TIPOS_INFORME = [
       },
       // 8 recuadros fijos impresos en la plantilla — ver
       // SLOTS_FOTOS.diagnostico_servomotor en informeTecnicoExcel.js, que
-      // ubica cada foto por la clave del slot, no por orden de subida.
+      // ubica cada foto por la clave del slot, no por orden de subida. Los
+      // rótulos impresos sobre cada recuadro son editables desde el propio
+      // card de cada foto (`campoTitulo`, ver SeccionEvidencias en
+      // FormInformeTecnico.jsx) — si el técnico no los toca, escribir() en
+      // informeTecnicoExcel.js no sobrescribe la celda y queda el texto
+      // impreso. A diferencia de arrancador/plc, acá cada recuadro tiene su
+      // propio rótulo (ninguno compartido).
       {
         ...EVIDENCIAS_ESTANDAR, titulo: "Fotos del diagnóstico",
+        // 3 columnas, miniatura grande y 1 sola foto por cuadro (pedido
+        // explícito del usuario) — ver SeccionEvidencias en
+        // FormInformeTecnico.jsx.
+        columnas: 3, miniaturaGrande: true, maxImagenes: 1,
         slotsFijos: [
-          { clave: "vistaFrontal", label: "Vista frontal del equipo" },
-          { clave: "placa", label: "Placa" },
-          { clave: "estadoCarcasa", label: "Estado de la carcasa del equipo" },
-          { clave: "estadoEncoder", label: "Estado del encoder" },
-          { clave: "estadoInterno", label: "Estado interno del equipo" },
-          { clave: "conectores", label: "Conectores" },
-          { clave: "estadoRodamientos", label: "Estado de los rodamientos" },
-          { clave: "pruebaEquipo", label: "Prueba del equipo" },
+          { clave: "vistaFrontal", label: "Vista frontal del equipo", campoTitulo: "tituloVistaFrontal" },
+          { clave: "placa", label: "Placa", campoTitulo: "tituloPlaca" },
+          { clave: "estadoCarcasa", label: "Estado de la carcasa del equipo", campoTitulo: "tituloEstadoCarcasa" },
+          { clave: "estadoEncoder", label: "Estado del encoder", campoTitulo: "tituloEstadoEncoder" },
+          { clave: "estadoInterno", label: "Estado interno del equipo", campoTitulo: "tituloEstadoInterno" },
+          { clave: "conectores", label: "Conectores", campoTitulo: "tituloConectores" },
+          { clave: "estadoRodamientos", label: "Estado de los rodamientos", campoTitulo: "tituloEstadoRodamientos" },
+          { clave: "pruebaEquipo", label: "Prueba del equipo", campoTitulo: "tituloPruebaEquipo" },
         ],
       },
-      PIEZAS_A_REEMPLAZAR,
+      // La plantilla real ahora trae una tabla propia Cantidad/Descripción
+      // para "Piezas a reemplazar" (antes era texto libre sin celda, caía
+      // al anexo) — mismo tipo "filas" que arrancador/plc, habilita el botón
+      // "Traer de requerimientos" (ver SeccionFilas en FormInformeTecnico.jsx).
+      PIEZAS_A_REEMPLAZAR_TABLA,
       checklistOkNok("Checklist de verificación técnica", [
         "Revisión de estado general del gabinete y carcasa",
         "Verificación visual de conectores",
@@ -373,17 +387,24 @@ export const TIPOS_INFORME = [
       { tipo: "campos", titulo: "Datos del equipo", campos: [...CAMPOS_EQUIPO_ESTANDAR, ...CAMPOS_OPERARIO] },
       // 7 recuadros fijos impresos en la plantilla — ver SLOTS_FOTOS.pc en
       // informeTecnicoExcel.js, que ubica cada foto por la clave del slot,
-      // no por orden de subida.
+      // no por orden de subida. Los rótulos impresos sobre cada recuadro son
+      // editables desde el propio card de cada foto (`campoTitulo`, ver
+      // SeccionEvidencias en FormInformeTecnico.jsx) — "Limpieza de tarjeta
+      // inicial/final" comparte 1 solo rótulo entre sus 2 recuadros.
       {
         ...EVIDENCIAS_ESTANDAR, titulo: "Fotos del mantenimiento",
+        // 3 columnas, miniatura grande y 1 sola foto por cuadro (pedido
+        // explícito del usuario) — ver SeccionEvidencias en
+        // FormInformeTecnico.jsx.
+        columnas: 3, miniaturaGrande: true, maxImagenes: 1,
         slotsFijos: [
-          { clave: "vistaFrontal", label: "Vista frontal del equipo" },
-          { clave: "placaEquipo", label: "Placa Equipo" },
-          { clave: "carcasaContaminada", label: "Carcasa contaminada" },
-          { clave: "carcasaDescontaminada", label: "Carcasa descontaminada" },
-          { clave: "limpiezaTarjetaInicial", label: "Limpieza de tarjeta inicial" },
-          { clave: "limpiezaTarjetaFinal", label: "Limpieza de tarjeta final" },
-          { clave: "cambioVentilador", label: "Cambio de ventilador" },
+          { clave: "vistaFrontal", label: "Vista frontal del equipo", campoTitulo: "tituloVistaFrontal" },
+          { clave: "placaEquipo", label: "Placa Equipo", campoTitulo: "tituloPlacaEquipo" },
+          { clave: "carcasaContaminada", label: "Carcasa contaminada", campoTitulo: "tituloCarcasaContaminada" },
+          { clave: "carcasaDescontaminada", label: "Carcasa descontaminada", campoTitulo: "tituloCarcasaDescontaminada" },
+          { clave: "limpiezaTarjetaInicial", label: "Limpieza de tarjeta inicial", campoTitulo: "tituloLimpiezaTarjeta" },
+          { clave: "limpiezaTarjetaFinal", label: "Limpieza de tarjeta final", campoTitulo: "tituloLimpiezaTarjeta" },
+          { clave: "cambioVentilador", label: "Cambio de ventilador", campoTitulo: "tituloCambioVentilador" },
         ],
       },
       PIEZAS_A_REEMPLAZAR_TABLA,
@@ -412,20 +433,29 @@ export const TIPOS_INFORME = [
       // 10 recuadros fijos impresos en la plantilla — ver SLOTS_FOTOS.panel
       // en informeTecnicoExcel.js, que ubica cada foto por la clave del
       // slot, no por orden de subida. "Cambio de LCD" está repetido a
-      // propósito (antes/después, mismo patrón que "Cambio de Touch").
+      // propósito (antes/después, mismo patrón que "Cambio de Touch"). Los
+      // rótulos impresos sobre cada recuadro son editables desde el propio
+      // card de cada foto (`campoTitulo`, ver SeccionEvidencias en
+      // FormInformeTecnico.jsx) — "Carcasa contaminada/descontaminada",
+      // "Limpieza de tarjeta inicial/final", "Cambio de LCD" y "Cambio de
+      // Touch" comparten 1 solo rótulo entre sus 2 recuadros.
       {
         ...EVIDENCIAS_ESTANDAR, titulo: "Fotos del mantenimiento",
+        // 3 columnas, miniatura grande y 1 sola foto por cuadro (pedido
+        // explícito del usuario) — ver SeccionEvidencias en
+        // FormInformeTecnico.jsx.
+        columnas: 3, miniaturaGrande: true, maxImagenes: 1,
         slotsFijos: [
-          { clave: "vistaFrontal", label: "Vista frontal del equipo" },
-          { clave: "placaEquipo", label: "Placa Equipo" },
-          { clave: "carcasaContaminada", label: "Carcasa contaminada" },
-          { clave: "carcasaDescontaminada", label: "Carcasa descontaminada" },
-          { clave: "limpiezaTarjetaInicial", label: "Limpieza de tarjeta inicial" },
-          { clave: "limpiezaTarjetaFinal", label: "Limpieza de tarjeta Final" },
-          { clave: "cambioLcdInicial", label: "Cambio de LCD" },
-          { clave: "cambioLcdFinal", label: "Cambio de LCD" },
-          { clave: "cambioTouchInicial", label: "Cambio de Touch" },
-          { clave: "cambioTouchFinal", label: "Cambio de Touch" },
+          { clave: "vistaFrontal", label: "Vista frontal del equipo", campoTitulo: "tituloVistaFrontal" },
+          { clave: "placaEquipo", label: "Placa Equipo", campoTitulo: "tituloPlacaEquipo" },
+          { clave: "carcasaContaminada", label: "Carcasa contaminada", campoTitulo: "tituloCarcasaContaminadaDescontaminada" },
+          { clave: "carcasaDescontaminada", label: "Carcasa descontaminada", campoTitulo: "tituloCarcasaContaminadaDescontaminada" },
+          { clave: "limpiezaTarjetaInicial", label: "Limpieza de tarjeta inicial", campoTitulo: "tituloLimpiezaTarjeta" },
+          { clave: "limpiezaTarjetaFinal", label: "Limpieza de tarjeta Final", campoTitulo: "tituloLimpiezaTarjeta" },
+          { clave: "cambioLcdInicial", label: "Cambio de LCD", campoTitulo: "tituloCambioLcd" },
+          { clave: "cambioLcdFinal", label: "Cambio de LCD", campoTitulo: "tituloCambioLcd" },
+          { clave: "cambioTouchInicial", label: "Cambio de Touch", campoTitulo: "tituloCambioTouch" },
+          { clave: "cambioTouchFinal", label: "Cambio de Touch", campoTitulo: "tituloCambioTouch" },
         ],
       },
       PIEZAS_A_REEMPLAZAR_TABLA,
@@ -461,13 +491,24 @@ export const TIPOS_INFORME = [
       },
       // 2 recuadros fijos impresos en la plantilla — ver SLOTS_FOTOS.adicional
       // en informeTecnicoExcel.js, que ubica cada foto por la clave del
-      // slot, no por orden de subida.
+      // slot, no por orden de subida. Los rótulos impresos en A21/E21
+      // ("VISTA FRONTAL COMPONENTE"/"VISTA FRONTAL EQUIPO") son editables
+      // desde el propio card de cada foto (`campoTitulo`, ver
+      // SeccionEvidencias en FormInformeTecnico.jsx) — si el técnico no los
+      // toca, escribir() en informeTecnicoExcel.js no sobrescribe la celda y
+      // queda el texto impreso original.
       {
         ...EVIDENCIAS_ESTANDAR, titulo: "Fotos del componente y del equipo",
         slotsFijos: [
-          { clave: "vistaFrontalComponente", label: "Vista frontal del componente" },
-          { clave: "vistaFrontalEquipo", label: "Vista frontal del equipo" },
+          { clave: "vistaFrontalComponente", label: "Vista frontal del componente", campoTitulo: "tituloVistaComponente" },
+          { clave: "vistaFrontalEquipo", label: "Vista frontal del equipo", campoTitulo: "tituloVistaEquipo" },
         ],
+        // Solo 2 slots — se ven mejor uno al lado del otro que apilados, con
+        // miniatura más grande y 1 sola foto por cuadro (pedido explícito
+        // para este tipo, ver SeccionEvidencias en FormInformeTecnico.jsx).
+        columnas: 2,
+        miniaturaGrande: true,
+        maxImagenes: 1,
       },
       checklistOkNok("Checklist de verificación técnica", [
         "Estado visual del componente",
@@ -490,17 +531,26 @@ export const TIPOS_INFORME = [
       { tipo: "campos", titulo: "Datos del equipo", campos: [...CAMPOS_EQUIPO_ESTANDAR, ...CAMPOS_OPERARIO] },
       // 7 recuadros fijos impresos en la plantilla — ver SLOTS_FOTOS.plc en
       // informeTecnicoExcel.js, que ubica cada foto por la clave del slot,
-      // no por orden de subida.
+      // no por orden de subida. Los rótulos impresos sobre cada recuadro son
+      // editables desde el propio card de cada foto (`campoTitulo`, ver
+      // SeccionEvidencias en FormInformeTecnico.jsx) — si el técnico no los
+      // toca, escribir() en informeTecnicoExcel.js no sobrescribe la celda y
+      // queda el texto impreso. "Limpieza de tarjeta inicial/final" comparte
+      // 1 solo rótulo para sus 2 recuadros — no hay 2 celdas separadas.
       {
         ...EVIDENCIAS_ESTANDAR, titulo: "Fotos del mantenimiento",
+        // 3 columnas, miniatura grande y 1 sola foto por cuadro (pedido
+        // explícito del usuario) — ver SeccionEvidencias en
+        // FormInformeTecnico.jsx.
+        columnas: 3, miniaturaGrande: true, maxImagenes: 1,
         slotsFijos: [
-          { clave: "vistaFrontal", label: "Vista frontal del equipo" },
-          { clave: "placaEquipo", label: "Placa Equipo" },
-          { clave: "carcasaContaminada", label: "Carcasa contaminada" },
-          { clave: "carcasaDescontaminada", label: "Carcasa descontaminada" },
-          { clave: "limpiezaTarjetaInicial", label: "Limpieza de tarjeta inicial" },
-          { clave: "limpiezaTarjetaFinal", label: "Limpieza de tarjeta Final" },
-          { clave: "cambioComponentes", label: "Cambio de componentes" },
+          { clave: "vistaFrontal", label: "Vista frontal del equipo", campoTitulo: "tituloVistaFrontal" },
+          { clave: "placaEquipo", label: "Placa Equipo", campoTitulo: "tituloPlacaEquipo" },
+          { clave: "carcasaContaminada", label: "Carcasa contaminada", campoTitulo: "tituloCarcasaContaminada" },
+          { clave: "carcasaDescontaminada", label: "Carcasa descontaminada", campoTitulo: "tituloCarcasaDescontaminada" },
+          { clave: "limpiezaTarjetaInicial", label: "Limpieza de tarjeta inicial", campoTitulo: "tituloLimpiezaTarjeta" },
+          { clave: "limpiezaTarjetaFinal", label: "Limpieza de tarjeta Final", campoTitulo: "tituloLimpiezaTarjeta" },
+          { clave: "cambioComponentes", label: "Cambio de componentes", campoTitulo: "tituloCambioComponentes" },
         ],
       },
       PIEZAS_A_REEMPLAZAR_TABLA,
@@ -526,31 +576,46 @@ export const TIPOS_INFORME = [
     secciones: [
       { tipo: "campos", titulo: "Datos generales", campos: CAMPOS_HEADER_SERVICIO },
       { tipo: "campos", titulo: "Datos del equipo", campos: [...CAMPOS_EQUIPO_ESTANDAR, ...CAMPOS_OPERARIO] },
-      PROTOCOLO_PRUEBA(PROTOCOLO_ITEMS_ESTANDAR, "inicial", "protoInicial"),
-      EVIDENCIA_PRUEBA_EQUIPO("inicial", "protoInicial"),
-      PROTOCOLO_PRUEBA(PROTOCOLO_ITEMS_ESTANDAR, "final", "protoFinal"),
-      EVIDENCIA_PRUEBA_EQUIPO("final", "protoFinal"),
+      // `parPosicion` — solo para este tipo (pedido explícito del usuario):
+      // rompe el apilado lineal por defecto y pone la card de foto a la
+      // derecha de su card de protocolo correspondiente, en vez de debajo
+      // (ver el agrupamiento por parPosicion en FormInformeTecnico.jsx).
+      { ...PROTOCOLO_PRUEBA(PROTOCOLO_ITEMS_ESTANDAR, "inicial", "protoInicial"), parPosicion: "izquierda" },
+      { ...EVIDENCIA_PRUEBA_EQUIPO("inicial", "protoInicial"), parPosicion: "derecha", miniaturaGrande: true, maxImagenes: 1 },
+      { ...PROTOCOLO_PRUEBA(PROTOCOLO_ITEMS_ESTANDAR, "final", "protoFinal"), parPosicion: "izquierda" },
+      { ...EVIDENCIA_PRUEBA_EQUIPO("final", "protoFinal"), parPosicion: "derecha", miniaturaGrande: true, maxImagenes: 1 },
       // 13 recuadros fijos impresos en la plantilla — ver
       // SLOTS_FOTOS.arrancador en informeTecnicoExcel.js, que ubica cada
       // foto por la clave del slot, no por orden de subida. "Cambio de
       // componentes" y "Medición de SCR" están repetidos a propósito
       // (antes/después de la intervención), mismo patrón que otros tipos.
+      // Los rótulos impresos sobre cada recuadro son editables desde el
+      // propio card de cada foto (`campoTitulo`, ver SeccionEvidencias en
+      // FormInformeTecnico.jsx) — si el técnico no los toca, escribir() en
+      // informeTecnicoExcel.js no sobrescribe la celda y queda el texto
+      // impreso. "Cambio de componentes"/"Medición de SCR"/"Tarjeta.../
+      // Pasta térmica..." comparten 1 solo rótulo entre sus 2 recuadros
+      // (antes/después) — no hay 2 celdas separadas en la plantilla.
       {
         ...EVIDENCIAS_ESTANDAR, titulo: "Fotos del mantenimiento",
+        // 3 columnas, miniatura grande y 1 sola foto por cuadro (pedido
+        // explícito del usuario) — ver SeccionEvidencias en
+        // FormInformeTecnico.jsx.
+        columnas: 3, miniaturaGrande: true, maxImagenes: 1,
         slotsFijos: [
-          { clave: "vistaFrontal", label: "Vista frontal del equipo" },
-          { clave: "placaEquipo", label: "Placa Equipo" },
-          { clave: "carcasaContaminada", label: "Carcasa contaminada" },
-          { clave: "carcasaDescontaminada", label: "Carcasa descontaminada" },
-          { clave: "limpiezaContaminada", label: "Limpieza Contaminada" },
-          { clave: "limpiezaDescontaminada", label: "Limpieza Descontaminada" },
-          { clave: "pastaTermicaSeca", label: "Pasta térmica seca" },
-          { clave: "pastaTermicaNueva", label: "Pasta térmica nueva" },
-          { clave: "cambioVentilador", label: "Cambio ventilador" },
-          { clave: "cambioComponentesInicial", label: "Cambio de componentes" },
-          { clave: "cambioComponentesFinal", label: "Cambio de componentes" },
-          { clave: "medicionScrInicial", label: "Medición de SCR" },
-          { clave: "medicionScrFinal", label: "Medición de SCR" },
+          { clave: "vistaFrontal", label: "Vista frontal del equipo", campoTitulo: "tituloVistaFrontal" },
+          { clave: "placaEquipo", label: "Placa Equipo", campoTitulo: "tituloPlacaEquipo" },
+          { clave: "carcasaContaminada", label: "Carcasa contaminada", campoTitulo: "tituloCarcasaContaminada" },
+          { clave: "carcasaDescontaminada", label: "Carcasa descontaminada", campoTitulo: "tituloCarcasaDescontaminada" },
+          { clave: "limpiezaContaminada", label: "Limpieza Contaminada", campoTitulo: "tituloTarjeta" },
+          { clave: "limpiezaDescontaminada", label: "Limpieza Descontaminada", campoTitulo: "tituloTarjeta" },
+          { clave: "pastaTermicaSeca", label: "Pasta térmica seca", campoTitulo: "tituloPastaTermica" },
+          { clave: "pastaTermicaNueva", label: "Pasta térmica nueva", campoTitulo: "tituloPastaTermica" },
+          { clave: "cambioVentilador", label: "Cambio ventilador", campoTitulo: "tituloCambioVentilador" },
+          { clave: "cambioComponentesInicial", label: "Cambio de componentes", campoTitulo: "tituloCambioComponentes" },
+          { clave: "cambioComponentesFinal", label: "Cambio de componentes", campoTitulo: "tituloCambioComponentes" },
+          { clave: "medicionScrInicial", label: "Medición de SCR", campoTitulo: "tituloMedicionScr" },
+          { clave: "medicionScrFinal", label: "Medición de SCR", campoTitulo: "tituloMedicionScr" },
         ],
       },
       {
@@ -655,18 +720,53 @@ export const TIPOS_INFORME = [
     secciones: [
       { tipo: "campos", titulo: "Datos generales", campos: CAMPOS_HEADER_SERVICIO },
       { tipo: "campos", titulo: "Datos del equipo", campos: [...CAMPOS_EQUIPO_ESTANDAR, ...CAMPOS_OPERARIO] },
-      PROTOCOLO_PRUEBA(PROTOCOLO_ITEMS_ESTANDAR, "inicial", "protoInicial"),
-      EVIDENCIA_PRUEBA_EQUIPO("inicial", "protoInicial"),
-      PROTOCOLO_PRUEBA(PROTOCOLO_ITEMS_ESTANDAR, "final", "protoFinal"),
-      EVIDENCIA_PRUEBA_EQUIPO("final", "protoFinal"),
-      EVIDENCIAS_ESTANDAR,
+      // `parPosicion` — solo para este tipo (pedido explícito del usuario,
+      // mismo patrón que arrancador): rompe el apilado lineal por defecto y
+      // pone la card de foto a la derecha de su card de protocolo
+      // correspondiente (ver el agrupamiento por parPosicion en
+      // FormInformeTecnico.jsx).
+      { ...PROTOCOLO_PRUEBA(PROTOCOLO_ITEMS_ESTANDAR, "inicial", "protoInicial"), parPosicion: "izquierda" },
+      { ...EVIDENCIA_PRUEBA_EQUIPO("inicial", "protoInicial"), parPosicion: "derecha", miniaturaGrande: true, maxImagenes: 1 },
+      { ...PROTOCOLO_PRUEBA(PROTOCOLO_ITEMS_ESTANDAR, "final", "protoFinal"), parPosicion: "izquierda" },
+      { ...EVIDENCIA_PRUEBA_EQUIPO("final", "protoFinal"), parPosicion: "derecha", miniaturaGrande: true, maxImagenes: 1 },
+      // 9 recuadros fijos impresos en la plantilla (13 slots contando
+      // antes/después) — ver SLOTS_FOTOS.ups en informeTecnicoExcel.js, que
+      // ubica cada foto por la clave del slot, no por orden de subida. Los
+      // rótulos impresos sobre cada recuadro son editables desde el propio
+      // card de cada foto (`campoTitulo`, ver SeccionEvidencias en
+      // FormInformeTecnico.jsx) — "Tarjeta contaminada/descontaminada",
+      // "Baterías contaminadas/descontaminadas", "Cambio de componentes" y
+      // "Medición de baterías" comparten 1 solo rótulo entre sus 2 recuadros.
+      {
+        ...EVIDENCIAS_ESTANDAR, titulo: "Fotos del mantenimiento",
+        columnas: 3, miniaturaGrande: true, maxImagenes: 1,
+        slotsFijos: [
+          { clave: "vistaFrontal", label: "Vista frontal del equipo", campoTitulo: "tituloVistaFrontal" },
+          { clave: "placaEquipo", label: "Placa Equipo", campoTitulo: "tituloPlacaEquipo" },
+          { clave: "carcasaContaminada", label: "Carcasa contaminada", campoTitulo: "tituloCarcasaContaminada" },
+          { clave: "carcasaDescontaminada", label: "Carcasa descontaminada", campoTitulo: "tituloCarcasaDescontaminada" },
+          { clave: "tarjetaContaminada", label: "Tarjeta contaminada", campoTitulo: "tituloTarjeta" },
+          { clave: "tarjetaDescontaminada", label: "Tarjeta descontaminada", campoTitulo: "tituloTarjeta" },
+          { clave: "bateriasContaminadas", label: "Baterías contaminadas", campoTitulo: "tituloBaterias" },
+          { clave: "bateriasDescontaminadas", label: "Baterías descontaminadas", campoTitulo: "tituloBaterias" },
+          { clave: "cambioVentilador", label: "Cambio ventilador", campoTitulo: "tituloCambioVentilador" },
+          { clave: "cambioComponentesInicial", label: "Cambio de componentes", campoTitulo: "tituloCambioComponentes" },
+          { clave: "cambioComponentesFinal", label: "Cambio de componentes", campoTitulo: "tituloCambioComponentes" },
+          { clave: "medicionBateriasInicial", label: "Medición de baterías", campoTitulo: "tituloMedicionBaterias" },
+          { clave: "medicionBateriasFinal", label: "Medición de baterías", campoTitulo: "tituloMedicionBaterias" },
+        ],
+      },
       {
         tipo: "tabla", titulo: "Medición de baterías", clave: "medicionBaterias",
         columnas: [{ clave: "nominal", label: "Nominal (V)" }, { clave: "real", label: "Real (V)" }],
         filas: Array.from({ length: 10 }, (_, i) => ({ clave: `bateria${i + 1}`, label: `Batería ${i + 1}` })),
       },
-      PIEZAS_A_REEMPLAZAR,
-      checklistDoble("Checklist de verificación técnica", "checklistTecnico", [
+      // La plantilla real ahora trae una tabla propia Cantidad/Descripción
+      // (10 filas, al lado de "Medición de baterías") — antes era texto
+      // libre sin celda propia. Mismo tipo "filas" que arrancador/plc,
+      // habilita el botón "Traer de requerimientos".
+      PIEZAS_A_REEMPLAZAR_TABLA,
+      checklistDobleOkNok("Checklist de verificación técnica", "checklistTecnico", [
         "Estado general del gabinete y carcasa",
         "Estado visual de tarjetas y conectores",
         "Estado revisión de conexiones de potencia y control",

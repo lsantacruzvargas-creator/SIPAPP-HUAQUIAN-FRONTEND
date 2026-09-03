@@ -6,6 +6,8 @@ import ModalCrearFactura  from "../components/ModalCrearFactura";
 import ModalImportarExcel, { COLS_FACTURAS } from "../components/ModalImportarExcel";
 import { DotChip, badgePago, dotPago } from "../components/detalleShared";
 import TablaScroll from "../components/TablaScroll";
+import ConfirmacionAccion from "../components/ConfirmacionAccion";
+import AvisoAccion from "../components/AvisoAccion";
 import * as XLSX from "xlsx";
 
 const MESES = [
@@ -283,6 +285,9 @@ export default function ListaFacturas() {
   const [crearOpen, setCrearOpen]     = useState(false);
   const [importarOpen, setImportarOpen] = useState(false);
   const [sortBy, setSortBy]           = useState("fecha");
+  const [avisoPermiso, setAvisoPermiso] = useState("");
+  const [confirmandoPago, setConfirmandoPago] = useState(null);
+  const [procesandoPago, setProcesandoPago] = useState(false);
 
   const cargar = () =>
     Promise.all([
@@ -356,24 +361,15 @@ export default function ListaFacturas() {
   // ahora — puede ser parcial. `estadoPago` se deriva del monto igual que en
   // el backend (routes/facturas.js /estado-pago): 0 = sin pago, entre 0 y el
   // total = pago parcial, >= total = pagado.
-  const handlePagoMonto = async (id, montoIngresado) => {
+  const ejecutarPagoMonto = async (id, montoIngresado) => {
     const factura = facturas.find(f => f._id === id);
     if (!factura) return;
 
     const totalAPagar = Number(factura.totalAPagar) || 0;
     const pago = Math.max(0, Number(montoIngresado) || 0);
-    const estadoPagoAnterior = factura.estadoPago;
     let estadoPago = "sin pago";
     if (pago > 0 && pago < totalAPagar) estadoPago = "pago parcial";
     if (totalAPagar > 0 && pago >= totalAPagar) estadoPago = "pagado";
-
-    if (estadoPagoAnterior === "pagado" && estadoPago !== "pagado" && getUsuario()?.rol !== "admin") {
-      alert("Solo un administrador puede deshacer un pago ya confirmado.");
-      return;
-    }
-    if (estadoPago === "pagado" && estadoPagoAnterior !== "pagado") {
-      if (!window.confirm("¿Confirmas marcar esta factura como pagada?")) return;
-    }
 
     // Al pagar se cierra toda la cadena (Cotización/OT/Informe/OC/Factura); se
     // refleja de inmediato en memoria, el backend hace lo mismo en la BD.
@@ -396,8 +392,30 @@ export default function ListaFacturas() {
     } catch {
       // Revertir el cambio optimista para que la UI no mienta si no se guardó
       setFacturas(prev => prev.map(f => f._id === id ? { ...f, ...previo } : f));
-      alert("No se pudo guardar el estado de pago. Verifica que el servidor esté disponible e intenta de nuevo.");
+      setAvisoPermiso("No se pudo guardar el estado de pago. Verifica que el servidor esté disponible e intenta de nuevo.");
     }
+  };
+
+  const handlePagoMonto = async (id, montoIngresado) => {
+    const factura = facturas.find(f => f._id === id);
+    if (!factura) return;
+
+    const totalAPagar = Number(factura.totalAPagar) || 0;
+    const pago = Math.max(0, Number(montoIngresado) || 0);
+    const estadoPagoAnterior = factura.estadoPago;
+    let estadoPago = "sin pago";
+    if (pago > 0 && pago < totalAPagar) estadoPago = "pago parcial";
+    if (totalAPagar > 0 && pago >= totalAPagar) estadoPago = "pagado";
+
+    if (estadoPagoAnterior === "pagado" && estadoPago !== "pagado" && getUsuario()?.rol !== "admin") {
+      setAvisoPermiso("Solo un administrador puede deshacer un pago ya confirmado.");
+      return;
+    }
+    if (estadoPago === "pagado" && estadoPagoAnterior !== "pagado") {
+      setConfirmandoPago({ tipo: "factura", id, montoIngresado });
+      return;
+    }
+    await ejecutarPagoMonto(id, montoIngresado);
   };
 
   // Igual que handlePagoMonto pero por cuota — el agregado (montoPagado/
@@ -405,17 +423,10 @@ export default function ListaFacturas() {
   // (Backend/src/routes/facturas.js:/:id/cuotas/:cuotaId/pagar), no se
   // reemplaza la factura completa con la respuesta del server para no perder
   // los campos `_numeroOT`/`_numeroCotizacion` que solo viven en el frontend.
-  const handleCuotaPagoCheck = async (facturaId, cuotaId, pagada) => {
+  const ejecutarCuotaPagoCheck = async (facturaId, cuotaId, pagada) => {
     const factura = facturas.find(f => f._id === facturaId);
     const cuota = factura?.cuotas?.find(c => c._id === cuotaId);
     if (!factura || !cuota) return;
-
-    if (pagada) {
-      if (!window.confirm("¿Confirmas marcar esta cuota como pagada?")) return;
-    } else if (getUsuario()?.rol !== "admin") {
-      alert("Solo un administrador puede deshacer un pago.");
-      return;
-    }
 
     const cuotasActualizadas = factura.cuotas.map(c =>
       c._id === cuotaId ? { ...c, pagado: pagada, fechaPago: pagada ? new Date().toISOString() : null } : c
@@ -445,8 +456,24 @@ export default function ListaFacturas() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
     } catch {
       setFacturas(prev => prev.map(f => f._id === facturaId ? { ...f, ...previo } : f));
-      alert("No se pudo guardar el estado de pago. Verifica que el servidor esté disponible e intenta de nuevo.");
+      setAvisoPermiso("No se pudo guardar el estado de pago. Verifica que el servidor esté disponible e intenta de nuevo.");
     }
+  };
+
+  const handleCuotaPagoCheck = async (facturaId, cuotaId, pagada) => {
+    const factura = facturas.find(f => f._id === facturaId);
+    const cuota = factura?.cuotas?.find(c => c._id === cuotaId);
+    if (!factura || !cuota) return;
+
+    if (pagada) {
+      setConfirmandoPago({ tipo: "cuota", facturaId, cuotaId, pagada });
+      return;
+    }
+    if (getUsuario()?.rol !== "admin") {
+      setAvisoPermiso("Solo un administrador puede deshacer un pago.");
+      return;
+    }
+    await ejecutarCuotaPagoCheck(facturaId, cuotaId, pagada);
   };
 
   const cerradas = filtradas.filter(f => f.estadoCadena === "cerrado");
@@ -596,6 +623,24 @@ export default function ListaFacturas() {
         }}
       />
     )}
+
+    {confirmandoPago && (
+      <ConfirmacionAccion
+        mensaje={confirmandoPago.tipo === "factura" ? "¿Confirmas marcar esta factura como pagada?" : "¿Confirmas marcar esta cuota como pagada?"}
+        onCancelar={() => setConfirmandoPago(null)}
+        onConfirmar={async () => {
+          setProcesandoPago(true);
+          if (confirmandoPago.tipo === "factura") await ejecutarPagoMonto(confirmandoPago.id, confirmandoPago.montoIngresado);
+          else await ejecutarCuotaPagoCheck(confirmandoPago.facturaId, confirmandoPago.cuotaId, confirmandoPago.pagada);
+          setProcesandoPago(false);
+          setConfirmandoPago(null);
+        }}
+        procesando={procesandoPago}
+        textoConfirmar="Confirmar"
+      />
+    )}
+
+    {avisoPermiso && <AvisoAccion mensaje={avisoPermiso} onCerrar={() => setAvisoPermiso("")} />}
     </>
   );
 }

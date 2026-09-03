@@ -116,11 +116,14 @@ export default function EmitirGuia() {
   const [comprador, setComprador]       = useState(PARTE_VACIA);
   const [puntoPartida, setPuntoPartida] = useState(DIRECCION_VACIA);
   const [puntoLlegada, setPuntoLlegada] = useState(DIRECCION_VACIA);
-  // "Direcciones guardadas" del destinatario (ver SelectorDireccionGuardada) —
-  // empresas se traen recién al abrir el selector la primera vez, no en el
-  // mount de la página (esta vista no las necesita para nada más).
+  // "Direcciones guardadas" — mismo selector para Destinatario y Remitente
+  // (dueño de la carga), `destinoSelectorDireccion` dice cuál de los 2 está
+  // llenando en este momento. Las empresas se traen recién al abrir el
+  // selector la primera vez, no en el mount de la página (esta vista no las
+  // necesita para nada más).
   const [empresasGuardadas, setEmpresasGuardadas] = useState([]);
   const [selectorDireccionOpen, setSelectorDireccionOpen] = useState(false);
+  const [destinoSelectorDireccion, setDestinoSelectorDireccion] = useState("destinatario");
   const [transportista, setTransportista] = useState(TRANSPORTISTA_VACIO);
   const [vehiculo, setVehiculo]           = useState(VEHICULO_VACIO);
   const [conductor, setConductor]         = useState(CONDUCTOR_VACIO);
@@ -191,7 +194,8 @@ export default function EmitirGuia() {
     setPuntoPartida({ ubigeo: HUAQUIAN.ubigeo, direccion: HUAQUIAN.direccion });
   }, [tipoGuia]);
 
-  const abrirSelectorDireccion = async () => {
+  const abrirSelectorDireccion = async (destino = "destinatario") => {
+    setDestinoSelectorDireccion(destino);
     if (empresasGuardadas.length === 0) {
       const r = await fetchAuth("/empresas");
       if (r.ok) setEmpresasGuardadas(await r.json());
@@ -200,8 +204,15 @@ export default function EmitirGuia() {
   };
 
   const elegirDireccionGuardada = (empresa, planta) => {
-    setDestinatario((d) => ({ ...d, schemeID: "6", numDoc: empresa.ruc || "", nombre: empresa.razonSocial }));
-    setPuntoLlegada({ ubigeo: planta.ubigeo, direccion: planta.direccion });
+    const datos = { schemeID: "6", numDoc: empresa.ruc || "", nombre: empresa.razonSocial };
+    const direccion = { ubigeo: planta.ubigeo, direccion: planta.direccion };
+    if (destinoSelectorDireccion === "remitente") {
+      setRemitente((r) => ({ ...r, ...datos }));
+      setPuntoPartida(direccion);
+    } else {
+      setDestinatario((d) => ({ ...d, ...datos }));
+      setPuntoLlegada(direccion);
+    }
     setSelectorDireccionOpen(false);
   };
 
@@ -633,7 +644,7 @@ export default function EmitirGuia() {
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Destinatario</p>
             {!ro && (
-              <button type="button" onClick={abrirSelectorDireccion}
+              <button type="button" onClick={() => abrirSelectorDireccion("destinatario")}
                 className="text-xs text-blue-600 hover:text-blue-800 underline">
                 Elegir de direcciones guardadas
               </button>
@@ -670,10 +681,18 @@ export default function EmitirGuia() {
         {/* Remitente (solo guía de transportista) */}
         {tipoGuia === "TRANSPORTISTA" && (
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mb-5">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center">
-              Remitente (dueño de la carga)
-              <Ayuda texto="Obligatorio cuando el emisor es el transportista: identifica a la empresa dueña de la mercadería que se traslada." />
-            </p>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center">
+                Remitente (dueño de la carga)
+                <Ayuda texto="Obligatorio cuando el emisor es el transportista: identifica a la empresa dueña de la mercadería que se traslada." />
+              </p>
+              {!ro && (
+                <button type="button" onClick={() => abrirSelectorDireccion("remitente")}
+                  className="text-xs text-blue-600 hover:text-blue-800 underline">
+                  Elegir de direcciones guardadas
+                </button>
+              )}
+            </div>
             <div className="grid grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Tipo de documento</label>

@@ -3,7 +3,6 @@ import { fetchAuth } from "../utils/fetchAuth";
 
 const FORM_VACIO = { razonSocial: "", ruc: "", direccion: "", alias: "", requiereHes: false, requiereActaConformidad: false, plantas: [] };
 const PLANTA_VACIA = { nombre: "", ubigeo: "", direccion: "", contactoNombre: "", contactoTelefono: "", contactoCorreo: "" };
-const CONTACTO_VACIO = { nombre: "", telefono: "", correo: "" };
 
 export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
   const [form, setForm] = useState(
@@ -24,10 +23,15 @@ export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
   const [error, setError] = useState("");
   const [cargando, setCargando] = useState(false);
   const [buscandoRuc, setBuscandoRuc] = useState(false);
-  // Contacto nuevo pendiente de agregar a una planta ya creada — solo una
-  // planta a la vez tiene su mini-form de "+ agregar contacto" abierto.
-  const [contactoNuevo, setContactoNuevo] = useState(CONTACTO_VACIO);
-  const [plantaAgregandoContacto, setPlantaAgregandoContacto] = useState(null);
+  // Edición in-place de una planta ya creada — un solo botón "Editar" por
+  // planta abre nombre/ubigeo/dirección Y sus contactos juntos (agregar,
+  // editar, quitar) en un solo bloque, con un solo Guardar/Cancelar. Antes
+  // solo se podía borrar y volver a crear la planta entera, o agregar
+  // contactos de a uno sin poder corregirlos. `plantaEditContactos` es un
+  // borrador editable de los contactos — no toca `form` hasta Guardar.
+  const [plantaEditInput, setPlantaEditInput] = useState(PLANTA_VACIA);
+  const [plantaEditContactos, setPlantaEditContactos] = useState([]);
+  const [plantaEditandoIdx, setPlantaEditandoIdx] = useState(null);
   // El input dispara la consulta tanto en Enter como en blur — sin este
   // guard, escribir el RUC y presionar Enter (y luego salir del campo)
   // consulta la API 2 veces por el mismo RUC (cada consulta ya cuesta 2
@@ -71,8 +75,8 @@ export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
     setPlantaInput({ ...plantaInput, [e.target.name]: e.target.value });
 
   // Cada planta nueva se crea junto con su primer contacto — los contactos
-  // adicionales se agregan después, directo en la lista, con
-  // "+ Agregar contacto" (ver agregarContacto).
+  // adicionales se agregan después entrando a "Editar" esa planta (ver
+  // abrirEditarPlanta/agregarContactoEditDraft).
   const agregarPlanta = () => {
     const nombre = plantaInput.nombre.trim();
     const ubigeo = plantaInput.ubigeo.trim();
@@ -95,38 +99,51 @@ export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
   const quitarPlanta = (idx) =>
     setForm((f) => ({ ...f, plantas: f.plantas.filter((_, i) => i !== idx) }));
 
-  const abrirAgregarContacto = (idx) => {
-    setPlantaAgregandoContacto(idx);
-    setContactoNuevo(CONTACTO_VACIO);
+  const abrirEditarPlanta = (idx) => {
+    const p = form.plantas[idx];
+    setPlantaEditInput({ nombre: p.nombre || "", ubigeo: p.ubigeo || "", direccion: p.direccion || "" });
+    setPlantaEditContactos((p.contactos || []).map((c) => ({ ...c })));
+    setPlantaEditandoIdx(idx);
     setErrorPlanta("");
   };
 
-  const agregarContacto = (idx) => {
-    const nombre = contactoNuevo.nombre.trim();
-    const telefono = contactoNuevo.telefono.trim();
-    const correo = contactoNuevo.correo.trim();
-    if (!nombre || !telefono) {
-      setErrorPlanta("Completa nombre y teléfono del contacto.");
+  const handlePlantaEditChange = (e) =>
+    setPlantaEditInput({ ...plantaEditInput, [e.target.name]: e.target.value });
+
+  const handleContactoEditChange = (ci, campo, valor) =>
+    setPlantaEditContactos((cs) => cs.map((c, i) => (i === ci ? { ...c, [campo]: valor } : c)));
+
+  const agregarContactoEditDraft = () =>
+    setPlantaEditContactos((cs) => [...cs, { nombre: "", telefono: "", correo: "" }]);
+
+  const quitarContactoEditDraft = (ci) =>
+    setPlantaEditContactos((cs) => cs.filter((_, i) => i !== ci));
+
+  const guardarEdicionPlanta = (idx) => {
+    const nombre = plantaEditInput.nombre.trim();
+    if (!nombre) {
+      setErrorPlanta("El nombre de la planta es obligatorio.");
+      return;
+    }
+    // Filas de contacto totalmente vacías (agregadas con "+ agregar" y
+    // dejadas sin llenar) se descartan solas — errar solo si quedó a medias
+    // (nombre sin teléfono o viceversa).
+    const contactos = plantaEditContactos
+      .map((c) => ({ nombre: c.nombre.trim(), telefono: c.telefono.trim(), correo: c.correo.trim() }))
+      .filter((c) => c.nombre || c.telefono || c.correo);
+    if (contactos.some((c) => !c.nombre || !c.telefono)) {
+      setErrorPlanta("Cada contacto necesita nombre y teléfono.");
       return;
     }
     setErrorPlanta("");
     setForm((f) => ({
       ...f,
       plantas: f.plantas.map((p, i) =>
-        i === idx ? { ...p, contactos: [...(p.contactos || []), { nombre, telefono, correo }] } : p
+        i === idx ? { ...p, nombre, ubigeo: plantaEditInput.ubigeo.trim(), direccion: plantaEditInput.direccion.trim(), contactos } : p
       ),
     }));
-    setContactoNuevo(CONTACTO_VACIO);
-    setPlantaAgregandoContacto(null);
+    setPlantaEditandoIdx(null);
   };
-
-  const quitarContacto = (idxPlanta, idxContacto) =>
-    setForm((f) => ({
-      ...f,
-      plantas: f.plantas.map((p, i) =>
-        i === idxPlanta ? { ...p, contactos: p.contactos.filter((_, ci) => ci !== idxContacto) } : p
-      ),
-    }));
 
   const guardar = async (e) => {
     e.preventDefault();
@@ -307,75 +324,113 @@ export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
               <ul className="space-y-2">
                 {form.plantas.map((p, idx) => (
                   <li key={idx} className="bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 text-sm space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium text-gray-700">{p.nombre}</span>
-                      <button
-                        type="button"
-                        onClick={() => quitarPlanta(idx)}
-                        className="text-gray-400 hover:text-red-500 transition text-base leading-none ml-2"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                    {(p.ubigeo || p.direccion) && (
-                      <p className="text-xs text-gray-400 pl-1">
-                        {p.ubigeo && <span className="font-mono">{p.ubigeo}</span>}{p.ubigeo && p.direccion ? " — " : ""}{p.direccion}
-                      </p>
-                    )}
-                    {(p.contactos || []).length > 0 && (
-                      <ul className="space-y-1">
-                        {p.contactos.map((c, ci) => (
-                          <li key={ci} className="flex items-center justify-between text-xs text-gray-500 pl-1">
-                            <span>{c.nombre} · {c.telefono}{c.correo ? ` · ${c.correo}` : ""}</span>
+                    {plantaEditandoIdx === idx ? (
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          <input
+                            name="nombre"
+                            value={plantaEditInput.nombre}
+                            onChange={handlePlantaEditChange}
+                            placeholder="Nombre de la planta…"
+                            className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-gray-400"
+                          />
+                          <input
+                            name="ubigeo"
+                            value={plantaEditInput.ubigeo}
+                            onChange={handlePlantaEditChange}
+                            maxLength={6}
+                            placeholder="Ubigeo (6 dígitos)…"
+                            className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-gray-400"
+                          />
+                          <input
+                            name="direccion"
+                            value={plantaEditInput.direccion}
+                            onChange={handlePlantaEditChange}
+                            placeholder="Dirección de la planta…"
+                            className="col-span-2 border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-gray-400"
+                          />
+                        </div>
+                        {plantaEditContactos.length > 0 && (
+                          <div className="space-y-1.5 pt-1 border-t border-gray-100">
+                            {plantaEditContactos.map((c, ci) => (
+                              <div key={ci} className="flex flex-wrap gap-2 pt-1.5">
+                                <input
+                                  value={c.nombre}
+                                  onChange={(e) => handleContactoEditChange(ci, "nombre", e.target.value)}
+                                  placeholder="Nombre"
+                                  className="flex-1 min-w-[100px] border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-gray-400"
+                                />
+                                <input
+                                  value={c.telefono}
+                                  onChange={(e) => handleContactoEditChange(ci, "telefono", e.target.value)}
+                                  placeholder="Teléfono"
+                                  className="flex-1 min-w-[90px] border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-gray-400"
+                                />
+                                <input
+                                  value={c.correo}
+                                  onChange={(e) => handleContactoEditChange(ci, "correo", e.target.value)}
+                                  placeholder="Correo (opcional)"
+                                  className="flex-1 min-w-[120px] border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-gray-400"
+                                />
+                                <button type="button" onClick={() => quitarContactoEditDraft(ci)}
+                                  className="text-gray-300 hover:text-red-500 transition shrink-0">
+                                  ✕
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <button type="button" onClick={agregarContactoEditDraft}
+                          className="text-xs text-blue-500 hover:text-blue-700 transition">
+                          + Agregar contacto
+                        </button>
+                        <div className="flex justify-end gap-3 pt-1">
+                          <button type="button" onClick={() => setPlantaEditandoIdx(null)}
+                            className="text-xs text-gray-400 hover:text-gray-600 transition">
+                            Cancelar
+                          </button>
+                          <button type="button" onClick={() => guardarEdicionPlanta(idx)}
+                            className="text-xs bg-gray-900 text-white px-2.5 py-1 rounded-lg hover:bg-gray-700 transition">
+                            Guardar
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-gray-700">{p.nombre}</span>
+                          <div className="flex items-center gap-2 shrink-0">
                             <button
                               type="button"
-                              onClick={() => quitarContacto(idx, ci)}
-                              className="text-gray-300 hover:text-red-500 transition"
+                              onClick={() => abrirEditarPlanta(idx)}
+                              className="text-xs text-blue-500 hover:text-blue-700 transition"
+                            >
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => quitarPlanta(idx)}
+                              className="text-gray-400 hover:text-red-500 transition text-base leading-none"
                             >
                               ✕
                             </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                    {plantaAgregandoContacto === idx ? (
-                      <div className="flex flex-wrap gap-2 pt-1">
-                        <input
-                          value={contactoNuevo.nombre}
-                          onChange={(e) => setContactoNuevo((c) => ({ ...c, nombre: e.target.value }))}
-                          placeholder="Nombre"
-                          className="flex-1 min-w-[100px] border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-gray-400"
-                        />
-                        <input
-                          value={contactoNuevo.telefono}
-                          onChange={(e) => setContactoNuevo((c) => ({ ...c, telefono: e.target.value }))}
-                          placeholder="Teléfono"
-                          className="flex-1 min-w-[90px] border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-gray-400"
-                        />
-                        <input
-                          value={contactoNuevo.correo}
-                          onChange={(e) => setContactoNuevo((c) => ({ ...c, correo: e.target.value }))}
-                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); agregarContacto(idx); } }}
-                          placeholder="Correo (opcional)"
-                          className="flex-1 min-w-[120px] border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-gray-400"
-                        />
-                        <button type="button" onClick={() => agregarContacto(idx)}
-                          className="text-xs bg-gray-900 text-white px-2.5 rounded-lg hover:bg-gray-700 transition shrink-0">
-                          Agregar
-                        </button>
-                        <button type="button" onClick={() => setPlantaAgregandoContacto(null)}
-                          className="text-xs text-gray-400 hover:text-gray-600 transition shrink-0">
-                          Cancelar
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => abrirAgregarContacto(idx)}
-                        className="text-xs text-blue-500 hover:text-blue-700 transition"
-                      >
-                        + Agregar contacto
-                      </button>
+                          </div>
+                        </div>
+                        {(p.ubigeo || p.direccion) && (
+                          <p className="text-xs text-gray-400 pl-1">
+                            {p.ubigeo && <span className="font-mono">{p.ubigeo}</span>}{p.ubigeo && p.direccion ? " — " : ""}{p.direccion}
+                          </p>
+                        )}
+                        {(p.contactos || []).length > 0 && (
+                          <ul className="space-y-1">
+                            {p.contactos.map((c, ci) => (
+                              <li key={ci} className="text-xs text-gray-500 pl-1">
+                                {c.nombre} · {c.telefono}{c.correo ? ` · ${c.correo}` : ""}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </>
                     )}
                   </li>
                 ))}

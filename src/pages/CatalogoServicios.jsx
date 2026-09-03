@@ -2,10 +2,12 @@ import { useState, useEffect } from "react";
 import { fetchAuth } from "../utils/fetchAuth";
 import ModalCatalogoServicio from "../components/ModalCatalogoServicio";
 import TablaScroll from "../components/TablaScroll";
+import ConfirmacionAccion from "../components/ConfirmacionAccion";
 
 export default function CatalogoServicios() {
   const [catalogo, setCatalogo] = useState([]);
   const [modal, setModal] = useState(null); // null | "nuevo" | objeto grupo
+  const [confirmandoEliminar, setConfirmandoEliminar] = useState(null);
 
   useEffect(() => {
     fetchAuth("/catalogo-servicios").then((r) => r.ok ? r.json() : []).then(setCatalogo);
@@ -19,8 +21,9 @@ export default function CatalogoServicios() {
     setModal(null);
   };
 
-  const eliminar = async (g) => {
-    if (!confirm(`¿Eliminar el grupo "${g.grupo}"? Esta acción no se puede deshacer.`)) return;
+  const eliminar = async () => {
+    const g = confirmandoEliminar;
+    setConfirmandoEliminar(null);
     const res = await fetchAuth(`/catalogo-servicios/${g._id}`, { method: "DELETE" });
     if (res.ok) setCatalogo((prev) => prev.filter((x) => x._id !== g._id));
   };
@@ -65,7 +68,7 @@ export default function CatalogoServicios() {
                     <button onClick={() => setModal(g)} className="text-xs text-gray-500 hover:text-gray-800 transition">
                       Editar
                     </button>
-                    <button onClick={() => eliminar(g)} className="text-xs text-red-400 hover:text-red-600 transition">
+                    <button onClick={() => setConfirmandoEliminar(g)} className="text-xs text-red-400 hover:text-red-600 transition">
                       Eliminar
                     </button>
                   </td>
@@ -81,6 +84,15 @@ export default function CatalogoServicios() {
           grupoServicio={modal === "nuevo" ? null : modal}
           onClose={() => setModal(null)}
           onGuardado={upsert}
+        />
+      )}
+
+      {confirmandoEliminar && (
+        <ConfirmacionAccion
+          mensaje={`¿Eliminar el grupo "${confirmandoEliminar.grupo}"? Esta acción no se puede deshacer.`}
+          onCancelar={() => setConfirmandoEliminar(null)}
+          onConfirmar={eliminar}
+          textoConfirmar="Eliminar"
         />
       )}
     </div>

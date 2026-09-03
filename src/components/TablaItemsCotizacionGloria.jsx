@@ -1,6 +1,7 @@
 import { useState } from "react";
 import TablaScroll from "./TablaScroll";
 import SelectorCatalogoServicios from "./SelectorCatalogoServicios";
+import ConfirmacionAccion from "./ConfirmacionAccion";
 import {
   GRUPOS_GLORIA, itemVacioGloria, calcSubtotalGloria, UNIDADES,
   descripcionInvalida,
@@ -36,6 +37,7 @@ export default function TablaItemsCotizacionGloria({
   // ver SelectorCatalogoServicios.jsx), que son dos taxonomías distintas.
   const [catalogoOpen, setCatalogoOpen] = useState(false);
   const [catalogoGrupo, setCatalogoGrupo] = useState(null);
+  const [confirmandoQuitarOT, setConfirmandoQuitarOT] = useState(null);
 
   const handleItem = (key, campo, valor) =>
     onItemsChange(items.map((i) => (i._key === key ? { ...i, [campo]: valor } : i)));
@@ -166,11 +168,7 @@ export default function TablaItemsCotizacionGloria({
                                   </button>
                                   {editable && onQuitarOT && (
                                     <button type="button" title="Quitar OT (no se anula, queda sin cotización)"
-                                      onClick={() => {
-                                        if (window.confirm("¿Quitar el vínculo con esta OT? La OT no se anula, solo queda sin cotización asociada.")) {
-                                          onQuitarOT(idx);
-                                        }
-                                      }}
+                                      onClick={() => setConfirmandoQuitarOT(idx)}
                                       className="text-gray-300 hover:text-red-500 text-sm leading-none transition">
                                       ✕
                                     </button>
@@ -306,6 +304,15 @@ export default function TablaItemsCotizacionGloria({
           onSeleccionar={agregarDesdeCatalogo}
           onSeleccionarGrupo={agregarGrupoDesdeCatalogo}
           onClose={cerrarCatalogo}
+        />
+      )}
+
+      {confirmandoQuitarOT != null && (
+        <ConfirmacionAccion
+          mensaje="¿Quitar el vínculo con esta OT? La OT no se anula, solo queda sin cotización asociada."
+          onCancelar={() => setConfirmandoQuitarOT(null)}
+          onConfirmar={() => { onQuitarOT(confirmandoQuitarOT); setConfirmandoQuitarOT(null); }}
+          textoConfirmar="Quitar vínculo"
         />
       )}
     </div>

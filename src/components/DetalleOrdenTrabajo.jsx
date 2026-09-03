@@ -12,6 +12,7 @@ import ModalRequerimiento from "./ModalRequerimiento";
 import TablaServiciosExternos from "./TablaServiciosExternos";
 import TablaScroll from "./TablaScroll";
 import ModalGenerarGRE from "./ModalGenerarGRE";
+import ConfirmacionAccion from "./ConfirmacionAccion";
 import { exportarInformeTecnicoExcel } from "../utils/informeTecnicoExcel";
 import {
   FlujoNegocio, TarjetaRelacion, Chip,
@@ -353,9 +354,11 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
   // intermedio que pedía N°/tipo/moneda/subtotal) y navega de una al editor
   // completo — pedir esos mismos datos dos veces (modal rápido + de nuevo en
   // el detalle de la cotización, vía ítems) era trabajo duplicado.
-  const crearCotizacion = async () => {
-    if (!window.confirm("¿Crear una cotización para esta OT?")) return;
+  const [confirmandoCrearCotizacion, setConfirmandoCrearCotizacion] = useState(false);
+  const [creandoCotizacion, setCreandoCotizacion] = useState(false);
 
+  const crearCotizacion = async () => {
+    setCreandoCotizacion(true);
     const numRes = await fetchAuth("/cotizaciones/siguiente-numero-cotizacion");
     const { siguiente } = numRes.ok ? await numRes.json() : { siguiente: "" };
 
@@ -381,13 +384,15 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    if (!res.ok) { setError("Error al crear la cotización."); return; }
+    if (!res.ok) { setError("Error al crear la cotización."); setCreandoCotizacion(false); setConfirmandoCrearCotizacion(false); return; }
     const nueva = await res.json();
     await fetchAuth(`/ordenes-trabajo/${ot._id}/vincular-cotizacion`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ cotizacion: nueva._id }),
     });
+    setCreandoCotizacion(false);
+    setConfirmandoCrearCotizacion(false);
     onNavegar?.({ tipo: "cotizacion", data: nueva });
   };
 
@@ -768,7 +773,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
             {(!esVistaLimitada || rolActual === "planner") && (
               <TarjetaRelacion tipo="cotizacion" codigo={cot?.codigo} numero={cot?.numeroCotizacion} vacio={!cot}
                 onClick={cot ? () => onNavegar?.({ tipo: "cotizacion", data: cot }) : undefined}
-                onCrear={!cot && !ot.anulado ? crearCotizacion : undefined} crearLabel="Cotización">
+                onCrear={!cot && !ot.anulado ? () => setConfirmandoCrearCotizacion(true) : undefined} crearLabel="Cotización">
                 <p className="text-sm text-gray-700 line-clamp-2">{cot?.titulo}</p>
                 {puedeVerPrecios && cot?.total > 0 && <p className="text-xs text-gray-500">{money(cot.total)}</p>}
               </TarjetaRelacion>
@@ -1043,6 +1048,16 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
           ot={ot}
           subOTs={subOTs}
           onClose={() => setGenerarGREOpen(false)}
+        />
+      )}
+
+      {confirmandoCrearCotizacion && (
+        <ConfirmacionAccion
+          mensaje="¿Crear una cotización para esta OT?"
+          onCancelar={() => setConfirmandoCrearCotizacion(false)}
+          onConfirmar={crearCotizacion}
+          procesando={creandoCotizacion}
+          textoConfirmar="Crear cotización"
         />
       )}
 

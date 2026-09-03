@@ -3,6 +3,7 @@ import { fetchAuth } from "../utils/fetchAuth";
 import { formatearFecha } from "../utils/fecha";
 import ModalServicioExterno from "./ModalServicioExterno";
 import TablaScroll from "./TablaScroll";
+import PromptAccion from "./PromptAccion";
 
 const money = (v) => "S/ " + Number(v ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2 });
 
@@ -13,15 +14,18 @@ const money = (v) => "S/ " + Number(v ?? 0).toLocaleString("es-PE", { minimumFra
 // `?ordenTrabajoPadre=`) y en DetalleSubOT.jsx (solo lo propio).
 export default function TablaServiciosExternos({ ot, subOTs = [], servicios, puedeEditar, onCambio }) {
   const [crearOpen, setCrearOpen] = useState(false);
+  const [confirmandoAnular, setConfirmandoAnular] = useState(null);
+  const [anulando, setAnulando] = useState(false);
 
-  const anular = async (servicio) => {
-    const motivo = window.prompt("Motivo de anulación:");
-    if (motivo === null) return;
-    const res = await fetchAuth(`/servicios-externos/${servicio._id}/anular`, {
+  const anular = async (motivo) => {
+    setAnulando(true);
+    const res = await fetchAuth(`/servicios-externos/${confirmandoAnular._id}/anular`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ motivo }),
     });
+    setAnulando(false);
+    setConfirmandoAnular(null);
     if (res.ok) onCambio();
   };
 
@@ -85,7 +89,7 @@ export default function TablaServiciosExternos({ ot, subOTs = [], servicios, pue
                       {puedeEditar && (
                         <td className="py-2 pr-3">
                           {!s.anulado && (
-                            <button type="button" onClick={() => anular(s)}
+                            <button type="button" onClick={() => setConfirmandoAnular(s)}
                               className="text-xs text-gray-400 hover:text-red-500 transition">
                               Anular
                             </button>
@@ -113,6 +117,17 @@ export default function TablaServiciosExternos({ ot, subOTs = [], servicios, pue
       {crearOpen && (
         <ModalServicioExterno ot={ot} onClose={() => setCrearOpen(false)}
           onCreado={() => { setCrearOpen(false); onCambio(); }} />
+      )}
+
+      {confirmandoAnular && (
+        <PromptAccion
+          titulo={`Anular servicio ${confirmandoAnular.codigo}`}
+          label="Motivo de anulación"
+          onCancelar={() => setConfirmandoAnular(null)}
+          onConfirmar={anular}
+          procesando={anulando}
+          textoConfirmar="Anular"
+        />
       )}
     </div>
   );

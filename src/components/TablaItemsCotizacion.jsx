@@ -1,5 +1,6 @@
 import { useState } from "react";
 import SelectorCatalogoServicios from "./SelectorCatalogoServicios";
+import ConfirmacionAccion from "./ConfirmacionAccion";
 import TablaScroll from "./TablaScroll";
 import {
   calcSubtotal, itemVacioServicio, UNIDADES,
@@ -21,6 +22,7 @@ export default function TablaItemsCotizacion({
 }) {
   const [catalogoOpen, setCatalogoOpen] = useState(false);
   const [catalogoTarget, setCatalogoTarget] = useState(null); // null = "+ Agregar ítem de plantilla" (fusiona/crea fila); _key = agregar descripción a esa fila puntual
+  const [confirmandoQuitarOT, setConfirmandoQuitarOT] = useState(null);
 
   // `puedeEditar` es el permiso de rol (admin/asistente); `disabled` es un
   // bloqueo por estado del documento (anulado o enviado) que aplica incluso
@@ -179,11 +181,7 @@ export default function TablaItemsCotizacion({
                           </button>
                           {editable && onQuitarOT && (
                             <button type="button" title="Quitar OT (no se anula, queda sin cotización)"
-                              onClick={() => {
-                                if (window.confirm("¿Quitar el vínculo con esta OT? La OT no se anula, solo queda sin cotización asociada.")) {
-                                  onQuitarOT(idx);
-                                }
-                              }}
+                              onClick={() => setConfirmandoQuitarOT(idx)}
                               className="text-gray-300 hover:text-red-500 text-sm leading-none transition">
                               ✕
                             </button>
@@ -304,6 +302,15 @@ export default function TablaItemsCotizacion({
           onSeleccionar={agregarDesdeCatalogo}
           onSeleccionarGrupo={agregarGrupoCompleto}
           onClose={cerrarCatalogo}
+        />
+      )}
+
+      {confirmandoQuitarOT != null && (
+        <ConfirmacionAccion
+          mensaje="¿Quitar el vínculo con esta OT? La OT no se anula, solo queda sin cotización asociada."
+          onCancelar={() => setConfirmandoQuitarOT(null)}
+          onConfirmar={() => { onQuitarOT(confirmandoQuitarOT); setConfirmandoQuitarOT(null); }}
+          textoConfirmar="Quitar vínculo"
         />
       )}
     </div>

@@ -18,6 +18,7 @@ const MESES = [
 const FILTROS_VACIO = { empresa: "", planta: "", ano: "", mes: "", oc: "", busqueda: "" };
 
 const VISTAS = [
+  { valor: "todasLasCotizaciones", label: "Todas las cotizaciones" },
   { valor: "todas",      label: "Todas las tablas" },
   { valor: "sinOT",      label: "Cotizaciones sin OT" },
   { valor: "pendientes", label: "Cotizaciones pendientes de OC" },
@@ -231,7 +232,9 @@ export default function ListaCotizaciones() {
   const [ocPorNumDoc, setOcPorNumDoc] = useState(new Map());
   const [facturaPorNumDoc, setFacturaPorNumDoc] = useState(new Map());
   const [sortBy, setSortBy] = useState("numeroOT");
-  const [vista, setVista] = useState("todas");
+  // "Todas las cotizaciones" (tabla única, sin categorizar por estado) es la
+  // vista por defecto al abrir la página — pedido explícito del usuario.
+  const [vista, setVista] = useState("todasLasCotizaciones");
   const [tipoCambio, setTipoCambio] = useState(null);
   // Precios: información sensible, solo Admin/Facturación/Jefatura los ven —
   // esta lista es compartida también con Planner y Asistente (Administración).
@@ -382,7 +385,7 @@ export default function ListaCotizaciones() {
   // pertenece a una cotización "con OC" mientras la vista activa es
   // "Pendientes") — las otras 3 páginas de lista siempre muestran todas sus
   // categorías a la vez, así que en búsqueda esta página se comporta igual.
-  const vistaEfectiva = filtros.busqueda ? "todas" : vista;
+  const vistaEfectiva = filtros.busqueda ? "todasLasCotizaciones" : vista;
 
   // Misma columnas que TablaCotizaciones — una hoja por cada tabla visible.
   const filaCotizacion = (c) => {
@@ -518,12 +521,28 @@ export default function ListaCotizaciones() {
         </select>
 
         <button
-          onClick={() => { setFiltros(FILTROS_VACIO); setVista("todas"); }}
+          onClick={() => { setFiltros(FILTROS_VACIO); setVista("todasLasCotizaciones"); }}
           className="text-sm text-gray-400 hover:text-gray-700 transition"
         >
           Limpiar
         </button>
       </div>
+
+      {vistaEfectiva === "todasLasCotizaciones" && (
+        <TablaCotizaciones
+          titulo="Todas las cotizaciones"
+          acento="bg-blue-500"
+          cotizaciones={filtradas}
+          onSelect={seleccionarFila}
+          vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin cotizaciones registradas"}
+          tipoCambio={tipoCambio}
+          puedeVerPrecios={puedeVerPrecios}
+          mostrarEstadoServicio
+          mostrarTituloOT
+          otsPorCot={otsPorCot}
+          mostrarDiasInforme
+        />
+      )}
 
       {(vistaEfectiva === "todas" || vistaEfectiva === "sinOT") && (
         <TablaCotizaciones

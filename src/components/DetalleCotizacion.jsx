@@ -12,6 +12,7 @@ import ModalCrearOT from "./ModalCrearOT";
 import ModalOrdenCompra from "./ModalOrdenCompra";
 import BuscadorOrdenTrabajo from "./BuscadorOrdenTrabajo";
 import SelectorEmpresas from "./SelectorEmpresas";
+import ConfirmacionAccion from "./ConfirmacionAccion";
 import TablaItemsCotizacion from "./TablaItemsCotizacion";
 import TablaItemsCotizacionGloria from "./TablaItemsCotizacionGloria";
 import TablaItemsCotizacionAlicorp from "./TablaItemsCotizacionAlicorp";
@@ -106,6 +107,8 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   const [crearOTOpen, setCrearOTOpen] = useState(false);
   const [crearOCOpen, setCrearOCOpen] = useState(false);
   const [buscadorOTOpen, setBuscadorOTOpen] = useState(false);
+  const [confirmandoReasignarOT, setConfirmandoReasignarOT] = useState(null);
+  const [reasignandoOT, setReasignandoOT] = useState(false);
   const [seleccionados, setSeleccionados] = useState(() => new Set());
   const [generandoOT, setGenerandoOT] = useState(false);
   const rolActual = getUsuario()?.rol;
@@ -219,6 +222,24 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
     setBusquedaEmpresa(e.target.value);
     setListaEmpresaAbierta(true);
     if (form.empresa) setForm(f => ({ ...f, empresa: "", planta: "", personaContacto: "" }));
+  };
+
+  // Vincula una OT elegida desde BuscadorOrdenTrabajo a esta cotización — si
+  // esa OT ya pertenecía a otra cotización, el llamador confirma antes
+  // (ver ConfirmacionAccion más abajo) que quiere reasignarla.
+  const vincularOT = async (orden) => {
+    setReasignandoOT(true);
+    const res = await fetchAuth(`/ordenes-trabajo/${orden._id}/vincular-cotizacion`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cotizacion: cot._id }),
+    });
+    setReasignandoOT(false);
+    setConfirmandoReasignarOT(null);
+    if (res.ok) {
+      setBuscadorOTOpen(false);
+      cargarRelaciones();
+    }
   };
 
   const toggleSeleccion = (idx) => setSeleccionados(prev => {
@@ -1274,23 +1295,25 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
       {buscadorOTOpen && (
         <BuscadorOrdenTrabajo
           onClose={() => setBuscadorOTOpen(false)}
-          onSelect={async (orden) => {
+          onSelect={(orden) => {
             const otraCot = orden.cotizacion && (orden.cotizacion._id || orden.cotizacion) !== cot._id
               ? orden.cotizacion : null;
             if (otraCot) {
-              const codigoOtra = otraCot.codigo || "otra cotización";
-              if (!window.confirm(`Esta OT ya está vinculada a ${codigoOtra} — ¿deseas reasignarla a esta cotización?`)) return;
-            }
-            const res = await fetchAuth(`/ordenes-trabajo/${orden._id}/vincular-cotizacion`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ cotizacion: cot._id }),
-            });
-            if (res.ok) {
-              setBuscadorOTOpen(false);
-              cargarRelaciones();
+              setConfirmandoReasignarOT({ orden, codigoOtra: otraCot.codigo || "otra cotización" });
+            } else {
+              vincularOT(orden);
             }
           }}
+        />
+      )}
+
+      {confirmandoReasignarOT && (
+        <ConfirmacionAccion
+          mensaje={`Esta OT ya está vinculada a ${confirmandoReasignarOT.codigoOtra} — ¿deseas reasignarla a esta cotización?`}
+          onCancelar={() => setConfirmandoReasignarOT(null)}
+          onConfirmar={() => vincularOT(confirmandoReasignarOT.orden)}
+          procesando={reasignandoOT}
+          textoConfirmar="Reasignar"
         />
       )}
 

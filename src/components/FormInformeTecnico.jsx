@@ -7,6 +7,16 @@ import TablaScroll from "./TablaScroll";
 
 const INP = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 w-full transition";
 
+// Tipos cuya plantilla ya no trae bloque de encabezado propio (ver
+// MAPEOS.<tipo> en informeTecnicoExcel.js) — la celda de descripción se
+// autocompleta con el TÍTULO de la OT/sub-OT en vez de su descripción
+// general (pedido explícito del usuario, tipo por tipo, 2026-09-03).
+const TIPOS_SIN_ENCABEZADO = ["adicional", "arrancador", "plc", "diagnostico_servomotor", "panel", "pc", "ups"];
+// Tipos cuyo "Datos del equipo" (Equipo/Marca, Modelo, Código, Tag,
+// Potencia, S/N) comparte los mismos nombres de campo que la OT/sub-OT y se
+// autocompleta desde ahí.
+const TIPOS_DATOS_EQUIPO_DESDE_OT = ["arrancador", "plc", "diagnostico_servomotor", "panel", "pc", "ups"];
+
 function Seccion({ titulo, children }) {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
@@ -23,7 +33,7 @@ function SeccionCampos({ seccion, campos, onCampo }) {
         {seccion.campos.map((c) => (
           <div key={c.clave}>
             <label className="text-xs text-gray-500 block mb-1">{c.label}</label>
-            <input value={campos[c.clave] ?? ""} onChange={(e) => onCampo(c.clave, e.target.value)} className={INP} />
+            <input value={campos[c.clave] ?? ""} onChange={(e) => onCampo(c.clave, e.target.value)} placeholder={c.placeholder} className={INP} />
           </div>
         ))}
       </div>
@@ -96,11 +106,23 @@ function SeccionBullets({ seccion, campos, onCampos }) {
 // Lista dinámica de filas con 2 campos cada una (ej. Cantidad/Descripción)
 // — mismo patrón "+ agregar" de SeccionBullets, pero cada línea guarda un
 // objeto en vez de un string.
-function SeccionFilas({ seccion, campos, onCampos }) {
+function SeccionFilas({ seccion, campos, onCampos, itemsRequerimientos }) {
   const filas = campos[seccion.clave] || [];
   const set = (nuevas) => onCampos(seccion.clave, nuevas);
   const [colUno, colDos] = seccion.columnas;
   const actualizar = (i, clave, valor) => set(filas.map((f, j) => (j === i ? { ...f, [clave]: valor } : f)));
+  // "Traer de requerimientos" — solo en Piezas a reemplazar (pedido
+  // explícito del usuario): agrega de una sola vez todos los ítems
+  // "atendidos" de los requerimientos de esta OT/sub-OT que todavía no
+  // estén en la tabla (comparados por cantidad+descripción exactos, para
+  // no duplicar si se hace clic más de una vez).
+  const traerDeRequerimientos = () => {
+    const existentes = new Set(filas.map((f) => `${f[colUno.clave]}__${f[colDos.clave]}`));
+    const nuevas = (itemsRequerimientos || [])
+      .filter((it) => !existentes.has(`${it.cantidad}__${it.descripcion}`))
+      .map((it) => ({ [colUno.clave]: it.cantidad, [colDos.clave]: it.descripcion }));
+    if (nuevas.length) set([...filas, ...nuevas]);
+  };
   return (
     <Seccion titulo={seccion.titulo}>
       <div className="space-y-2">
@@ -114,8 +136,14 @@ function SeccionFilas({ seccion, campos, onCampos }) {
               className="text-red-300 hover:text-red-500 shrink-0">✕</button>
           </div>
         ))}
-        <button type="button" onClick={() => set([...filas, { [colUno.clave]: "", [colDos.clave]: "" }])}
-          className="text-xs text-gray-400 hover:text-amber-600 transition">+ agregar fila</button>
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={() => set([...filas, { [colUno.clave]: "", [colDos.clave]: "" }])}
+            className="text-xs text-gray-400 hover:text-amber-600 transition">+ agregar fila</button>
+          {seccion.clave === "piezasAReemplazar" && itemsRequerimientos?.length > 0 && (
+            <button type="button" onClick={traerDeRequerimientos}
+              className="text-xs text-amber-600 hover:text-amber-700 font-medium transition">↓ Traer de requerimientos</button>
+          )}
+        </div>
       </div>
     </Seccion>
   );
@@ -206,7 +234,7 @@ function SeccionEvidencias({ seccion, campos, onCampos }) {
   const gruposAMostrar = seccion.slotsFijos
     ? seccion.slotsFijos.map((slot) => {
         const g = grupos.find((gr) => gr.titulo === slot.clave);
-        return g ? { ...g, _label: slot.label, _separador: slot.separador } : null;
+        return g ? { ...g, _label: slot.label, _separador: slot.separador, _campoTitulo: slot.campoTitulo } : null;
       }).filter(Boolean)
     : grupos;
 
@@ -217,9 +245,17 @@ function SeccionEvidencias({ seccion, campos, onCampos }) {
     set(grupos.map((g) => (g._key === key ? { ...g, imagenes: g.imagenes.filter((_, i) => i !== indice) } : g)));
 
   const subir = async (key, files) => {
+    // `maxImagenes` — tope opcional por sección (ver "adicional" y
+    // "Fotos del mantenimiento" de arrancador en informesTecnicos.js): si el
+    // cuadro ya llegó al tope, no sube nada más; si la selección múltiple
+    // trae más archivos de los que caben, solo toma los primeros.
+    const grupo = grupos.find((g) => g._key === key);
+    const espacio = seccion.maxImagenes ? Math.max(0, seccion.maxImagenes - (grupo?.imagenes.length || 0)) : Infinity;
+    const archivos = Array.from(files).slice(0, espacio);
+    if (!archivos.length) return;
     setSubiendo(key);
     const urls = [];
-    for (const file of Array.from(files)) {
+    for (const file of archivos) {
       const fd = new FormData();
       fd.append("imagen", file);
       const res = await uploadAuth("/informes-tecnicos/subir-imagen", fd);
@@ -229,10 +265,23 @@ function SeccionEvidencias({ seccion, campos, onCampos }) {
     setSubiendo(null);
   };
 
+  // `columnas`/`miniaturaGrande` — opcionales por sección (ver definiciones
+  // de "adicional" y "arrancador" en informesTecnicos.js): por defecto los
+  // grupos se apilan en una sola columna con miniaturas chicas, igual que
+  // siempre en el resto de tipos de informe. Clases Tailwind literales (no
+  // generadas dinámicamente) para que el escaneo estático las detecte.
+  const CLASES_COLUMNAS = { 2: "grid grid-cols-1 sm:grid-cols-2 gap-3 items-start", 3: "grid grid-cols-1 sm:grid-cols-3 gap-3 items-start" };
+  // Ancho fijo (300px) se desbordaba de la card en columnas de 2/3 (el flex
+  // no encoge un w-[300px] al hacer wrap) — "grande" ahora llena el ancho
+  // disponible de la card (w-full, hasta 300px como tope) y mantiene 300px
+  // de alto.
+  const tamMiniatura = seccion.miniaturaGrande ? "w-full max-w-[300px] h-[300px]" : "w-16 h-16";
   return (
     <Seccion titulo={seccion.titulo}>
-      <div className="space-y-3">
-        {gruposAMostrar.map((g) => (
+      <div className={CLASES_COLUMNAS[seccion.columnas] || "space-y-3"}>
+        {gruposAMostrar.map((g) => {
+          const alcanzoLimite = seccion.maxImagenes && g.imagenes.length >= seccion.maxImagenes;
+          return (
           <div key={g._key}>
             {g._separador && (
               <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2 mt-1 first:mt-0">{g._separador}</p>
@@ -240,7 +289,18 @@ function SeccionEvidencias({ seccion, campos, onCampos }) {
             <div className="border border-gray-100 rounded-xl p-3 space-y-2 bg-gray-50/50">
               <div className="flex items-center gap-2">
                 {seccion.slotsFijos ? (
-                  <span className="flex-1 text-sm font-semibold text-gray-700">{g._label}</span>
+                  // `campoTitulo` (ver definición del slot en informesTecnicos.js)
+                  // — el rótulo de este cuadro tiene celda propia en la
+                  // plantilla y es editable; si el técnico lo deja vacío,
+                  // escribir() en informeTecnicoExcel.js no la toca y queda
+                  // el texto impreso. Sin `campoTitulo`, el rótulo es fijo
+                  // (comportamiento de siempre en el resto de tipos).
+                  g._campoTitulo ? (
+                    <input value={campos[g._campoTitulo] ?? ""} onChange={(e) => onCampos(g._campoTitulo, e.target.value)}
+                      placeholder={g._label} className={`${INP} flex-1 text-sm font-semibold`} />
+                  ) : (
+                    <span className="flex-1 text-sm font-semibold text-gray-700">{g._label}</span>
+                  )
                 ) : (
                   <>
                     <input value={g.titulo} onChange={(e) => actualizarTitulo(g._key, e.target.value)}
@@ -251,8 +311,11 @@ function SeccionEvidencias({ seccion, campos, onCampos }) {
               </div>
               <div className="flex flex-wrap gap-2">
                 {g.imagenes.map((img, i) => (
-                  <div key={i} className="relative shrink-0">
-                    <ImagenProtegida src={img} className="w-16 h-16 object-cover rounded-lg border border-gray-200" />
+                  // El tamaño va en el wrapper (flex item real) — un
+                  // w-full en la propia <img>, sin ancho definido en su
+                  // padre, no tiene contra qué resolver el 100% y colapsa.
+                  <div key={i} className={`relative ${seccion.miniaturaGrande ? tamMiniatura : `${tamMiniatura} shrink-0`}`}>
+                    <ImagenProtegida src={img} className="w-full h-full object-cover rounded-lg border border-gray-200" />
                     <button type="button" onClick={() => eliminarImagen(g._key, i)}
                       title="Eliminar foto"
                       // Siempre visible (no solo en hover) — en tablet/touch no
@@ -263,13 +326,17 @@ function SeccionEvidencias({ seccion, campos, onCampos }) {
                     </button>
                   </div>
                 ))}
-                {["environment", null].map((capture) => (
+                {/* maxImagenes: 1 foto por cuadro (adicional / fotos del
+                    mantenimiento) — al llegar al tope se ocultan los botones
+                    de subida; hay que borrar la foto actual para poder subir
+                    otra. */}
+                {!alcanzoLimite && ["environment", null].map((capture) => (
                   <label key={capture || "galeria"}
-                    className={`w-16 h-16 flex flex-col items-center justify-center border-2 border-dashed rounded-lg cursor-pointer transition text-gray-400 select-none
+                    className={`${tamMiniatura} flex flex-col items-center justify-center border-2 border-dashed rounded-lg cursor-pointer transition text-gray-400 select-none
                       ${subiendo === g._key ? "opacity-50 cursor-wait border-gray-200" : "border-gray-300 hover:border-amber-400 hover:text-amber-500"}`}>
                     <span className="text-lg leading-none">{capture ? "📷" : "🖼️"}</span>
                     <span className="text-[10px] mt-0.5">{capture ? "Cámara" : "Galería"}</span>
-                    <input type="file" accept="image/*" multiple className="hidden"
+                    <input type="file" accept="image/*" multiple={seccion.maxImagenes !== 1} className="hidden"
                       capture={capture || undefined}
                       disabled={subiendo === g._key}
                       onChange={(e) => subir(g._key, e.target.files)} />
@@ -278,7 +345,8 @@ function SeccionEvidencias({ seccion, campos, onCampos }) {
               </div>
             </div>
           </div>
-        ))}
+          );
+        })}
         {!seccion.slotsFijos && (
           <button type="button" onClick={agregarGrupo}
             className="w-full text-sm border-2 border-dashed border-gray-200 text-gray-400 py-2.5 rounded-xl hover:border-amber-300 hover:text-amber-600 transition">
@@ -299,15 +367,37 @@ export default function FormInformeTecnico({ ordenTrabajo, tipo, informeExistent
   // Sigue siendo editable por si el informe puntual necesita un valor
   // distinto (ej. otro contacto para ese servicio específico).
   const hoy = formatearFecha(new Date());
+  // Ver TIPOS_SIN_ENCABEZADO/TIPOS_DATOS_EQUIPO_DESDE_OT arriba: sus
+  // plantillas ya no traen bloque de encabezado propio (ver MAPEOS.<tipo> en
+  // informeTecnicoExcel.js), así que la celda de descripción se autocompleta
+  // con el TÍTULO de la OT/sub-OT en vez de su descripción general. En
+  // Adicional también se autocompletan Equipo/Marca, Modelo y Potencia de
+  // "Datos del componente / equipo" desde los mismos campos de la OT/sub-OT
+  // (mismo nombre de clave en ambos lados) — "Componente" y "Cantidad"
+  // quedan vacíos porque no tienen equivalente en la OT.
+  const esAdicional = tipo === "adicional";
   const [campos, setCampos] = useState(() => informeExistente?.campos ?? {
     empresa: ordenTrabajo.empresa?.razonSocial || "",
     contacto: [ordenTrabajo.contactoNombre, ordenTrabajo.contactoTelefono].filter(Boolean).join(" — "),
     lineaArea: ordenTrabajo.micLinea || "",
-    descripcion: ordenTrabajo.descripcion || "",
+    descripcion: (TIPOS_SIN_ENCABEZADO.includes(tipo) ? ordenTrabajo.titulo : ordenTrabajo.descripcion) || "",
     categoria: ordenTrabajo.categorizacionTaller || "",
     fecha: hoy,
     fechaInicio: hoy,
     fechaTermino: hoy,
+    ...(esAdicional && {
+      equipoMarca: ordenTrabajo.equipoMarca || "",
+      equipoModelo: ordenTrabajo.equipoModelo || "",
+      equipoPotencia: ordenTrabajo.equipoPotencia || "",
+    }),
+    ...(TIPOS_DATOS_EQUIPO_DESDE_OT.includes(tipo) && {
+      equipoMarca: ordenTrabajo.equipoMarca || "",
+      modelo: ordenTrabajo.equipoModelo || "",
+      codigo: ordenTrabajo.equipoCodigo || "",
+      tag: ordenTrabajo.equipoTag || "",
+      potencia: ordenTrabajo.equipoPotencia || "",
+      serie: ordenTrabajo.equipoSerie || "",
+    }),
   });
   const [hechoPor, setHechoPor] = useState(informeExistente?.hechoPor ?? getUsuario()?.nombre ?? "");
   const [vB, setVB] = useState(informeExistente?.vB ?? "");
@@ -316,6 +406,26 @@ export default function FormInformeTecnico({ ordenTrabajo, tipo, informeExistent
   );
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
+  // Ítems "atendidos" (ver Requerimiento.js, enum de estado) de los
+  // requerimientos de material de esta OT/sub-OT — usados por el botón
+  // "Traer de requerimientos" de la sección "Piezas a reemplazar" (ver
+  // SeccionFilas). Mismo formato de descripción que la tabla de
+  // Requerimientos en DetalleOrdenTrabajo.jsx/DetalleSubOT.jsx.
+  const [itemsAtendidos, setItemsAtendidos] = useState([]);
+  useEffect(() => {
+    fetchAuth(`/requerimientos?ordenTrabajo=${ordenTrabajo._id}`)
+      .then((r) => r.ok && r.json())
+      .then((reqs) => {
+        const items = (reqs || [])
+          .flatMap((r) => r.items || [])
+          .filter((it) => it.estado === "atendido")
+          .map((it) => ({
+            cantidad: it.cantidad,
+            descripcion: it.esSolicitudCompra ? `${it.categoriaNombre} (compra)` : (it.material?.nombre || ""),
+          }));
+        setItemsAtendidos(items);
+      });
+  }, [ordenTrabajo._id]);
 
   const handleCampo = (clave, valor) => setCampos((prev) => ({ ...prev, [clave]: valor }));
 
@@ -344,6 +454,33 @@ export default function FormInformeTecnico({ ordenTrabajo, tipo, informeExistent
 
   if (!def) return null;
 
+  const renderSeccion = (seccion, key) => {
+    if (seccion.tipo === "campos") return <SeccionCampos key={key} seccion={seccion} campos={campos} onCampo={handleCampo} />;
+    if (seccion.tipo === "checklist") return <SeccionChecklist key={key} seccion={seccion} campos={campos} onCampo={handleCampo} />;
+    if (seccion.tipo === "bullets") return <SeccionBullets key={key} seccion={seccion} campos={campos} onCampos={handleCampo} />;
+    if (seccion.tipo === "filas") return <SeccionFilas key={key} seccion={seccion} campos={campos} onCampos={handleCampo} itemsRequerimientos={itemsAtendidos} />;
+    if (seccion.tipo === "tabla") return <SeccionTabla key={key} seccion={seccion} campos={campos} onCampo={handleCampo} onCampos={handleCampo} />;
+    if (seccion.tipo === "evidencias") return <SeccionEvidencias key={key} seccion={seccion} campos={campos} onCampos={handleCampo} />;
+    return null;
+  };
+
+  // `parPosicion: "izquierda"/"derecha"` en 2 secciones consecutivas (ej.
+  // Informe Arrancador: "Protocolo de prueba inicial" + su foto) — pedido
+  // explícito del usuario para romper el apilado lineal por defecto y
+  // ponerlas lado a lado. El resto de tipos de informe no lo usa y sigue
+  // apilándose una card debajo de otra, igual que siempre.
+  const gruposSecciones = [];
+  for (let i = 0; i < def.secciones.length; i++) {
+    const actual = def.secciones[i];
+    const siguiente = def.secciones[i + 1];
+    if (actual.parPosicion === "izquierda" && siguiente?.parPosicion === "derecha") {
+      gruposSecciones.push([actual, siguiente]);
+      i += 1;
+    } else {
+      gruposSecciones.push([actual]);
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-[70] bg-gray-50 flex flex-col">
       <div className="shrink-0 bg-white border-b border-gray-100 shadow-sm flex items-center justify-between px-8 py-4">
@@ -356,15 +493,11 @@ export default function FormInformeTecnico({ ordenTrabajo, tipo, informeExistent
 
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-4xl mx-auto px-8 py-8 space-y-5">
-          {def.secciones.map((seccion, i) => {
-            if (seccion.tipo === "campos") return <SeccionCampos key={i} seccion={seccion} campos={campos} onCampo={handleCampo} />;
-            if (seccion.tipo === "checklist") return <SeccionChecklist key={i} seccion={seccion} campos={campos} onCampo={handleCampo} />;
-            if (seccion.tipo === "bullets") return <SeccionBullets key={i} seccion={seccion} campos={campos} onCampos={handleCampo} />;
-            if (seccion.tipo === "filas") return <SeccionFilas key={i} seccion={seccion} campos={campos} onCampos={handleCampo} />;
-            if (seccion.tipo === "tabla") return <SeccionTabla key={i} seccion={seccion} campos={campos} onCampo={handleCampo} onCampos={handleCampo} />;
-            if (seccion.tipo === "evidencias") return <SeccionEvidencias key={i} seccion={seccion} campos={campos} onCampos={handleCampo} />;
-            return null;
-          })}
+          {gruposSecciones.map((grupo, i) => grupo.length === 2 ? (
+            <div key={i} className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+              {grupo.map((seccion, j) => renderSeccion(seccion, j))}
+            </div>
+          ) : renderSeccion(grupo[0], i))}
 
           <Seccion titulo="Firma">
             <div className="grid grid-cols-3 gap-4">

@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import ModalEmpresa from "../components/ModalEmpresa";
 import TablaScroll from "../components/TablaScroll";
+import ConfirmacionAccion from "../components/ConfirmacionAccion";
+import AvisoAccion from "../components/AvisoAccion";
 
 export default function Empresas() {
   const [empresas, setEmpresas] = useState([]);
@@ -9,20 +11,23 @@ export default function Empresas() {
   const [modal, setModal] = useState(false);
   const [editando, setEditando] = useState(null);
   const [eliminandoId, setEliminandoId] = useState(null);
+  const [confirmandoEliminar, setConfirmandoEliminar] = useState(null);
+  const [avisoError, setAvisoError] = useState("");
   const esAdmin = getUsuario()?.rol === "admin";
 
   const cargar = () =>
     fetchAuth("/empresas").then((res) => res.ok && res.json().then(setEmpresas));
 
-  const eliminar = async (empresa) => {
-    if (!window.confirm(`¿Eliminar la empresa "${empresa.razonSocial}"? Esta acción no se puede deshacer.`)) return;
+  const eliminar = async () => {
+    const empresa = confirmandoEliminar;
+    setConfirmandoEliminar(null);
     setEliminandoId(empresa._id);
     const r = await fetchAuth(`/empresas/${empresa._id}`, { method: "DELETE" });
     if (r.ok) {
       await cargar();
     } else {
       const d = await r.json().catch(() => ({}));
-      window.alert(d.mensaje || "Error al eliminar la empresa.");
+      setAvisoError(d.mensaje || "Error al eliminar la empresa.");
     }
     setEliminandoId(null);
   };
@@ -106,7 +111,7 @@ export default function Empresas() {
                     </button>
                     {esAdmin && (
                       <button
-                        onClick={() => eliminar(e)}
+                        onClick={() => setConfirmandoEliminar(e)}
                         disabled={eliminandoId === e._id}
                         className="text-red-500 hover:underline text-xs disabled:opacity-50"
                       >
@@ -132,6 +137,17 @@ export default function Empresas() {
           }}
         />
       )}
+
+      {confirmandoEliminar && (
+        <ConfirmacionAccion
+          mensaje={`¿Eliminar la empresa "${confirmandoEliminar.razonSocial}"? Esta acción no se puede deshacer.`}
+          onCancelar={() => setConfirmandoEliminar(null)}
+          onConfirmar={eliminar}
+          textoConfirmar="Eliminar"
+        />
+      )}
+
+      {avisoError && <AvisoAccion mensaje={avisoError} onCerrar={() => setAvisoError("")} />}
     </div>
   );
 }

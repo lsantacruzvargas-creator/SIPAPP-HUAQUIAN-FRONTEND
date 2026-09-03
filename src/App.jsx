@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Sidebar from "./components/Sidebar";
 import AlertaGlobal from "./components/AlertaGlobal";
+import AlertaDiscoLleno from "./components/AlertaDiscoLleno";
 import { SidebarProvider, useSidebar } from "./context/SidebarContext.jsx";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
@@ -24,6 +25,7 @@ import AprobacionCotizaciones from "./pages/AprobacionCotizaciones";
 import Inventario from "./pages/Inventario";
 import Requerimientos from "./pages/Requerimientos";
 import TipoCambio from "./pages/TipoCambio";
+import Sistema from "./pages/Sistema";
 import NotFound from "./pages/NotFound";
 
 function AppShell({ children }) {
@@ -32,6 +34,7 @@ function AppShell({ children }) {
     <>
       <Sidebar />
       <AlertaGlobal />
+      <AlertaDiscoLleno />
       <main className={`min-h-screen transition-[margin] duration-200 ${colapsado ? "md:ml-[72px]" : "md:ml-60"}`}>
         {children}
       </main>
@@ -237,6 +240,15 @@ export default function App() {
         element={
           <ProtectedRoute roles={["admin", "asistente", "facturacion", "almacenero", "jefatura"]}>
             <Layout><TipoCambio /></Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/sistema"
+        element={
+          <ProtectedRoute roles={["admin", "jefatura"]}>
+            <Layout><Sistema /></Layout>
           </ProtectedRoute>
         }
       />

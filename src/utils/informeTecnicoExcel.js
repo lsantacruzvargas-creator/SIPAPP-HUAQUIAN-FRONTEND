@@ -312,24 +312,41 @@ const MAPEOS = {
     // queda en su celda "de papel").
   },
 
+  // Re-mapeada completa (2026-09-03): la plantilla real ya no trae el bloque
+  // de encabezado — A3 recibe la descripción (título de la OT). "Datos del
+  // equipo" usa fila 7 con Equipo/Marca y Modelo fusionados a 2 columnas
+  // (Código/Tag/Potencia/S-N siguen siendo 1 celda cada uno), y Operario/
+  // Observación comparten la fila 8 en vez de tener su propia fila de valor
+  // debajo (distinto del patrón de arrancador/plc). "Piezas a reemplazar"
+  // ahora SÍ tiene celda propia (tabla Cantidad/Descripción, antes cayía al
+  // anexo) — ver el cambio de PIEZAS_A_REEMPLAZAR a PIEZAS_A_REEMPLAZAR_TABLA
+  // para este tipo en informesTecnicos.js. El checklist sigue siendo de una
+  // sola columna OK/NOK (no doble inicial/final).
   diagnostico_servomotor: {
     campos: {
-      ...CAMPOS_ENCABEZADO_SERVICIO,
-      equipoMarca: "C15", modelo: "D15", codigo: "E15", tag: "F15", potencia: "G15", serie: "H15",
-      observacionIngreso: "G16",
+      descripcion: "A3",
+      equipoMarca: "A7", modelo: "C7", codigo: "E7", tag: "F7", potencia: "G7", serie: "H7",
+      operario: "B8", observacionIngreso: "E8",
+      // Rótulos editables sobre los recuadros de "Fotos del diagnóstico" (ver
+      // sección "Títulos de las fotos" en informesTecnicos.js) — a diferencia
+      // de arrancador/plc, acá los 8 rótulos son todos independientes.
+      tituloVistaFrontal: "A22", tituloPlaca: "C22", tituloEstadoCarcasa: "E22", tituloEstadoEncoder: "G22",
+      tituloEstadoInterno: "A35", tituloConectores: "C35", tituloEstadoRodamientos: "E35", tituloPruebaEquipo: "G35",
+    },
+    filas: {
+      piezasAReemplazar: { colCantidad: "A", colDescripcion: "B", filaInicial: 38, max: 5 },
     },
     checklist: {
       "Checklist de verificación técnica": {
-        items: Object.fromEntries(Array.from({ length: 13 }, (_, i) => [`item${i + 1}`, `H${52 + i}`])),
+        items: Object.fromEntries(Array.from({ length: 13 }, (_, i) => [`item${i + 1}`, `H${45 + i}`])),
       },
     },
     bullets: {
-      observacionFallas: { col: "A", fila: 66, max: 3 },
-      actividadesARealizar: { col: "A", fila: 70, max: 4 },
+      observacionFallas: { col: "A", fila: 59, max: 5 },
+      actividadesARealizar: { col: "A", fila: 65, max: 5 },
     },
     // "Estado general" ya no es texto libre — se migró a 8 slots de foto
-    // fijos, ver SLOTS_FOTOS.diagnostico_servomotor. Piezas a reemplazar
-    // sigue sin celda confirmada, cae al anexo.
+    // fijos, ver SLOTS_FOTOS.diagnostico_servomotor.
   },
 
   tarjetas: {
@@ -350,40 +367,67 @@ const MAPEOS = {
     },
   },
 
+  // Re-mapeada completa (2026-09-03): la plantilla real ya no trae el bloque
+  // de encabezado — A3 recibe la descripción (título de la OT), mismo patrón
+  // que plc/panel (fila 7 con Equipo/Marca-Modelo-Código fusionados a 2
+  // columnas, Operario/Observación con celda C8:I9). Sin bullet
+  // "Observaciones" (esta plantilla nunca lo tuvo) — Conclusiones/
+  // Recomendaciones con caja de 5 líneas cada una (igual que plc/panel).
   pc: {
-    campos: { ...CAMPOS_ENCABEZADO_SERVICIO, ...CAMPOS_EQUIPO_9COL },
+    campos: {
+      descripcion: "A3",
+      equipoMarca: "A7", modelo: "C7", codigo: "E7", tag: "G7", potencia: "H7", serie: "I7",
+      operario: "A9", observacionIngreso: "C8",
+      // Rótulos editables sobre los recuadros de "Fotos del mantenimiento"
+      // (ver sección con `campoTitulo` en informesTecnicos.js).
+      tituloVistaFrontal: "A31", tituloPlacaEquipo: "D31", tituloCarcasaContaminada: "G31",
+      tituloCarcasaDescontaminada: "A52", tituloLimpiezaTarjeta: "D52", tituloCambioVentilador: "G52",
+    },
     filas: {
-      piezasAReemplazar: { colCantidad: "A", colDescripcion: "B", filaInicial: 64, max: 4 },
+      piezasAReemplazar: { colCantidad: "A", colDescripcion: "B", filaInicial: 56, max: 5 },
     },
     tabla: {
       checklistTecnico: Object.fromEntries(
-        Array.from({ length: 9 }, (_, i) => [i, 70 + i]).flatMap(([i, fila]) => [
+        Array.from({ length: 9 }, (_, i) => [i, 63 + i]).flatMap(([i, fila]) => [
           [`item${i + 1}__inicial`, `H${fila}`], [`item${i + 1}__final`, `I${fila}`],
         ])
       ),
     },
     bullets: {
-      conclusiones: { col: "A", fila: 80, max: 2 },
-      recomendaciones: { col: "A", fila: 83, max: 2 },
+      conclusiones: { col: "A", fila: 73, max: 5 },
+      recomendaciones: { col: "A", fila: 79, max: 5 },
     },
   },
 
+  // Re-mapeada completa (2026-09-03): la plantilla real ya no trae el bloque
+  // de encabezado — A3 recibe la descripción (título de la OT), mismo patrón
+  // que plc (fila 7 con Equipo/Marca-Modelo-Código fusionados a 2 columnas,
+  // Operario/Observación con celda C8:I9). Observaciones/Conclusiones/
+  // Recomendaciones tienen caja de 5 líneas cada una (igual que plc).
   panel: {
-    campos: { ...CAMPOS_ENCABEZADO_SERVICIO, ...CAMPOS_EQUIPO_9COL },
+    campos: {
+      descripcion: "A3",
+      equipoMarca: "A7", modelo: "C7", codigo: "E7", tag: "G7", potencia: "H7", serie: "I7",
+      operario: "A9", observacionIngreso: "C8",
+      // Rótulos editables sobre los recuadros de "Fotos del mantenimiento"
+      // (ver sección con `campoTitulo` en informesTecnicos.js).
+      tituloVistaFrontal: "A31", tituloPlacaEquipo: "D31", tituloCarcasaContaminadaDescontaminada: "G31",
+      tituloLimpiezaTarjeta: "A52", tituloCambioLcd: "D52", tituloCambioTouch: "G52",
+    },
     filas: {
-      piezasAReemplazar: { colCantidad: "A", colDescripcion: "B", filaInicial: 64, max: 4 },
+      piezasAReemplazar: { colCantidad: "A", colDescripcion: "B", filaInicial: 56, max: 5 },
     },
     tabla: {
       checklistTecnico: Object.fromEntries(
-        Array.from({ length: 8 }, (_, i) => [i, 70 + i]).flatMap(([i, fila]) => [
+        Array.from({ length: 8 }, (_, i) => [i, 63 + i]).flatMap(([i, fila]) => [
           [`item${i + 1}__inicial`, `H${fila}`], [`item${i + 1}__final`, `I${fila}`],
         ])
       ),
     },
     bullets: {
-      observaciones: { col: "A", fila: 79, max: 1 },
-      conclusiones: { col: "A", fila: 81, max: 2 },
-      recomendaciones: { col: "A", fila: 84, max: 2 },
+      observaciones: { col: "A", fila: 72, max: 5 },
+      conclusiones: { col: "A", fila: 78, max: 5 },
+      recomendaciones: { col: "A", fila: 84, max: 5 },
     },
   },
 
@@ -400,6 +444,9 @@ const MAPEOS = {
       descripcion: "A2",
       componenteMarca: "A7", componenteModelo: "B7", componentePotencia: "C7", componenteCantidad: "D7",
       equipoMarca: "E7", equipoModelo: "F7", equipoPotencia: "G7", equipoCantidad: "H7",
+      // Rótulos A21:D21/E21:H21, editables — si el técnico los deja vacíos,
+      // escribir() no toca la celda y queda el texto impreso de la plantilla.
+      tituloVistaComponente: "A21", tituloVistaEquipo: "E21",
     },
     checklist: {
       "Checklist de verificación técnica": {
@@ -409,47 +456,96 @@ const MAPEOS = {
     bullets: { recomendaciones: { col: "A", fila: 32, max: 5 } },
   },
 
+  // Re-mapeada completa (2026-09-03): la plantilla real ya no trae el bloque
+  // de encabezado — igual que "adicional"/"arrancador", A3 (bajo el rótulo
+  // impreso "DESCRIPCION" en A1:I2) recibe la descripción. "Datos del
+  // equipo"/fotos/checklist subieron 8 filas por la eliminación del
+  // encabezado (confirmado celda por celda). Observaciones/Conclusiones/
+  // Recomendaciones ya no son de 1-2 líneas: la plantilla les dio una caja
+  // de 5 líneas cada una (filas 71-75/77-81/83-87), no solo se corrieron.
   plc: {
-    campos: { ...CAMPOS_ENCABEZADO_SERVICIO, ...CAMPOS_EQUIPO_9COL },
+    campos: {
+      descripcion: "A3",
+      equipoMarca: "A7", modelo: "C7", codigo: "E7", tag: "G7", potencia: "H7", serie: "I7",
+      operario: "A9", observacionIngreso: "C8",
+      // Rótulos editables sobre los recuadros de "Fotos del mantenimiento"
+      // (ver sección "Títulos de las fotos" en informesTecnicos.js).
+      tituloVistaFrontal: "A31", tituloPlacaEquipo: "D31", tituloCarcasaContaminada: "G31",
+      tituloCarcasaDescontaminada: "A52", tituloLimpiezaTarjeta: "D52", tituloCambioComponentes: "G52",
+    },
     filas: {
-      piezasAReemplazar: { colCantidad: "A", colDescripcion: "B", filaInicial: 64, max: 4 },
+      piezasAReemplazar: { colCantidad: "A", colDescripcion: "B", filaInicial: 56, max: 4 },
     },
     tabla: {
       checklistTecnico: Object.fromEntries(
-        Array.from({ length: 8 }, (_, i) => [i, 70 + i]).flatMap(([i, fila]) => [
+        Array.from({ length: 8 }, (_, i) => [i, 62 + i]).flatMap(([i, fila]) => [
           [`item${i + 1}__inicial`, `H${fila}`], [`item${i + 1}__final`, `I${fila}`],
         ])
       ),
     },
     bullets: {
-      observaciones: { col: "A", fila: 79, max: 1 },
-      conclusiones: { col: "A", fila: 81, max: 2 },
-      recomendaciones: { col: "A", fila: 84, max: 2 },
+      observaciones: { col: "A", fila: 71, max: 5 },
+      conclusiones: { col: "A", fila: 77, max: 5 },
+      recomendaciones: { col: "A", fila: 83, max: 5 },
     },
   },
 
+  // Re-mapeada completa (2026-09-03): la plantilla real ya no trae el bloque
+  // de encabezado (CAMPOS_ENCABEZADO_SERVICIO) — igual que "adicional", una
+  // sola celda A3 (bajo el rótulo impreso "DESCRIPCION" en A1:I2) recibe la
+  // descripción. Todo el resto del contenido, desde "DATOS DEL EQUIPO" en
+  // adelante, subió exactamente 8 filas por la eliminación del encabezado
+  // (confirmado celda por celda contra la plantilla real). "Equipo/Marca",
+  // "Modelo" y "Código" ahora van en celdas fusionadas de 2 columnas (antes
+  // 1 sola) — Tag/Potencia/S-N siguen siendo 1 celda. Ver SLOTS_FOTOS.arrancador
+  // para el recuadro de "Prueba de equipo inicial/final" (reubicado, pedido
+  // explícito del usuario).
   arrancador: {
-    campos: { ...CAMPOS_ENCABEZADO_SERVICIO, ...CAMPOS_EQUIPO_9COL, ...CAMPOS_PROTOCOLO_ESTANDAR },
+    campos: {
+      descripcion: "A3",
+      equipoMarca: "A7", modelo: "C7", codigo: "E7", tag: "G7", potencia: "H7", serie: "I7",
+      operario: "A9", observacionIngreso: "C8",
+      protoInicialEncendido: "B11", protoFinalEncendido: "G11",
+      protoInicialBackup: "B12", protoFinalBackup: "G12",
+      protoInicialTemperatura: "B13", protoFinalTemperatura: "G13",
+      protoInicialVentilador: "B14", protoFinalVentilador: "G14",
+      protoInicialTiempoPrueba: "B15", protoFinalTiempoPrueba: "G15",
+      protoInicialCorrienteSalida: "B16", protoFinalCorrienteSalida: "G16",
+      protoInicialCorrienteSoftware: "B17", protoFinalCorrienteSoftware: "G17",
+      protoInicialVoltajeSalida: "B18", protoFinalVoltajeSalida: "G18",
+      protoInicialVoltajeSoftware: "B19", protoFinalVoltajeSoftware: "G19",
+      protoInicialMedicionBusDc: "B20", protoFinalMedicionBusDc: "G20",
+      protoInicialMedicionLineaTierra: "B21", protoFinalMedicionLineaTierra: "G21",
+      protoInicialProtocoloComunicacion: "B22", protoFinalProtocoloComunicacion: "G22",
+      protoInicialIdProtocolo: "B23", protoFinalIdProtocolo: "G23",
+      protoInicialObservacion: "A25", protoFinalObservacion: "F25",
+      // Rótulos editables sobre los recuadros de "Fotos del mantenimiento"
+      // (ver sección "Títulos de las fotos" en informesTecnicos.js) — celda
+      // master de cada rótulo fusionado, confirmada contra la plantilla real.
+      tituloVistaFrontal: "A47", tituloPlacaEquipo: "D47", tituloCarcasaContaminada: "G47",
+      tituloCarcasaDescontaminada: "A68", tituloTarjeta: "D68", tituloPastaTermica: "G68",
+      tituloCambioVentilador: "A89", tituloCambioComponentes: "D89", tituloMedicionScr: "G89",
+    },
     filas: {
-      piezasAReemplazar: { colCantidad: "F", colDescripcion: "G", filaInicial: 101, max: 3 },
+      piezasAReemplazar: { colCantidad: "F", colDescripcion: "G", filaInicial: 93, max: 3 },
     },
     tabla: {
       medicionScr: {
-        scr1__gateAnode: "B101", scr1__gateCathode: "C101",
-        scr2__gateAnode: "B102", scr2__gateCathode: "C102",
-        scr3__gateAnode: "B103", scr3__gateCathode: "C103",
+        scr1__gateAnode: "B93", scr1__gateCathode: "C93",
+        scr2__gateAnode: "B94", scr2__gateCathode: "C94",
+        scr3__gateAnode: "B95", scr3__gateCathode: "C95",
       },
       checklistTecnico: Object.fromEntries(
-        Array.from({ length: 13 }, (_, i) => [i, 108 + i]).flatMap(([i, fila]) => [
+        Array.from({ length: 13 }, (_, i) => [i, 100 + i]).flatMap(([i, fila]) => [
           [`item${i + 1}__inicial`, `H${fila}`], [`item${i + 1}__final`, `I${fila}`],
         ])
       ),
     },
     bullets: {
-      observacionesScr: { col: "A", fila: 105, max: 1 },
-      observaciones: { col: "A", fila: 122, max: 1 },
-      conclusiones: { col: "A", fila: 124, max: 3 },
-      recomendaciones: { col: "A", fila: 128, max: 2 },
+      observacionesScr: { col: "A", fila: 97, max: 1 },
+      observaciones: { col: "A", fila: 114, max: 1 },
+      conclusiones: { col: "A", fila: 116, max: 3 },
+      recomendaciones: { col: "A", fila: 120, max: 2 },
     },
   },
 
@@ -475,24 +571,56 @@ const MAPEOS = {
     },
   },
 
+  // Re-mapeada completa (2026-09-03): la plantilla real ya no trae el bloque
+  // de encabezado — layout prácticamente idéntico a arrancador (mismas filas
+  // exactas para protocolo/fotos/checklist/bullets), con "Medición de
+  // baterías" y "Piezas a reemplazar" compartiendo el bloque de 10 filas
+  // (93-102) lado a lado en vez del típico bloque de 5. La plantilla trae
+  // además 9 recuadros de foto con rótulo propio (antes esta era la única
+  // plantilla del set sin `slotsFijos` — modo libre); se migra al mismo
+  // patrón que arrancador para que los rótulos impresos sean editables.
   ups: {
-    campos: { ...CAMPOS_ENCABEZADO_SERVICIO, ...CAMPOS_EQUIPO_9COL, ...CAMPOS_PROTOCOLO_ESTANDAR },
+    campos: {
+      descripcion: "A3",
+      equipoMarca: "A7", modelo: "C7", codigo: "E7", tag: "G7", potencia: "H7", serie: "I7",
+      operario: "A9", observacionIngreso: "C8",
+      protoInicialEncendido: "B11", protoFinalEncendido: "G11",
+      protoInicialBackup: "B12", protoFinalBackup: "G12",
+      protoInicialTemperatura: "B13", protoFinalTemperatura: "G13",
+      protoInicialVentilador: "B14", protoFinalVentilador: "G14",
+      protoInicialTiempoPrueba: "B15", protoFinalTiempoPrueba: "G15",
+      protoInicialCorrienteSalida: "B16", protoFinalCorrienteSalida: "G16",
+      protoInicialCorrienteSoftware: "B17", protoFinalCorrienteSoftware: "G17",
+      protoInicialVoltajeSalida: "B18", protoFinalVoltajeSalida: "G18",
+      protoInicialVoltajeSoftware: "B19", protoFinalVoltajeSoftware: "G19",
+      protoInicialMedicionBusDc: "B20", protoFinalMedicionBusDc: "G20",
+      protoInicialMedicionLineaTierra: "B21", protoFinalMedicionLineaTierra: "G21",
+      protoInicialProtocoloComunicacion: "B22", protoFinalProtocoloComunicacion: "G22",
+      protoInicialIdProtocolo: "B23", protoFinalIdProtocolo: "G23",
+      protoInicialObservacion: "A25", protoFinalObservacion: "F25",
+      tituloVistaFrontal: "A47", tituloPlacaEquipo: "D47", tituloCarcasaContaminada: "G47",
+      tituloCarcasaDescontaminada: "A68", tituloTarjeta: "D68", tituloBaterias: "G68",
+      tituloCambioVentilador: "A89", tituloCambioComponentes: "D89", tituloMedicionBaterias: "G89",
+    },
+    filas: {
+      piezasAReemplazar: { colCantidad: "F", colDescripcion: "G", filaInicial: 93, max: 10 },
+    },
     tabla: {
       medicionBaterias: Object.fromEntries(
-        Array.from({ length: 10 }, (_, i) => [i, 101 + i]).flatMap(([i, fila]) => [
+        Array.from({ length: 10 }, (_, i) => [i, 93 + i]).flatMap(([i, fila]) => [
           [`bateria${i + 1}__nominal`, `B${fila}`], [`bateria${i + 1}__real`, `C${fila}`],
         ])
       ),
       checklistTecnico: Object.fromEntries(
-        Array.from({ length: 12 }, (_, i) => [i, 114 + i]).flatMap(([i, fila]) => [
+        Array.from({ length: 12 }, (_, i) => [i, 106 + i]).flatMap(([i, fila]) => [
           [`item${i + 1}__inicial`, `H${fila}`], [`item${i + 1}__final`, `I${fila}`],
         ])
       ),
     },
     bullets: {
-      observaciones: { col: "A", fila: 127, max: 1 },
-      conclusiones: { col: "A", fila: 129, max: 3 },
-      recomendaciones: { col: "A", fila: 133, max: 2 },
+      observaciones: { col: "A", fila: 119, max: 5 },
+      conclusiones: { col: "A", fila: 125, max: 5 },
+      recomendaciones: { col: "A", fila: 131, max: 5 },
     },
   },
 
@@ -574,40 +702,54 @@ const SLOTS_FOTOS = {
     vistaFrontal: "A18:B29", placa: "C18:D29", estadoInterno1: "E18:F29", estadoInterno2: "G18:H29",
     estadoCarcasa: "A31:B42", estadoTarjeta: "C31:D42", componentesMalEstado: "E31:F42", estadoVentiladores: "G31:H42",
   },
+  // 8 filas más arriba por la eliminación del encabezado (confirmado celda
+  // por celda 2026-09-03).
   diagnostico_servomotor: {
-    vistaFrontal: "A18:B29", placa: "C18:D29", estadoCarcasa: "E18:F29", estadoEncoder: "G18:H29",
-    estadoInterno: "A31:B42", conectores: "C31:D42", estadoRodamientos: "E31:F42", pruebaEquipo: "G31:H42",
+    vistaFrontal: "A10:B21", placa: "C10:D21", estadoCarcasa: "E10:F21", estadoEncoder: "G10:H21",
+    estadoInterno: "A23:B34", conectores: "C23:D34", estadoRodamientos: "E23:F34", pruebaEquipo: "G23:H34",
   },
   tarjetas: { imagenA: "A19:C38", imagenB: "D19:F38", imagenC: "G19:I38" },
+  // 8 filas más arriba por la eliminación del encabezado (confirmado celda
+  // por celda 2026-09-03).
   pc: {
-    vistaFrontal: "A19:C38", placaEquipo: "D19:F38", carcasaContaminada: "G19:I38",
-    carcasaDescontaminada: "A40:C59", limpiezaTarjetaInicial: "D40:F49", limpiezaTarjetaFinal: "D50:F59",
-    cambioVentilador: "G40:I59",
+    vistaFrontal: "A11:C30", placaEquipo: "D11:F30", carcasaContaminada: "G11:I30",
+    carcasaDescontaminada: "A32:C51", limpiezaTarjetaInicial: "D32:F41", limpiezaTarjetaFinal: "D42:F51",
+    cambioVentilador: "G32:I51",
   },
+  // 8 filas más arriba por la eliminación del encabezado (confirmado celda
+  // por celda 2026-09-03).
   panel: {
-    vistaFrontal: "A19:C38", placaEquipo: "D19:F38",
-    carcasaContaminada: "G19:I28", carcasaDescontaminada: "G29:I38",
-    limpiezaTarjetaInicial: "A40:C49", limpiezaTarjetaFinal: "A50:C59",
-    cambioLcdInicial: "D40:F49", cambioLcdFinal: "D50:F59",
-    cambioTouchInicial: "G40:I49", cambioTouchFinal: "G50:I59",
+    vistaFrontal: "A11:C30", placaEquipo: "D11:F30",
+    carcasaContaminada: "G11:I20", carcasaDescontaminada: "G21:I30",
+    limpiezaTarjetaInicial: "A32:C41", limpiezaTarjetaFinal: "A42:C51",
+    cambioLcdInicial: "D32:F41", cambioLcdFinal: "D42:F51",
+    cambioTouchInicial: "G32:I41", cambioTouchFinal: "G42:I51",
   },
   // Recuadro subió con el resto del contenido (ver comentario en MAPEOS.adicional)
   // — inferido por el hueco entre la fila 8 (spacer) y el rótulo "VISTA FRONTAL..."
   // en la fila 21 (ahora DEBAJO del recuadro, no encima como en las demás
   // plantillas); no confirmado visualmente con una foto real insertada.
   adicional: { vistaFrontalComponente: "A9:D20", vistaFrontalEquipo: "E9:H20" },
+  // 8 filas más arriba por la eliminación del encabezado (ver comentario en
+  // MAPEOS.plc, confirmado celda por celda 2026-09-03).
   plc: {
-    vistaFrontal: "A19:C38", placaEquipo: "D19:F38", carcasaContaminada: "G19:I38",
-    carcasaDescontaminada: "A40:C59", limpiezaTarjetaInicial: "D40:F49", limpiezaTarjetaFinal: "D50:F59",
-    cambioComponentes: "G40:I59",
+    vistaFrontal: "A11:C30", placaEquipo: "D11:F30", carcasaContaminada: "G11:I30",
+    carcasaDescontaminada: "A32:C51", limpiezaTarjetaInicial: "D32:F41", limpiezaTarjetaFinal: "D42:F51",
+    cambioComponentes: "G32:I51",
   },
+  // Mismo layout de 13 recuadros que antes, 8 filas más arriba por la
+  // eliminación del encabezado (ver comentario en MAPEOS.arrancador,
+  // confirmado celda por celda 2026-09-03). "Prueba de equipo inicial/final"
+  // ya NO usa el recuadro chico C24:D25/H24:I25 impreso en la plantilla —
+  // pedido explícito del usuario: ocupa toda la altura de su tabla de
+  // protocolo (misma fila que el primer/último ítem, C11:D23 / H11:I23).
   arrancador: {
-    vistaFrontal: "A35:C54", placaEquipo: "D35:F54", carcasaContaminada: "G35:I54",
-    carcasaDescontaminada: "A56:C75", limpiezaContaminada: "D56:F65", limpiezaDescontaminada: "D66:F75",
-    pastaTermicaSeca: "G56:I65", pastaTermicaNueva: "G66:I75",
-    cambioVentilador: "A77:C96", cambioComponentesInicial: "D77:F86", cambioComponentesFinal: "D87:F96",
-    medicionScrInicial: "G77:I86", medicionScrFinal: "G87:I96",
-    ...RANGOS_PRUEBA_EQUIPO,
+    vistaFrontal: "A27:C46", placaEquipo: "D27:F46", carcasaContaminada: "G27:I46",
+    carcasaDescontaminada: "A48:C67", limpiezaContaminada: "D48:F57", limpiezaDescontaminada: "D58:F67",
+    pastaTermicaSeca: "G48:I57", pastaTermicaNueva: "G58:I67",
+    cambioVentilador: "A69:C88", cambioComponentesInicial: "D69:F78", cambioComponentesFinal: "D79:F88",
+    medicionScrInicial: "G69:I78", medicionScrFinal: "G79:I88",
+    protoInicialPrueba: "C11:D23", protoFinalPrueba: "H11:I23",
   },
   variador_reparacion: {
     vistaFrontal: "A35:C54", placaEquipo: "D35:F54", carcasaContaminada: "G35:I54",
@@ -617,7 +759,18 @@ const SLOTS_FOTOS = {
     medicionIgbtFotoInicial: "G77:I86", medicionIgbtFotoFinal: "G87:I96",
     ...RANGOS_PRUEBA_EQUIPO,
   },
-  ups: { ...RANGOS_PRUEBA_EQUIPO },
+  // 9 recuadros de foto (13 slots contando las variantes antes/después) —
+  // mismas filas exactas que arrancador (confirmado celda por celda
+  // 2026-09-03), "Prueba de equipo inicial/final" también reubicada a toda
+  // la altura de su tabla de protocolo en vez del recuadro chico impreso.
+  ups: {
+    vistaFrontal: "A27:C46", placaEquipo: "D27:F46", carcasaContaminada: "G27:I46",
+    carcasaDescontaminada: "A48:C67", tarjetaContaminada: "D48:F57", tarjetaDescontaminada: "D58:F67",
+    bateriasContaminadas: "G48:I57", bateriasDescontaminadas: "G58:I67",
+    cambioVentilador: "A69:C88", cambioComponentesInicial: "D69:F78", cambioComponentesFinal: "D79:F88",
+    medicionBateriasInicial: "G69:I78", medicionBateriasFinal: "G79:I88",
+    protoInicialPrueba: "C11:D23", protoFinalPrueba: "H11:I23",
+  },
   servomotor: {
     estadoEjeRotor: "A128:B139", asientoRodamientoDelantero: "C128:D139", estadoNucleoRotor: "E128:G139", asientoTrasero: "H128:I139",
     estadoChaveteroChaveta: "A141:B154", rodamientoDelantero: "C141:D154", fotoOriginalRotor: "E141:G154", rodamientoTrasero: "H141:I154",
@@ -775,6 +928,17 @@ export async function exportarInformeTecnicoExcel(informe, ot) {
         escribir(`${m.colDescripcion}${m.filaInicial + i}`, f[colDos.clave]);
       });
     } else if (seccion.tipo === "evidencias") {
+      // Rótulos editables de cada recuadro (`campoTitulo` en el slot, ver
+      // informesTecnicos.js) — viven en mapa.campos (misma celda que si
+      // fueran una sección "campos" normal), no en mapa.evidencias. Un Set
+      // evita escribir 2 veces un campoTitulo compartido por 2 slots (ej.
+      // "Cambio de componentes" antes/después).
+      const titulosEscritos = new Set();
+      (seccion.slotsFijos || []).forEach((slot) => {
+        if (!slot.campoTitulo || titulosEscritos.has(slot.campoTitulo)) return;
+        titulosEscritos.add(slot.campoTitulo);
+        escribir(mapa.campos?.[slot.campoTitulo], campos[slot.campoTitulo]);
+      });
       const slots = mapa.evidencias?.[seccion.clave];
       if (!slots) return;
       const grupos = campos[seccion.clave] || [];

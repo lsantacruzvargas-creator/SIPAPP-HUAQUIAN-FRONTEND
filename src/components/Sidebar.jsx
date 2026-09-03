@@ -64,6 +64,9 @@ const IconClipboardList = (p) => (
 const IconChartBar = (p) => (
   <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3v18h18M8 17V11m5 6V7m5 10v-4" /></svg>
 );
+const IconServer = (p) => (
+  <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="6" rx="1.5" strokeWidth={2} /><rect x="3" y="14" width="18" height="6" rx="1.5" strokeWidth={2} /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 17h.01" /></svg>
+);
 const IconPanelClose = (p) => (
   <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="16" rx="2" strokeWidth={2} /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 4v16m4-8l-2 2 2 2" /></svg>
 );
@@ -173,6 +176,7 @@ export default function Sidebar() {
     { to: "/requerimientos", label: "Requerimientos", Icon: IconClipboardList, show: esAdmin || esAlmacenero || esJefatura },
     { to: "/aprobaciones", label: "Aprobaciones", Icon: IconCheckCircle, show: esAdmin || esJefatura },
     { to: "/usuarios", label: "Usuarios", Icon: IconUsers, show: esAdmin },
+    { to: "/sistema", label: "Sistema", Icon: IconServer, show: esAdmin || esJefatura },
   ];
 
   const itemCls = (activo) =>

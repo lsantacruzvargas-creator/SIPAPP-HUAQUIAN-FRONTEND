@@ -4,38 +4,11 @@ import { formatearFecha, fechaHoyLima } from "../utils/fecha";
 import ModalImportarExcel, { COLS_MATERIALES } from "../components/ModalImportarExcel";
 import BuscadorMaterialInline from "../components/BuscadorMaterialInline";
 import TablaScroll from "../components/TablaScroll";
+import ConfirmacionAccion from "../components/ConfirmacionAccion";
 import * as XLSX from "xlsx";
 
 const INP =
   "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white";
-
-// Confirmación propia (NO window.confirm) — en la app de Electron, el
-// diálogo nativo de window.confirm() puede dejar la ventana sin foco de
-// teclado/mouse al cerrarse (bug conocido de Electron con BrowserWindow: la
-// devolución de foco a los webContents tras un diálogo nativo no siempre
-// ocurre), congelando el formulario hasta que algún otro evento del SO le
-// devuelve el foco — reportado en Ingreso/Egreso de Almacén, solo dentro de
-// la app de escritorio, nunca en el navegador normal. Este panel vive dentro
-// de la misma página, sin esa capa nativa.
-function ConfirmacionAccion({ mensaje, onCancelar, onConfirmar, procesando, textoConfirmar = "Confirmar" }) {
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm">
-        <p className="text-sm text-gray-700 mb-6">{mensaje}</p>
-        <div className="flex justify-end gap-3">
-          <button onClick={onCancelar} disabled={procesando}
-            className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition disabled:opacity-50">
-            Cancelar
-          </button>
-          <button onClick={onConfirmar} disabled={procesando}
-            className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-700 transition disabled:opacity-50">
-            {procesando ? "Guardando…" : textoConfirmar}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 const UNIDADES = ["und", "kg", "g", "L", "mL", "m", "cm", "m²", "caja", "rollo", "par", "juego", "bolsa"];
 
@@ -566,6 +539,8 @@ function SeccionCategorias() {
   const [editando, setEditando] = useState(null);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
+  const [confirmandoEliminar, setConfirmandoEliminar] = useState(null);
+  const [eliminando, setEliminando] = useState(false);
 
   const cargar = useCallback(async () => {
     const r = await fetchAuth("/categorias-material");
@@ -618,9 +593,11 @@ function SeccionCategorias() {
     setGuardando(false);
   };
 
-  const eliminar = async (c) => {
-    if (!window.confirm(`¿Desactivar la categoría "${c.nombre}"?`)) return;
-    const r = await fetchAuth(`/categorias-material/${c._id}`, { method: "DELETE" });
+  const eliminar = async () => {
+    setEliminando(true);
+    const r = await fetchAuth(`/categorias-material/${confirmandoEliminar._id}`, { method: "DELETE" });
+    setEliminando(false);
+    setConfirmandoEliminar(null);
     if (r.ok) await cargar();
   };
 
@@ -699,13 +676,23 @@ function SeccionCategorias() {
                 </td>
                 <td className="px-5 py-3 text-right space-x-3">
                   <button onClick={() => iniciarEdicion(c)} className="text-xs text-blue-500 hover:text-blue-700 transition">Editar</button>
-                  <button onClick={() => eliminar(c)} className="text-xs text-gray-400 hover:text-red-500 transition">Desactivar</button>
+                  <button onClick={() => setConfirmandoEliminar(c)} className="text-xs text-gray-400 hover:text-red-500 transition">Desactivar</button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {confirmandoEliminar && (
+        <ConfirmacionAccion
+          mensaje={`¿Desactivar la categoría "${confirmandoEliminar.nombre}"?`}
+          onCancelar={() => setConfirmandoEliminar(null)}
+          onConfirmar={eliminar}
+          procesando={eliminando}
+          textoConfirmar="Desactivar"
+        />
+      )}
     </div>
   );
 }
@@ -730,6 +717,11 @@ function SeccionComponentes() {
   const [editandoCat, setEditandoCat] = useState(null);
   const [guardandoCat, setGuardandoCat] = useState(false);
   const [errorCat, setErrorCat] = useState("");
+
+  const [confirmandoTipo, setConfirmandoTipo] = useState(null);
+  const [eliminandoTipo, setEliminandoTipo] = useState(false);
+  const [confirmandoCat, setConfirmandoCat] = useState(null);
+  const [eliminandoCat, setEliminandoCat] = useState(false);
 
   const cargar = useCallback(async () => {
     const [rt, rc] = await Promise.all([
@@ -757,9 +749,12 @@ function SeccionComponentes() {
     setGuardandoTipo(false);
   };
 
-  const eliminarTipo = async (t) => {
-    if (!window.confirm(`¿Desactivar el Tipo Componente "${t.nombre}"? También sus categorías hijas dejarán de aparecer para elegir.`)) return;
+  const eliminarTipo = async () => {
+    const t = confirmandoTipo;
+    setEliminandoTipo(true);
     const r = await fetchAuth(`/tipos-componente/${t._id}`, { method: "DELETE" });
+    setEliminandoTipo(false);
+    setConfirmandoTipo(null);
     if (r.ok) { await cargar(); if (tipoSel === t._id) setTipoSel(null); }
   };
 
@@ -781,9 +776,11 @@ function SeccionComponentes() {
     setGuardandoCat(false);
   };
 
-  const eliminarCat = async (c) => {
-    if (!window.confirm(`¿Desactivar la categoría "${c.nombre}"?`)) return;
-    const r = await fetchAuth(`/categorias-componente/${c._id}`, { method: "DELETE" });
+  const eliminarCat = async () => {
+    setEliminandoCat(true);
+    const r = await fetchAuth(`/categorias-componente/${confirmandoCat._id}`, { method: "DELETE" });
+    setEliminandoCat(false);
+    setConfirmandoCat(null);
     if (r.ok) await cargar();
   };
 
@@ -828,7 +825,7 @@ function SeccionComponentes() {
                   <td className="px-5 py-3 font-medium text-gray-800">{t.nombre}</td>
                   <td className="px-5 py-3 text-right space-x-3" onClick={(e) => e.stopPropagation()}>
                     <button onClick={() => iniciarEdicionTipo(t)} className="text-xs text-blue-500 hover:text-blue-700 transition">Editar</button>
-                    <button onClick={() => eliminarTipo(t)} className="text-xs text-gray-400 hover:text-red-500 transition">Desactivar</button>
+                    <button onClick={() => setConfirmandoTipo(t)} className="text-xs text-gray-400 hover:text-red-500 transition">Desactivar</button>
                   </td>
                 </tr>
               ))}
@@ -881,7 +878,7 @@ function SeccionComponentes() {
                     <td className="px-5 py-3 font-medium text-gray-800">{c.nombre}</td>
                     <td className="px-5 py-3 text-right space-x-3">
                       <button onClick={() => iniciarEdicionCat(c)} className="text-xs text-blue-500 hover:text-blue-700 transition">Editar</button>
-                      <button onClick={() => eliminarCat(c)} className="text-xs text-gray-400 hover:text-red-500 transition">Desactivar</button>
+                      <button onClick={() => setConfirmandoCat(c)} className="text-xs text-gray-400 hover:text-red-500 transition">Desactivar</button>
                     </td>
                   </tr>
                 ))}
@@ -890,6 +887,25 @@ function SeccionComponentes() {
           </div>
         )}
       </div>
+
+      {confirmandoTipo && (
+        <ConfirmacionAccion
+          mensaje={`¿Desactivar el Tipo Componente "${confirmandoTipo.nombre}"? También sus categorías hijas dejarán de aparecer para elegir.`}
+          onCancelar={() => setConfirmandoTipo(null)}
+          onConfirmar={eliminarTipo}
+          procesando={eliminandoTipo}
+          textoConfirmar="Desactivar"
+        />
+      )}
+      {confirmandoCat && (
+        <ConfirmacionAccion
+          mensaje={`¿Desactivar la categoría "${confirmandoCat.nombre}"?`}
+          onCancelar={() => setConfirmandoCat(null)}
+          onConfirmar={eliminarCat}
+          procesando={eliminandoCat}
+          textoConfirmar="Desactivar"
+        />
+      )}
     </div>
   );
 }

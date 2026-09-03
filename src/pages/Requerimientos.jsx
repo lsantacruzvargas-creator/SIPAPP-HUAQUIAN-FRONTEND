@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import { formatearFecha } from "../utils/fecha";
 import SelectorMateriales from "../components/SelectorMateriales";
+import PromptAccion from "../components/PromptAccion";
 
 const ESTADO_ITEM = {
   pendiente: "bg-blue-100 text-blue-700",
@@ -174,6 +175,8 @@ function FilaItem({ requerimiento, item, puedeAtender, onActualizado }) {
   const [panelSalida, setPanelSalida] = useState(false);
   const [panelDevolucion, setPanelDevolucion] = useState(false);
   const [buscadorAbierto, setBuscadorAbierto] = useState(false);
+  const [confirmandoRechazo, setConfirmandoRechazo] = useState(false);
+  const [rechazando, setRechazando] = useState(false);
   const unidad = item.esSolicitudCompra ? item.materialAsociado?.unidad : item.material?.unidad;
 
   const accion = async (endpoint, body) => {
@@ -185,10 +188,11 @@ function FilaItem({ requerimiento, item, puedeAtender, onActualizado }) {
     if (r.ok) onActualizado(await r.json());
   };
 
-  const rechazar = () => {
-    const motivo = window.prompt("Motivo del rechazo:");
-    if (motivo === null) return;
-    accion("rechazar", { motivo });
+  const rechazar = async (motivo) => {
+    setRechazando(true);
+    await accion("rechazar", { motivo });
+    setRechazando(false);
+    setConfirmandoRechazo(false);
   };
 
   const vincular = (material) => {
@@ -238,7 +242,7 @@ function FilaItem({ requerimiento, item, puedeAtender, onActualizado }) {
           </button>
         )}
         {puedeAtender && item.estado === "pendiente" && (
-          <button onClick={rechazar} className="text-xs text-gray-400 hover:text-red-500 transition shrink-0">
+          <button onClick={() => setConfirmandoRechazo(true)} className="text-xs text-gray-400 hover:text-red-500 transition shrink-0">
             Rechazar
           </button>
         )}
@@ -266,6 +270,16 @@ function FilaItem({ requerimiento, item, puedeAtender, onActualizado }) {
       )}
       {buscadorAbierto && (
         <SelectorMateriales onSelect={vincular} onClose={() => setBuscadorAbierto(false)} />
+      )}
+      {confirmandoRechazo && (
+        <PromptAccion
+          titulo="Rechazar ítem"
+          label="Motivo del rechazo"
+          onCancelar={() => setConfirmandoRechazo(false)}
+          onConfirmar={rechazar}
+          procesando={rechazando}
+          textoConfirmar="Rechazar"
+        />
       )}
     </div>
   );

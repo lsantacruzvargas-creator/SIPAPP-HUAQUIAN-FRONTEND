@@ -1,5 +1,6 @@
 import { Fragment, useState } from "react";
 import { formatearFechaHora } from "../utils/fecha";
+import ConfirmacionAccion from "./ConfirmacionAccion";
 
 /* ─── Iconos SVG (stroke, currentColor) ─────────────────────────── */
 const svg = "w-5 h-5";
@@ -318,20 +319,31 @@ export function BotonAnular({ onAnular }) {
 // de anular).
 export function BotonCerrarCadena({ cerrado, onToggle }) {
   const [enviando, setEnviando] = useState(false);
+  const [confirmando, setConfirmando] = useState(false);
   const confirmar = async () => {
-    const pregunta = cerrado
-      ? "¿Reabrir a mano toda la cadena de este documento (Cotización, OT, OC, Informes y Factura relacionados)?"
-      : "¿Cerrar a mano toda la cadena de este documento (Cotización, OT, OC, Informes y Factura relacionados)?";
-    if (!window.confirm(pregunta)) return;
     setEnviando(true);
     await onToggle(!cerrado);
     setEnviando(false);
+    setConfirmando(false);
   };
   return (
-    <button onClick={confirmar} disabled={enviando}
-      className="text-xs text-white/70 hover:text-white underline transition disabled:opacity-50">
-      {enviando ? "…" : cerrado ? "Reabrir cadena" : "Cerrar cadena"}
-    </button>
+    <>
+      <button onClick={() => setConfirmando(true)} disabled={enviando}
+        className="text-xs text-white/70 hover:text-white underline transition disabled:opacity-50">
+        {enviando ? "…" : cerrado ? "Reabrir cadena" : "Cerrar cadena"}
+      </button>
+      {confirmando && (
+        <ConfirmacionAccion
+          mensaje={cerrado
+            ? "¿Reabrir a mano toda la cadena de este documento (Cotización, OT, OC, Informes y Factura relacionados)?"
+            : "¿Cerrar a mano toda la cadena de este documento (Cotización, OT, OC, Informes y Factura relacionados)?"}
+          onCancelar={() => setConfirmando(false)}
+          onConfirmar={confirmar}
+          procesando={enviando}
+          textoConfirmar={cerrado ? "Reabrir cadena" : "Cerrar cadena"}
+        />
+      )}
+    </>
   );
 }
 
@@ -339,17 +351,29 @@ export function BotonCerrarCadena({ cerrado, onToggle }) {
 // también permite jefatura). Mantiene el historial (motivo/quién/cuándo).
 export function BotonDesanular({ onDesanular }) {
   const [enviando, setEnviando] = useState(false);
+  const [confirmando, setConfirmando] = useState(false);
   const confirmar = async () => {
-    if (!window.confirm("¿Revertir la anulación de este documento?")) return;
     setEnviando(true);
     await onDesanular();
     setEnviando(false);
+    setConfirmando(false);
   };
   return (
-    <button onClick={confirmar} disabled={enviando}
-      className="text-xs text-white/70 hover:text-white underline transition disabled:opacity-50">
-      {enviando ? "…" : "Desanular"}
-    </button>
+    <>
+      <button onClick={() => setConfirmando(true)} disabled={enviando}
+        className="text-xs text-white/70 hover:text-white underline transition disabled:opacity-50">
+        {enviando ? "…" : "Desanular"}
+      </button>
+      {confirmando && (
+        <ConfirmacionAccion
+          mensaje="¿Revertir la anulación de este documento?"
+          onCancelar={() => setConfirmando(false)}
+          onConfirmar={confirmar}
+          procesando={enviando}
+          textoConfirmar="Desanular"
+        />
+      )}
+    </>
   );
 }
 
