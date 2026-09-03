@@ -1,0 +1,12 @@
+# Sin esto, git (con core.autocrlf=true en este repo) intenta normalizar
+# CRLF/LF en cualquier archivo que su heurística de detección de binarios no
+# reconozca a tiempo — con .xlsx (ZIP comprimido) falla seguido, corrompiendo
+# 1-2 bytes en cada checkout/stash/pull aunque Excel lo abra sin errores
+# visibles. "binary" = -text -diff -merge: nunca tocar, nunca diffear.
+*.xlsx binary
+*.xls binary
+*.ico binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.pdf binary
