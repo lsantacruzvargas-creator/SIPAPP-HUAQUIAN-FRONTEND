@@ -14,6 +14,8 @@ const ICONOS = {
   variador_reparacion: "🔧",
   ups: "🔋",
   servomotor: "⚡",
+  equipo_general: "🧰",
+  mantenimiento_variador: "🛠️",
 };
 
 // Primer paso del flujo "+ Crear informe": elegir uno de los tipos antes

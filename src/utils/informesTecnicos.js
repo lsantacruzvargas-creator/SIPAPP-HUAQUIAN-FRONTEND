@@ -1025,6 +1025,135 @@ export const TIPOS_INFORME = [
       BULLETS_ESTANDAR("recomendaciones", "Recomendaciones"),
     ],
   },
+  {
+    valor: "equipo_general",
+    label: "Informe de Equipo en General",
+    archivoExcel: "INFORME DE EQUIPO EN GENERAL.xlsx",
+    secciones: [
+      { tipo: "campos", titulo: "Datos generales", campos: CAMPOS_HEADER_SERVICIO },
+      // 9 recuadros fijos impresos en la plantilla — ver
+      // SLOTS_FOTOS.equipo_general en informeTecnicoExcel.js. Cada recuadro
+      // va ANTES de su rótulo impreso (no después) — pedido explícito del
+      // usuario, ver el comentario junto a SLOTS_FOTOS.equipo_general.
+      {
+        ...EVIDENCIAS_ESTANDAR, titulo: "Fotos del equipo",
+        columnas: 3, miniaturaGrande: true, maxImagenes: 1,
+        slotsFijos: [
+          { clave: "vistaFrontal", label: "Vista frontal del equipo", campoTitulo: "tituloVistaFrontal" },
+          { clave: "placaEquipo", label: "Placa del equipo", campoTitulo: "tituloPlacaEquipo" },
+          { clave: "carcasaContaminada", label: "Estado de carcasa contaminada", campoTitulo: "tituloCarcasaContaminada" },
+          { clave: "carcasaDescontaminada", label: "Carcasa descontaminada", campoTitulo: "tituloCarcasaDescontaminada" },
+          { clave: "tarjetaContaminada", label: "Tarjeta contaminada", campoTitulo: "tituloTarjetaContaminada" },
+          { clave: "tarjetaDescontaminada", label: "Tarjeta descontaminada", campoTitulo: "tituloTarjetaDescontaminada" },
+          { clave: "partesAdicionales", label: "Partes adicionales", campoTitulo: "tituloPartesAdicionales" },
+          { clave: "adicional1", label: "Adicional", campoTitulo: "tituloAdicional1" },
+          { clave: "adicional2", label: "Adicional", campoTitulo: "tituloAdicional2" },
+        ],
+      },
+      PIEZAS_A_REEMPLAZAR_TABLA,
+      checklistDobleOkNok("Checklist de verificación técnica", "checklistTecnico", [
+        "Estado general del gabinete y carcasa",
+        "Estado visual de tarjetas y conectores",
+        "Estado conexiones de potencia y control",
+        "Estado de tierra y posibles cortocircuitos",
+        "Estado de ventilador",
+        "Estado de medición de salida de voltaje",
+        "Estado y medición de capacitores de control y potencia",
+        "Estado de componentes de tarjeta electrónica (Mosfet, Chips integrados)",
+        "Estado de componentes pasivos de tarjeta electrónica (resistencias, Diodos, Optoacopladores)",
+        "Estado mecánico del equipo (Piezas de soporte, o base de tarjetas)",
+        "Estado de ajuste de torque de bornes, barras y pernería",
+        "Estado de toda la pernería",
+      ]),
+      BULLETS_ESTANDAR("conclusiones", "Conclusiones"),
+      BULLETS_ESTANDAR("observaciones", "Observaciones"),
+      BULLETS_ESTANDAR("recomendaciones", "Recomendaciones"),
+    ],
+  },
+  {
+    valor: "mantenimiento_variador",
+    label: "Informe de Mantenimiento de Variador",
+    archivoExcel: "INFORME DE MANTEMIENTO VARIADOR.xlsx",
+    secciones: [
+      { tipo: "campos", titulo: "Datos generales", campos: CAMPOS_HEADER_SERVICIO },
+      // Mismo patrón que arrancador/ups/variador_reparacion: la foto de
+      // "Prueba de equipo" va al lado de su card de protocolo (pedido
+      // explícito del usuario). Confirmado celda por celda 2026-09-04.
+      { ...PROTOCOLO_PRUEBA(PROTOCOLO_ITEMS_ESTANDAR, "inicial", "protoInicial"), parPosicion: "izquierda" },
+      { ...EVIDENCIA_PRUEBA_EQUIPO("inicial", "protoInicial"), parPosicion: "derecha", miniaturaGrande: true, maxImagenes: 1 },
+      { ...PROTOCOLO_PRUEBA(PROTOCOLO_ITEMS_ESTANDAR, "final", "protoFinal"), parPosicion: "izquierda" },
+      { ...EVIDENCIA_PRUEBA_EQUIPO("final", "protoFinal"), parPosicion: "derecha", miniaturaGrande: true, maxImagenes: 1 },
+      // 9 recuadros fijos — mismo patrón "recuadro antes de su rótulo
+      // impreso" que equipo_general, ver SLOTS_FOTOS.mantenimiento_variador
+      // en informeTecnicoExcel.js. "Tarjeta contaminada/descontaminada" y
+      // "Pasta térmica seca/nueva" comparten 1 solo rótulo impreso entre
+      // sus 2 recuadros (igual que ups/arrancador).
+      {
+        ...EVIDENCIAS_ESTANDAR, titulo: "Fotos del equipo",
+        columnas: 3, miniaturaGrande: true, maxImagenes: 1,
+        slotsFijos: [
+          { clave: "vistaFrontal", label: "Vista frontal del equipo", campoTitulo: "tituloVistaFrontal" },
+          { clave: "placaEquipo", label: "Placa del equipo", campoTitulo: "tituloPlacaEquipo" },
+          { clave: "carcasaContaminada", label: "Estado de carcasa contaminada", campoTitulo: "tituloCarcasaContaminada" },
+          { clave: "carcasaDescontaminada", label: "Carcasa descontaminada", campoTitulo: "tituloCarcasaDescontaminada" },
+          { clave: "tarjetaContaminada", label: "Tarjeta contaminada", campoTitulo: "tituloTarjetaContaminada" },
+          { clave: "tarjetaDescontaminada", label: "Tarjeta descontaminada", campoTitulo: "tituloTarjetaDescontaminada" },
+          { clave: "pastaTermicaSeca", label: "Pasta térmica seca", campoTitulo: "tituloPastaTermicaSeca" },
+          { clave: "pastaTermicaNueva", label: "Pasta térmica nueva", campoTitulo: "tituloPastaTermicaNueva" },
+          { clave: "cambioVentilador", label: "Cambio de ventilador", campoTitulo: "tituloCambioVentilador" },
+          { clave: "medicionCapacitoresFoto", label: "Medición de capacitores", campoTitulo: "tituloMedicionCapacitoresFoto" },
+          { clave: "medicionIgbtFoto", label: "Medición de IGBT", campoTitulo: "tituloMedicionIgbtFoto" },
+        ],
+      },
+      {
+        tipo: "tabla", titulo: "Medición de diodos de IGBT — ingreso", clave: "medicionIgbtIngreso",
+        columnas: [{ clave: "dcMenos", label: "DC-" }, { clave: "dcMas", label: "DC+" }],
+        filas: [{ clave: "l1", label: "L1" }, { clave: "l2", label: "L2" }, { clave: "l3", label: "L3" }],
+      },
+      {
+        tipo: "tabla", titulo: "Medición de diodos de IGBT — salida", clave: "medicionIgbtSalida",
+        columnas: [{ clave: "dcMenos", label: "DC-" }, { clave: "dcMas", label: "DC+" }],
+        filas: [{ clave: "u", label: "U" }, { clave: "v", label: "V" }, { clave: "w", label: "W" }],
+      },
+      BULLETS_ESTANDAR("observacionesIgbt", "Observaciones de la medición de IGBT"),
+      PIEZAS_A_REEMPLAZAR_TABLA,
+      // "Tolerancia 20%" es select OK/NOK/NA (pedido explícito del
+      // usuario) — Valor/Valor real siguen siendo texto libre, por eso
+      // `opciones` va en la COLUMNA, no en la sección (ver SeccionTabla en
+      // FormInformeTecnico.jsx, soporta mezclar select y texto en la misma
+      // tabla desde 2026-09-04).
+      {
+        tipo: "tabla", titulo: "Medición de banco de capacitores", clave: "medicionBancoCapacitores",
+        columnas: [
+          { clave: "valor", label: "Valor" }, { clave: "valorReal", label: "Valor real" },
+          { clave: "tolerancia", label: "Tolerancia 20%", opciones: ["OK", "NOK", "NA"] },
+        ],
+        filas: [
+          { clave: "capacitor1", label: "Capacitor N° 1" }, { clave: "capacitor2", label: "Capacitor N° 2" },
+          { clave: "capacitor3", label: "Capacitor N° 3" }, { clave: "capacitor4", label: "Capacitor N° 4" },
+          { clave: "capacitor5", label: "Capacitor N° 5" },
+        ],
+      },
+      BULLETS_ESTANDAR("observacionesCapacitores", "Observaciones de la medición de capacitores"),
+      checklistDobleOkNok("Checklist de verificación técnica", "checklistTecnico", [
+        "Estado general del gabinete y carcasa",
+        "Estado visual de tarjetas y conectores",
+        "Estado conexiones de potencia y control",
+        "Estado de tierra y posibles cortocircuitos",
+        "Estado de ventilador",
+        "Estado de medición de salida de voltaje",
+        "Estado y medición de capacitores de control y potencia",
+        "Estado de componentes de tarjeta electrónica (Mosfet, Chips integrados)",
+        "Estado de componentes pasivos de tarjeta electrónica (resistencias, Diodos, Optoacopladores)",
+        "Estado mecánico del equipo (Piezas de soporte, o base de tarjetas)",
+        "Estado de ajuste de torque de bornes, barras y pernería",
+        "Estado de toda la pernería",
+      ]),
+      BULLETS_ESTANDAR("conclusiones", "Conclusiones"),
+      BULLETS_ESTANDAR("observaciones", "Observaciones"),
+      BULLETS_ESTANDAR("recomendaciones", "Recomendaciones"),
+    ],
+  },
 ];
 
 export const tipoInformePorValor = (valor) => TIPOS_INFORME.find((t) => t.valor === valor) || null;

@@ -853,6 +853,93 @@ const MAPEOS = {
       recomendaciones: { col: "A", fila: 216, max: 5 },
     },
   },
+  // Confirmado celda por celda contra la plantilla real (2026-09-04). OJO:
+  // acá el rótulo "DESCRIPCION DEL EQUIPO" ocupa solo la fila 1 (a
+  // diferencia de las otras 12 plantillas, donde el rótulo ocupa 2 filas y
+  // el dato cae en la fila 3) — el dato real va en A2, NO en A3. A3 es el
+  // rótulo de sección "FOTOS DEL EQUIPO", ya impreso; escribir ahí lo
+  // pisaría. El pedido original decía A3 siguiendo el patrón de los otros
+  // tipos, pero la plantilla de este type corrió 1 fila distinto.
+  equipo_general: {
+    campos: {
+      descripcion: "A2",
+    },
+    filas: {
+      piezasAReemplazar: { colCantidad: "A", colDescripcion: "B", filaInicial: 70, max: 7 },
+    },
+    tabla: {
+      checklistTecnico: Object.fromEntries(
+        Array.from({ length: 12 }, (_, i) => [i, 80 + i]).flatMap(([i, fila]) => [
+          [`item${i + 1}__inicial`, `H${fila}`], [`item${i + 1}__final`, `I${fila}`],
+        ])
+      ),
+    },
+    bullets: {
+      conclusiones: { col: "A", fila: 93, max: 5 },
+      observaciones: { col: "A", fila: 99, max: 4 },
+      recomendaciones: { col: "A", fila: 104, max: 4 },
+    },
+  },
+  // Confirmado celda por celda contra la plantilla real (2026-09-04). Mismo
+  // patrón "recuadro de foto antes de su rótulo impreso" que equipo_general
+  // (ver SLOTS_FOTOS.mantenimiento_variador). El título va en A2: el rótulo
+  // "DESCRIPCION DEL EQUIPO" ocupa solo la fila 1 (a diferencia del resto
+  // de plantillas, donde ocupa 2 filas y el dato cae en A3).
+  mantenimiento_variador: {
+    campos: {
+      descripcion: "A2",
+      protoInicialEncendido: "B4", protoFinalEncendido: "G4",
+      protoInicialBackup: "B5", protoFinalBackup: "G5",
+      protoInicialTemperatura: "B6", protoFinalTemperatura: "G6",
+      protoInicialVentilador: "B7", protoFinalVentilador: "G7",
+      protoInicialTiempoPrueba: "B8", protoFinalTiempoPrueba: "G8",
+      protoInicialCorrienteSalida: "B9", protoFinalCorrienteSalida: "G9",
+      protoInicialCorrienteSoftware: "B10", protoFinalCorrienteSoftware: "G10",
+      protoInicialVoltajeSalida: "B11", protoFinalVoltajeSalida: "G11",
+      protoInicialVoltajeSoftware: "B12", protoFinalVoltajeSoftware: "G12",
+      protoInicialMedicionBusDc: "B13", protoFinalMedicionBusDc: "G13",
+      protoInicialMedicionLineaTierra: "B14", protoFinalMedicionLineaTierra: "G14",
+      protoInicialProtocoloComunicacion: "B15", protoFinalProtocoloComunicacion: "G15",
+      protoInicialIdProtocolo: "B16", protoFinalIdProtocolo: "G16",
+      protoInicialObservacion: "A18", protoFinalObservacion: "F18",
+      // Rótulos editables sobre los recuadros de foto (ver `campoTitulo` en
+      // informesTecnicos.js) — impresos DEBAJO de cada recuadro, no encima.
+      // "Prueba de equipo inicial/final" (C17/H17) no tiene campoTitulo,
+      // igual que en arrancador/ups/variador_reparacion — queda como texto
+      // impreso fijo, no editable.
+      tituloVistaFrontal: "A40", tituloPlacaEquipo: "D40", tituloCarcasaContaminada: "G40",
+      tituloCarcasaDescontaminada: "A61",
+      tituloTarjetaContaminada: "D61", tituloTarjetaDescontaminada: "D61",
+      tituloPastaTermicaSeca: "G61", tituloPastaTermicaNueva: "G61",
+      tituloCambioVentilador: "A82", tituloMedicionCapacitoresFoto: "D82", tituloMedicionIgbtFoto: "G82",
+    },
+    filas: {
+      piezasAReemplazar: { colCantidad: "F", colDescripcion: "G", filaInicial: 86, max: 7 },
+    },
+    tabla: {
+      medicionIgbtIngreso: { l1__dcMenos: "B86", l1__dcMas: "C86", l2__dcMenos: "B87", l2__dcMas: "C87", l3__dcMenos: "B88", l3__dcMas: "C88" },
+      medicionIgbtSalida: { u__dcMenos: "B90", u__dcMas: "C90", v__dcMenos: "B91", v__dcMas: "C91", w__dcMenos: "B92", w__dcMas: "C92" },
+      medicionBancoCapacitores: {
+        capacitor1__valor: "B97", capacitor1__valorReal: "C97", capacitor1__tolerancia: "D97",
+        capacitor2__valor: "B98", capacitor2__valorReal: "C98", capacitor2__tolerancia: "D98",
+        capacitor3__valor: "B99", capacitor3__valorReal: "C99", capacitor3__tolerancia: "D99",
+        capacitor4__valor: "B100", capacitor4__valorReal: "C100", capacitor4__tolerancia: "D100",
+        capacitor5__valor: "B101", capacitor5__valorReal: "C101", capacitor5__tolerancia: "D101",
+      },
+      checklistTecnico: Object.fromEntries(
+        Array.from({ length: 12 }, (_, i) => [i, 106 + i]).flatMap(([i, fila]) => [
+          [`item${i + 1}__inicial`, `H${fila}`], [`item${i + 1}__final`, `I${fila}`],
+        ])
+      ),
+    },
+    bullets: {
+      observacionesIgbt: { col: "B", fila: 93, max: 1 },
+      observacionesCapacitores: { col: "B", fila: 102, max: 1 },
+      conclusiones: { col: "A", fila: 119, max: 5 },
+      observaciones: { col: "A", fila: 125, max: 5 },
+      recomendaciones: { col: "A", fila: 131, max: 5 },
+    },
+  },
 };
 
 // Tipos donde el bloque anexo "DATOS ADICIONALES" no debe mostrar el
@@ -984,6 +1071,32 @@ const SLOTS_FOTOS = {
     vistaFrontalEquipo: "A161:C180", placaEquipoFoto: "D161:F180", fotoEncoder: "G161:I177",
     cambioRodamientosFoto: "A182:C201", estadoInternoEquipoInicial: "D182:F201", estadoInternoEquipoFinal: "G182:I201",
     protoInicialPrueba: "C11:D23", protoFinalPrueba: "H11:I23",
+  },
+  // Reordenado a pedido explícito del usuario (2026-09-04): cada recuadro
+  // de foto va ANTES de su rótulo impreso (no después, al revés que el
+  // resto de plantillas) — usa las filas 4-23 (antes vacías, entre "FOTOS
+  // DEL EQUIPO" en la fila 3 y el primer rótulo en la 24) y 46-65 (antes
+  // vacías, entre el rótulo de la fila 45 y el de la 66), así los 3
+  // recuadros "Partes adicionales"/"Adicional"/"Adicional" también quedan
+  // con su banda completa de 20 filas — resuelve el hueco de espacio que
+  // tenían antes sin tocar la plantilla real.
+  equipo_general: {
+    vistaFrontal: "A4:C23", placaEquipo: "D4:F23", carcasaContaminada: "G4:I23",
+    carcasaDescontaminada: "A25:C44", tarjetaContaminada: "D25:F44", tarjetaDescontaminada: "G25:I44",
+    partesAdicionales: "A46:C65", adicional1: "D46:F65", adicional2: "G46:I65",
+  },
+  // Confirmado celda por celda contra la plantilla real (2026-09-04),
+  // rangos dados explícitamente por el usuario. "Prueba de equipo inicial/
+  // final" va al lado de su card de protocolo (C4:D16/H4:I16, mismas filas
+  // que la tabla de protocolo). Tarjeta contaminada/descontaminada y pasta
+  // térmica seca/nueva comparten recuadro de 10 filas cada uno dentro de
+  // la misma banda de 20 (igual que en variador_reparacion/ups).
+  mantenimiento_variador: {
+    protoInicialPrueba: "C4:D16", protoFinalPrueba: "H4:I16",
+    vistaFrontal: "A20:C39", placaEquipo: "D20:F39", carcasaContaminada: "G20:I39",
+    carcasaDescontaminada: "A41:C60", tarjetaContaminada: "D41:F50", tarjetaDescontaminada: "D51:F60",
+    pastaTermicaSeca: "G41:I50", pastaTermicaNueva: "G51:I60",
+    cambioVentilador: "A62:C81", medicionCapacitoresFoto: "D62:F81", medicionIgbtFoto: "G62:I81",
   },
 };
 

@@ -11,7 +11,7 @@ const INP = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-n
 // MAPEOS.<tipo> en informeTecnicoExcel.js) — la celda de descripción se
 // autocompleta con el TÍTULO de la OT/sub-OT en vez de su descripción
 // general (pedido explícito del usuario, tipo por tipo, 2026-09-03).
-const TIPOS_SIN_ENCABEZADO = ["adicional", "arrancador", "plc", "diagnostico_servomotor", "panel", "pc", "ups", "diagnostico_equipo", "servomotor", "suministro", "tarjetas", "variador_reparacion"];
+const TIPOS_SIN_ENCABEZADO = ["adicional", "arrancador", "plc", "diagnostico_servomotor", "panel", "pc", "ups", "diagnostico_equipo", "servomotor", "suministro", "tarjetas", "variador_reparacion", "equipo_general", "mantenimiento_variador"];
 // Tipos cuyo "Datos del equipo" (Equipo/Marca, Modelo, Código, Tag,
 // Potencia, S/N) comparte los mismos nombres de campo que la OT/sub-OT y se
 // autocompleta desde ahí.
@@ -183,25 +183,34 @@ function SeccionTabla({ seccion, campos, onCampo, onCampos }) {
             {seccion.filas.map((f) => (
               <tr key={f.clave}>
                 <td className="px-2 py-1 text-xs text-gray-600 whitespace-nowrap">{f.label}</td>
-                {seccion.columnas.map((c) => (
-                  <td key={c.clave} className="px-1 py-1">
-                    {seccion.opciones ? (
-                      <select value={valores[`${f.clave}__${c.clave}`] ?? ""}
-                        onChange={(e) => set(f.clave, c.clave, e.target.value)}
-                        className={`${INP} text-center py-1 font-medium ${
-                          valores[`${f.clave}__${c.clave}`] === "OK" ? "text-green-600"
-                            : valores[`${f.clave}__${c.clave}`] === "NOK" ? "text-red-600" : "text-gray-500"
-                        }`}>
-                        <option value="">—</option>
-                        {seccion.opciones.map((op) => <option key={op} value={op}>{op}</option>)}
-                      </select>
-                    ) : (
-                      <input value={valores[`${f.clave}__${c.clave}`] ?? ""}
-                        onChange={(e) => set(f.clave, c.clave, e.target.value)}
-                        className={`${INP} text-center py-1`} />
-                    )}
-                  </td>
-                ))}
+                {seccion.columnas.map((c) => {
+                  // `c.opciones` (por columna) permite mezclar select y texto
+                  // libre en la misma tabla (ej. medición de banco de
+                  // capacitores: Valor/Valor real son texto, Tolerancia 20%
+                  // es select OK/NOK/NA) — si la columna no trae las suyas,
+                  // cae a `seccion.opciones` (checklists donde TODAS las
+                  // columnas son select, comportamiento de siempre).
+                  const opciones = c.opciones || seccion.opciones;
+                  return (
+                    <td key={c.clave} className="px-1 py-1">
+                      {opciones ? (
+                        <select value={valores[`${f.clave}__${c.clave}`] ?? ""}
+                          onChange={(e) => set(f.clave, c.clave, e.target.value)}
+                          className={`${INP} text-center py-1 font-medium ${
+                            valores[`${f.clave}__${c.clave}`] === "OK" ? "text-green-600"
+                              : valores[`${f.clave}__${c.clave}`] === "NOK" ? "text-red-600" : "text-gray-500"
+                          }`}>
+                          <option value="">—</option>
+                          {opciones.map((op) => <option key={op} value={op}>{op}</option>)}
+                        </select>
+                      ) : (
+                        <input value={valores[`${f.clave}__${c.clave}`] ?? ""}
+                          onChange={(e) => set(f.clave, c.clave, e.target.value)}
+                          className={`${INP} text-center py-1`} />
+                      )}
+                    </td>
+                  );
+                })}
               </tr>
             ))}
           </tbody>
