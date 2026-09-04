@@ -258,7 +258,6 @@ export default function ListaOrdenesCompra() {
   // Administración ve la vista de OC pero no montos/costos — mismo criterio
   // que Cotizaciones (Fase 16).
   const puedeVerPrecios = ["admin", "facturacion", "jefatura"].includes(getUsuario()?.rol);
-  const hoy = new Date();
   const [ordenes, setOrdenes]       = useState([]);
   const [otGroupMap, setOtGroupMap] = useState({});
   const [factMap, setFactMap]       = useState({});
@@ -275,8 +274,11 @@ export default function ListaOrdenesCompra() {
   const [estadoOT, setEstadoOT] = useState("");
   const [empresa, setEmpresa]   = useState("");
   const [planta, setPlanta]     = useState("");
-  const [anio, setAnio]         = useState(hoy.getFullYear());
-  const [mes, setMes]           = useState(hoy.getMonth() + 1);
+  // Sin año/mes preseleccionado — el filtro de fecha solo se aplica cuando
+  // el usuario elige uno, no por defecto (pedido explícito del usuario,
+  // 2026-09-04; mismo criterio que ListaCotizaciones.jsx).
+  const [anio, setAnio]         = useState("");
+  const [mes, setMes]           = useState("");
 
   const cargar = () =>
     Promise.all([
@@ -362,8 +364,8 @@ export default function ListaOrdenesCompra() {
 
   const filtradas = ordenes.filter((o) => {
     const fecha = new Date(o.fecha);
-    const matchAnio  = fecha.getFullYear() === anio;
-    const matchMes   = fecha.getMonth() + 1 === mes;
+    const matchAnio  = !anio || fecha.getFullYear() === Number(anio);
+    const matchMes   = !mes || fecha.getMonth() + 1 === Number(mes);
     const txt = busqueda.toLowerCase();
     const factura = factByOCMap[o._id] || factMap[o.cotizacion?._id || o.cotizacion];
     const grupoOT = otGroupMap[o.numeroDocumento];
@@ -390,7 +392,7 @@ export default function ListaOrdenesCompra() {
     return new Date(b.fecha) - new Date(a.fecha);
   });
 
-  const hayFiltro = busqueda || estadoOT || empresa || planta || anio !== hoy.getFullYear() || mes !== hoy.getMonth() + 1;
+  const hayFiltro = busqueda || estadoOT || empresa || planta || anio || mes;
   // Si hay búsqueda de texto activa, no dejar que el selector de "vista"
   // esconda una tabla donde SÍ cae el resultado — mismo criterio que
   // ListaCotizaciones.jsx.
@@ -480,19 +482,18 @@ export default function ListaOrdenesCompra() {
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-5 flex gap-3 flex-wrap items-center">
         <select
           value={anio}
-          onChange={(e) => setAnio(Number(e.target.value))}
+          onChange={(e) => setAnio(e.target.value ? Number(e.target.value) : "")}
           className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
         >
-          {anios.length === 0
-            ? <option value={anio}>{anio}</option>
-            : anios.map((a) => <option key={a} value={a}>{a}</option>)
-          }
+          <option value="">Todo año</option>
+          {anios.map((a) => <option key={a} value={a}>{a}</option>)}
         </select>
         <select
           value={mes}
-          onChange={(e) => setMes(Number(e.target.value))}
+          onChange={(e) => setMes(e.target.value ? Number(e.target.value) : "")}
           className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
         >
+          <option value="">Todo mes</option>
           {MESES.map((m, i) => (
             <option key={i} value={i + 1}>{m}</option>
           ))}
@@ -556,7 +557,7 @@ export default function ListaOrdenesCompra() {
         </select>
         {hayFiltro && (
           <button
-            onClick={() => { setBusqueda(""); setEstadoOT(""); setEmpresa(""); setPlanta(""); setAnio(hoy.getFullYear()); setMes(hoy.getMonth() + 1); setVista("todasLasOC"); }}
+            onClick={() => { setBusqueda(""); setEstadoOT(""); setEmpresa(""); setPlanta(""); setAnio(""); setMes(""); setVista("todasLasOC"); }}
             className="text-sm text-gray-400 hover:text-gray-700 transition"
           >
             Limpiar
