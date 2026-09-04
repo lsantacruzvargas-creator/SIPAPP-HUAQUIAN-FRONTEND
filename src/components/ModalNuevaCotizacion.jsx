@@ -293,11 +293,11 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs text-gray-500 block mb-1">Tiempo de entrega de servicio</label>
-                  <input name="plazoEntrega" value={form.plazoEntrega} onChange={handleChange} placeholder="Ej. 2 días de recibida su O/C." className={INP} />
+                  <input name="plazoEntrega" value={form.plazoEntrega || "2 días hábiles"} onChange={handleChange} placeholder="Ej. 2 días de recibida su O/C." className={INP} />
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 block mb-1">Validez de la oferta</label>
-                  <input name="validezOferta" value={form.validezOferta} onChange={handleChange} placeholder="Ej. 15 días" className={INP} />
+                  <input name="validezOferta" value={form.validezOferta || "15 días"} onChange={handleChange} placeholder="Ej. 15 días" className={INP} />
                 </div>
               </div>
 
@@ -437,7 +437,7 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
 
               <div>
                 <label className="text-xs text-gray-500 block mb-1">Tiempo de garantía</label>
-                <input name="tiempoGarantia" value={form.tiempoGarantia} onChange={handleChange} placeholder="Ej. 12 meses" className={INP} />
+                <input name="tiempoGarantia" value={form.tiempoGarantia || "6 meses"} onChange={handleChange} placeholder="Ej. 12 meses" className={INP} />
               </div>
             </div>
 
@@ -486,7 +486,7 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 block mb-1">Forma de pago</label>
-                  <input name="condicionPago" value={form.condicionPago} onChange={handleChange} placeholder="—" className={INP} />
+                  <input name="condicionPago" value={form.condicionPago || "Factura 30 días"} onChange={handleChange} placeholder="Factura 30 días" className={INP} />
                 </div>
               </div>
 

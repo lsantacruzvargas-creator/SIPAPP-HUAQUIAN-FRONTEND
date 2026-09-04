@@ -12,6 +12,17 @@ const ESTADOS_OT = ["", "pendiente", "en progreso", "completado"];
 const MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 const TH = "px-4 py-3 font-semibold text-gray-500 whitespace-nowrap";
 
+// "Todas las Órdenes de Compra" (tabla única, sin categorizar por estado) es
+// la vista por defecto al abrir la página — mismo patrón pedido para
+// Cotizaciones (ver ListaCotizaciones.jsx).
+const VISTAS = [
+  { valor: "todasLasOC",  label: "Todas las Órdenes de Compra" },
+  { valor: "todas",       label: "Todas las tablas" },
+  { valor: "sinFactura",  label: "Sin factura" },
+  { valor: "conFactura",  label: "Con factura" },
+  { valor: "cerradas",    label: "Cerradas" },
+];
+
 const SORTS = [
   { valor: "fecha",             label: "Más reciente" },
   { valor: "numeroOT",          label: "N° OT" },
@@ -255,6 +266,7 @@ export default function ListaOrdenesCompra() {
   const [greMap, setGreMap]         = useState({});
   const [tipoCambio, setTipoCambio] = useState(null);
   const [sortBy, setSortBy]         = useState("fecha");
+  const [vista, setVista]           = useState("todasLasOC");
   const [ordenSeleccionada, setOrdenSeleccionada] = useState(null);
   const [crearOpen, setCrearOpen]   = useState(false);
   const [importarOpen, setImportarOpen] = useState(false);
@@ -379,6 +391,10 @@ export default function ListaOrdenesCompra() {
   });
 
   const hayFiltro = busqueda || estadoOT || empresa || planta || anio !== hoy.getFullYear() || mes !== hoy.getMonth() + 1;
+  // Si hay búsqueda de texto activa, no dejar que el selector de "vista"
+  // esconda una tabla donde SÍ cae el resultado — mismo criterio que
+  // ListaCotizaciones.jsx.
+  const vistaEfectiva = busqueda ? "todasLasOC" : vista;
 
   const tieneFactura = (o) => !!(factByOCMap[o._id] || factMap[o.cotizacion?._id || o.cotizacion]);
   const cerradas   = filtradas.filter((o) => o.estadoCadena === "cerrado");
@@ -521,6 +537,15 @@ export default function ListaOrdenesCompra() {
           ))}
         </select>
         <select
+          value={vista}
+          onChange={(e) => setVista(e.target.value)}
+          className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+        >
+          {VISTAS.map(({ valor, label }) => (
+            <option key={valor} value={valor}>{label}</option>
+          ))}
+        </select>
+        <select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value)}
           className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
@@ -531,7 +556,7 @@ export default function ListaOrdenesCompra() {
         </select>
         {hayFiltro && (
           <button
-            onClick={() => { setBusqueda(""); setEstadoOT(""); setEmpresa(""); setPlanta(""); setAnio(hoy.getFullYear()); setMes(hoy.getMonth() + 1); }}
+            onClick={() => { setBusqueda(""); setEstadoOT(""); setEmpresa(""); setPlanta(""); setAnio(hoy.getFullYear()); setMes(hoy.getMonth() + 1); setVista("todasLasOC"); }}
             className="text-sm text-gray-400 hover:text-gray-700 transition"
           >
             Limpiar
@@ -539,39 +564,57 @@ export default function ListaOrdenesCompra() {
         )}
       </div>
 
-      <TablaOC
-        titulo="Órdenes de Compra sin factura"
-        acento="bg-amber-500"
-        ordenes={sinFactura}
-        otGroupMap={otGroupMap} factMap={factMap} factByOCMap={factByOCMap} greMap={greMap} tipoCambio={tipoCambio} puedeVerPrecios={puedeVerPrecios}
-        onSelect={setOrdenSeleccionada}
-        subirDocumento={subirDocumento}
-        mostrarFactura={false}
-        mostrarTitulo={false}
-        mostrarDocumento={false}
-        mostrarHesActa
-        vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de compra sin factura"}
-      />
+      {vistaEfectiva === "todasLasOC" && (
+        <TablaOC
+          titulo="Todas las Órdenes de Compra"
+          acento="bg-blue-500"
+          ordenes={filtradas}
+          otGroupMap={otGroupMap} factMap={factMap} factByOCMap={factByOCMap} greMap={greMap} tipoCambio={tipoCambio} puedeVerPrecios={puedeVerPrecios}
+          onSelect={setOrdenSeleccionada}
+          subirDocumento={subirDocumento}
+          vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de compra registradas"}
+        />
+      )}
 
-      <TablaOC
-        titulo="Órdenes de Compra con factura"
-        acento="bg-emerald-500"
-        ordenes={conFactura}
-        otGroupMap={otGroupMap} factMap={factMap} factByOCMap={factByOCMap} greMap={greMap} tipoCambio={tipoCambio} puedeVerPrecios={puedeVerPrecios}
-        onSelect={setOrdenSeleccionada}
-        subirDocumento={subirDocumento}
-        vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de compra con factura"}
-      />
+      {(vistaEfectiva === "todas" || vistaEfectiva === "sinFactura") && (
+        <TablaOC
+          titulo="Órdenes de Compra sin factura"
+          acento="bg-amber-500"
+          ordenes={sinFactura}
+          otGroupMap={otGroupMap} factMap={factMap} factByOCMap={factByOCMap} greMap={greMap} tipoCambio={tipoCambio} puedeVerPrecios={puedeVerPrecios}
+          onSelect={setOrdenSeleccionada}
+          subirDocumento={subirDocumento}
+          mostrarFactura={false}
+          mostrarTitulo={false}
+          mostrarDocumento={false}
+          mostrarHesActa
+          vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de compra sin factura"}
+        />
+      )}
 
-      <TablaOC
-        titulo="Órdenes de Compra cerradas"
-        acento="bg-gray-500"
-        ordenes={cerradas}
-        otGroupMap={otGroupMap} factMap={factMap} factByOCMap={factByOCMap} greMap={greMap} tipoCambio={tipoCambio} puedeVerPrecios={puedeVerPrecios}
-        onSelect={setOrdenSeleccionada}
-        subirDocumento={subirDocumento}
-        vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de compra cerradas"}
-      />
+      {(vistaEfectiva === "todas" || vistaEfectiva === "conFactura") && (
+        <TablaOC
+          titulo="Órdenes de Compra con factura"
+          acento="bg-emerald-500"
+          ordenes={conFactura}
+          otGroupMap={otGroupMap} factMap={factMap} factByOCMap={factByOCMap} greMap={greMap} tipoCambio={tipoCambio} puedeVerPrecios={puedeVerPrecios}
+          onSelect={setOrdenSeleccionada}
+          subirDocumento={subirDocumento}
+          vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de compra con factura"}
+        />
+      )}
+
+      {(vistaEfectiva === "todas" || vistaEfectiva === "cerradas") && (
+        <TablaOC
+          titulo="Órdenes de Compra cerradas"
+          acento="bg-gray-500"
+          ordenes={cerradas}
+          otGroupMap={otGroupMap} factMap={factMap} factByOCMap={factByOCMap} greMap={greMap} tipoCambio={tipoCambio} puedeVerPrecios={puedeVerPrecios}
+          onSelect={setOrdenSeleccionada}
+          subirDocumento={subirDocumento}
+          vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de compra cerradas"}
+        />
+      )}
 
       {ordenSeleccionada && (
         <DetalleDocumento
