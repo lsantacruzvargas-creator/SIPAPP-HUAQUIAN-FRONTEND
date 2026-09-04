@@ -291,7 +291,7 @@ export default function Requerimientos() {
   const [lista, setLista] = useState([]);
   const [filtro, setFiltro] = useState("activos");
   const usuario = getUsuario();
-  const puedeAtender = ["admin", "almacenero"].includes(usuario?.rol);
+  const puedeAtender = ["admin", "jefatura", "almacenero"].includes(usuario?.rol);
 
   const cargar = useCallback(async () => {
     const r = await fetchAuth("/requerimientos");

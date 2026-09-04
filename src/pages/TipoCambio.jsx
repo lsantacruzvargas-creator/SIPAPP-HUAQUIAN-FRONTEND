@@ -11,7 +11,7 @@ const INP = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-n
 // en la tabla de Cotizaciones).
 export default function TipoCambio() {
   const usuario = getUsuario();
-  const puedeEditar = ["admin", "facturacion"].includes(usuario?.rol);
+  const puedeEditar = ["admin", "jefatura", "facturacion"].includes(usuario?.rol);
 
   const [tc, setTc] = useState(null);
   const [valor, setValor] = useState("");

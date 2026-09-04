@@ -75,7 +75,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
   // Supervisor edita los campos de la OT y los Informes Técnicos, pero no
   // puede anularla. Igual que técnico, supervisor no ve el resto de la
   // cadena (Cotización/OC/Factura).
-  const puedeEditarCampos = ["admin", "supervisor", "planner", "coordinadora"].includes(rolActual);
+  const puedeEditarCampos = ["admin", "jefatura", "supervisor", "planner", "coordinadora"].includes(rolActual);
   // Anular un documento queda reservado a Admin y Jefatura — Facturación ya
   // no puede. Desanular y cerrar/abrir la cadena a mano son exclusivos de admin.
   const puedeAnular = ["admin", "jefatura"].includes(rolActual);
