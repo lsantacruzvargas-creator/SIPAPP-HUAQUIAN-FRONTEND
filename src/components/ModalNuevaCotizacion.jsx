@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
-import { calcSubtotalGloria, calcularGloria, calcularAlicorp, itemInvalido, RUC_GLORIA, RUC_ALICORP } from "../utils/cotizacionItems";
+import { calcSubtotalGloria, calcularGloria, calcularAlicorp, itemInvalido, RUC_GLORIA, esFormatoAlicorp } from "../utils/cotizacionItems";
 import TablaItemsCotizacion from "./TablaItemsCotizacion";
 import TablaItemsCotizacionGloria from "./TablaItemsCotizacionGloria";
 import TablaItemsCotizacionAlicorp from "./TablaItemsCotizacionAlicorp";
@@ -30,11 +30,17 @@ function calcular(sub, descuentoPct = 0) {
 const FORM_VACIO = {
   empresa: "", tipo: "venta", numeroCotizacion: "", atencion: "",
   fecha: new Date().toISOString().split("T")[0], fechaRecibida: "",
-  titulo: "", encargado: "", planta: "", personaContacto: "", condicionPago: "",
-  plazoEntrega: "", lugarEntrega: "", validezOferta: "",
+  // Estos 3 van con su valor por defecto YA cargado en el estado (no solo
+  // mostrado en el input) — antes el input mostraba "2 días hábiles"/etc.
+  // como mero placeholder visual (`value={form.x || "default"}`) pero el
+  // estado real quedaba en "" si el técnico no lo tocaba, así que se
+  // guardaba vacío y el PDF (sin ese mismo fallback) imprimía "—" aunque en
+  // pantalla se viera lleno. Reportado por el usuario, 2026-09-04.
+  titulo: "", encargado: "", planta: "", personaContacto: "", condicionPago: "Factura 30 días",
+  plazoEntrega: "2 días hábiles", lugarEntrega: "", validezOferta: "",
   numeroGuiaEmision: "", numeroGuiaRemision: "", codigoSap: "", fechaSalida: "",
   asesorComercial: "", numeroCelular: "", numeroSolicitudPedido: "",
-  numeroPeticionOferta: "", tiempoGarantia: "",
+  numeroPeticionOferta: "", tiempoGarantia: "6 meses",
   area: "", omAviso: "", numeroGuia: "", jefeSupervisorSolicitante: "", compradorResponsable: "",
   textoBreveServicio: "",
   subtotal: "", descuentoPorcentaje: "", gastosGeneralesPorcentaje: "2", utilidadPorcentaje: "10", moneda: "PEN",
@@ -90,7 +96,7 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
   const contactosPlanta = plantaSel?.contactos ?? [];
   const contactoSel = contactosPlanta.find(c => c.nombre === form.personaContacto);
   const esGloria = empresaSel?.ruc === RUC_GLORIA;
-  const esAlicorp = empresaSel?.ruc === RUC_ALICORP;
+  const esAlicorp = esFormatoAlicorp(empresaSel?.ruc);
 
   // Los defaults de Gastos/Utilidad difieren por formato (Gloria 2%/10%,
   // Alicorp 10%/5%) — como acá la empresa recién se elige durante el
@@ -293,7 +299,7 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs text-gray-500 block mb-1">Tiempo de entrega de servicio</label>
-                  <input name="plazoEntrega" value={form.plazoEntrega || "2 días hábiles"} onChange={handleChange} placeholder="Ej. 2 días de recibida su O/C." className={INP} />
+                  <input name="plazoEntrega" value={form.plazoEntrega} onChange={handleChange} placeholder="Ej. 2 días de recibida su O/C." className={INP} />
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 block mb-1">Validez de la oferta</label>
@@ -437,7 +443,7 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
 
               <div>
                 <label className="text-xs text-gray-500 block mb-1">Tiempo de garantía</label>
-                <input name="tiempoGarantia" value={form.tiempoGarantia || "6 meses"} onChange={handleChange} placeholder="Ej. 12 meses" className={INP} />
+                <input name="tiempoGarantia" value={form.tiempoGarantia} onChange={handleChange} placeholder="Ej. 12 meses" className={INP} />
               </div>
             </div>
 
@@ -486,7 +492,7 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 block mb-1">Forma de pago</label>
-                  <input name="condicionPago" value={form.condicionPago || "Factura 30 días"} onChange={handleChange} placeholder="Factura 30 días" className={INP} />
+                  <input name="condicionPago" value={form.condicionPago} onChange={handleChange} placeholder="Factura 30 días" className={INP} />
                 </div>
               </div>
 

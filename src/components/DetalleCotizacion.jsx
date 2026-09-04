@@ -6,7 +6,7 @@ import { exportarCotizacionGloriaPdf } from "../utils/cotizacionGloriaPdf";
 import { exportarCotizacionAlicorpPdf } from "../utils/cotizacionAlicorpPdf";
 import {
   calcSubtotalGloria, calcularGloria, calcSubtotal, calcularAlicorp,
-  itemDesdeDb, itemInvalido, RUC_GLORIA, RUC_ALICORP,
+  itemDesdeDb, itemInvalido, RUC_GLORIA, esFormatoAlicorp,
 } from "../utils/cotizacionItems";
 import ModalCrearOT from "./ModalCrearOT";
 import ModalOrdenCompra from "./ModalOrdenCompra";
@@ -48,7 +48,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   // `inicial.empresa.ruc` ya viene poblado (ver GET/PUT /cotizaciones,
   // populate("empresa", "razonSocial alias ruc")) — se puede resolver acá
   // mismo, antes de que `empresas` (la lista completa) termine de cargar.
-  const esAlicorpInicial = inicial.empresa?.ruc === RUC_ALICORP;
+  const esAlicorpInicial = esFormatoAlicorp(inicial.empresa?.ruc);
   const [form, setForm] = useState({
     subtotal: subtotalInicial > 0 ? String(subtotalInicial) : "",
     descuentoPorcentaje: inicial.descuentoPorcentaje ? String(inicial.descuentoPorcentaje) : "",
@@ -58,8 +58,12 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
     empresa: inicial.empresa?._id || "",
     tipo: inicial.tipo || "venta",
     moneda: inicial.moneda || "PEN",
-    condicionPago: inicial.condicionPago || "",
-    plazoEntrega: inicial.plazoEntrega || "",
+    // Mismo fix que ModalNuevaCotizacion.jsx: estos 3 valores por defecto
+    // van directo al estado, no solo mostrados con `|| "default"` en el
+    // input — si no, quedaban vacíos al guardar aunque en pantalla se
+    // vieran llenos, y el PDF (sin ese fallback) imprimía "—".
+    condicionPago: inicial.condicionPago || "Factura 30 días",
+    plazoEntrega: inicial.plazoEntrega || "2 días hábiles",
     lugarEntrega: inicial.lugarEntrega || "",
     validezOferta: inicial.validezOferta || "",
     fecha: inicial.fecha ? new Date(inicial.fecha).toISOString().split("T")[0] : "",
@@ -78,7 +82,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
     numeroCelular: inicial.numeroCelular || "",
     numeroSolicitudPedido: inicial.numeroSolicitudPedido || "",
     numeroPeticionOferta: inicial.numeroPeticionOferta || "",
-    tiempoGarantia: inicial.tiempoGarantia || "",
+    tiempoGarantia: inicial.tiempoGarantia || "6 meses",
     area: inicial.area || "",
     omAviso: inicial.omAviso || "",
     numeroGuia: inicial.numeroGuia || "",
@@ -194,7 +198,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   const contactosPlanta = plantaSel?.contactos ?? [];
   const contactoSel = contactosPlanta.find(c => c.nombre === form.personaContacto);
   const esGloria = empresaSel?.ruc === RUC_GLORIA;
-  const esAlicorp = empresaSel?.ruc === RUC_ALICORP;
+  const esAlicorp = esFormatoAlicorp(empresaSel?.ruc);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -725,7 +729,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs text-gray-500 block mb-1">Tiempo de entrega de servicio</label>
-                    <input name="plazoEntrega" value={form.plazoEntrega || "2 días hábiles"} onChange={handleChange}
+                    <input name="plazoEntrega" value={form.plazoEntrega} onChange={handleChange}
                       placeholder="Ej. 2 días de recibida su O/C." className={INP} />
                   </div>
                   <div>
@@ -886,7 +890,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
 
                 <div>
                   <label className="text-xs text-gray-500 block mb-1">Tiempo de garantía</label>
-                  <input name="tiempoGarantia" value={form.tiempoGarantia || "6 meses"} onChange={handleChange}
+                  <input name="tiempoGarantia" value={form.tiempoGarantia} onChange={handleChange}
                     placeholder="Ej. 12 meses" className={INP} />
                 </div>
               </div>
@@ -938,7 +942,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
                   </div>
                   <div>
                     <label className="text-xs text-gray-500 block mb-1">Forma de pago</label>
-                    <input name="condicionPago" value={form.condicionPago || "Factura 30 días"} onChange={handleChange}
+                    <input name="condicionPago" value={form.condicionPago} onChange={handleChange}
                       placeholder="Factura 30 días" className={INP} />
                   </div>
                 </div>

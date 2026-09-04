@@ -17,13 +17,6 @@ function cargarImagen(url) {
 
 const GRIS_CLARO = [232, 232, 232];
 
-// Datos del cliente hardcodeados — esta plantilla es exclusiva de Alicorp
-// (RUC 20100055237, ver cotizacion-alicorp.xlsx, raíz del proyecto).
-const ALICORP = {
-  razonSocial: "Alicorp S.A.A.",
-  direccion: "Av. Argentina 4793 Urb. Parque Industrial - Callao Carmen De La Legua Reynoso",
-};
-
 const COLUMNAS_TABLA = {
   head: (grupo) => [grupo.label.toUpperCase(), "Unidad", "Precio Unitario", "Cantidad", "Parcial"],
   fila: (item) => [
@@ -35,14 +28,18 @@ const COLUMNAS_TABLA = {
   ],
 };
 
-// Formato exclusivo de la empresa Alicorp (RUC 20100055237) — reproduce el
-// layout de cotizacion-alicorp.xlsx con jsPDF + jspdf-autotable en vez del
-// .xlsx real, mismo criterio que cotizacionGloriaPdf.js (ítems fluyen y
-// paginan solos, sin el riesgo de insertar filas dinámicas en una plantilla
-// con celdas combinadas). Aplica desde el día uno los fixes de
-// jspdf-autotable ya depurados para Gloria (ancho fijo, sin líneas entre
-// sub-ítems, pie sin marco en celdas vacías, redibujado del borde inferior
-// del header).
+// Formato "Alicorp" — reproduce el layout de cotizacion-alicorp.xlsx con
+// jsPDF + jspdf-autotable en vez del .xlsx real, mismo criterio que
+// cotizacionGloriaPdf.js (ítems fluyen y paginan solos, sin el riesgo de
+// insertar filas dinámicas en una plantilla con celdas combinadas). Aplica
+// desde el día uno los fixes de jspdf-autotable ya depurados para Gloria
+// (ancho fijo, sin líneas entre sub-ítems, pie sin marco en celdas vacías,
+// redibujado del borde inferior del header).
+// Compartido por Alicorp (RUC 20100055237), Intradevco (20417378911) y
+// Masterbread (20557345931) — ver RUCS_FORMATO_ALICORP en cotizacionItems.js.
+// Los datos de "Información de cliente" se leen de `cotizacion.empresa`
+// (razón social + dirección de la planta elegida, o la dirección fiscal si
+// no hay planta) en vez de estar hardcodeados a Alicorp.
 export const exportarCotizacionAlicorpPdf = async (cotizacion) => {
   const doc = new jsPDF();
   const M = 12;
@@ -126,7 +123,14 @@ export const exportarCotizacionAlicorpPdf = async (cotizacion) => {
   doc.line(M, y, PAGE_W - M, y);
   y += 5;
 
-  // ─── Información de cliente — hardcodeada (plantilla exclusiva de Alicorp) ───
+  // ─── Información de cliente — datos reales de la empresa/planta de la
+  // cotización (antes hardcodeado a Alicorp; ahora también sirve a
+  // Intradevco/Masterbread, ver RUCS_FORMATO_ALICORP en cotizacionItems.js).
+  // La dirección es la de la planta elegida si coincide con `cotizacion.planta`
+  // (mismo criterio que EmitirGuia.jsx), si no cae a la dirección fiscal de
+  // la empresa.
+  const plantaCliente = cotizacion.empresa?.plantas?.find((p) => p.nombre === cotizacion.planta);
+  const direccionCliente = plantaCliente?.direccion || cotizacion.empresa?.direccion || "";
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
   doc.text("Información de cliente:", M, y);
@@ -135,9 +139,9 @@ export const exportarCotizacionAlicorpPdf = async (cotizacion) => {
   doc.setFont("helvetica", "bold");
   doc.text("Razón social : ", M, y);
   doc.setFont("helvetica", "bold");
-  doc.text(ALICORP.razonSocial, M + doc.getTextWidth("Razón social : "), y);
+  doc.text(cotizacion.empresa?.razonSocial || "—", M + doc.getTextWidth("Razón social : "), y);
   y += 4.2;
-  labelValor(M, y, "Dirección      :  ", ALICORP.direccion); y += 4.2;
+  labelValor(M, y, "Dirección      :  ", direccionCliente); y += 4.2;
   labelValor(M, y, "Contacto       :  ", cotizacion.personaContacto); y += 4.2;
   labelValor(M, y, "Aviso             :  ", cotizacion.omAviso);
   labelValor(M + 110, y, "Guía : ", cotizacion.numeroGuia);
@@ -289,5 +293,5 @@ export const exportarCotizacionAlicorpPdf = async (cotizacion) => {
   clausula("Tiempo de pago      :   ", cotizacion.condicionPago);
   clausula("Garantia                    :  ", cotizacion.tiempoGarantia);
 
-  doc.save(`Cotización Alicorp N° ${codigoCotizacion}.pdf`);
+  doc.save(`Cotización ${cotizacion.empresa?.razonSocial || ""} N° ${codigoCotizacion}.pdf`.replace(/\s+/g, " "));
 };

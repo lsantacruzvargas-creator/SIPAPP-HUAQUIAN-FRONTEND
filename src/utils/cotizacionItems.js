@@ -124,11 +124,19 @@ export function calcularGloria(subtotalItems, gastosPct = 2, utilidadPct = 10) {
   };
 }
 
-// ── Formato exclusivo de Alicorp (RUC 20100055237) ──────────────────────────
+// ── Formato "Alicorp" — compartido por Alicorp, Intradevco y Masterbread ────
 // Mismo criterio de agrupación que Gloria (5 grupos fijos), pero acá los 5
 // comparten las mismas columnas — no hay variante de Mano de Obra por
 // personas/horas, todos usan cantidad × precio (calcSubtotal normal).
+// Originalmente exclusivo de Alicorp (RUC 20100055237); replicado a pedido
+// del usuario para Intradevco (20417378911) y Masterbread (20557345931),
+// 2026-09-04 — mismos parámetros/tablas/PDF, solo cambian los datos propios
+// de cada cliente (ver cotizacionAlicorpPdf.js).
 export const RUC_ALICORP = "20100055237";
+export const RUC_INTRADEVCO = "20417378911";
+export const RUC_MASTERBREAD = "20557345931";
+export const RUCS_FORMATO_ALICORP = [RUC_ALICORP, RUC_INTRADEVCO, RUC_MASTERBREAD];
+export const esFormatoAlicorp = (ruc) => RUCS_FORMATO_ALICORP.includes(ruc);
 export const GRUPOS_ALICORP = [
   { clave: "materiales",          numero: 1, label: "Materiales" },
   { clave: "materiales_consumibles", numero: 2, label: "Materiales Consumibles" },
