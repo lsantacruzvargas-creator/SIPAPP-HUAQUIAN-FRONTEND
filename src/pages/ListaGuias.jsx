@@ -241,6 +241,22 @@ export default function ListaGuias() {
             {(seleccionada.estado === "RECHAZADO" || seleccionada.estado === "ERROR") && seleccionada.sunat?.mensaje && (
               <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 mb-4 whitespace-pre-wrap">
                 {seleccionada.sunat.mensaje}
+                {/* Detalle campo por campo del hub (cuando lo trae) — antes se
+                    descartaba y solo quedaba el mensaje genérico de arriba. */}
+                {!!seleccionada.sunat?.errores?.length && (
+                  <ul className="list-disc list-inside mt-2 space-y-0.5">
+                    {seleccionada.sunat.errores.map((e, i) => (
+                      <li key={i}>{typeof e === "string" ? e : (e.mensaje || e.descripcion || JSON.stringify(e))}</li>
+                    ))}
+                  </ul>
+                )}
+                {!!seleccionada.sunat?.observaciones?.length && (
+                  <ul className="list-disc list-inside mt-2 space-y-0.5 text-amber-700">
+                    {seleccionada.sunat.observaciones.map((o, i) => (
+                      <li key={i}>{typeof o === "string" ? o : (o.mensaje || o.descripcion || JSON.stringify(o))}</li>
+                    ))}
+                  </ul>
+                )}
               </div>
             )}
             {errorDescarga && (
