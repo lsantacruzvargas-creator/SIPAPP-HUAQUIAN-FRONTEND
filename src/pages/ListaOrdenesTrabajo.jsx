@@ -40,6 +40,17 @@ const TH = "px-4 py-3 font-semibold text-gray-500 whitespace-nowrap";
 const pruebaLabel = (o) => (o.encargado?.trim() ? o.estadoPrueba : "No asignado");
 const intervencionLabel = (o) => (o.encargado2?.trim() ? o.estado : "No asignado");
 
+// Una sub-OT nace con la misma `cotizacion` que su padre, pero /vincular-cotizacion
+// (ver DetalleOrdenTrabajo/DetalleCotizacion) permite "jalarla" luego a otra
+// cotización distinta — eso la saca de la cadena de su padre. Se detecta
+// comparando el _id de cotización de cada una (no el numeroCotizacion, que
+// podría repetirse).
+const cotizacionReasignada = (sub, padre) => {
+  const idSub = sub.cotizacion?._id;
+  const idPadre = padre.cotizacion?._id;
+  return Boolean(idSub || idPadre) && idSub !== idPadre;
+};
+
 // Días transcurridos desde el ingreso del equipo (fechaRecibida) — las
 // sub-OTs no tienen su propia fechaRecibida (comparten el ingreso de la OT
 // padre), así que reciben la del padre como fallback.
@@ -151,7 +162,18 @@ function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg }) {
                       <td className="px-4 py-3 font-semibold text-indigo-700 whitespace-nowrap pl-8">
                         ↳ {s.numeroOT}
                       </td>
-                      <td className="px-4 py-3 text-gray-400 whitespace-nowrap">—</td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {cotizacionReasignada(s, o) ? (
+                          <span
+                            className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 uppercase tracking-wide"
+                            title={`Reasignada — la OT padre (${o.numeroOT}) pertenece a la cotización ${o.cotizacion?.numeroCotizacion || "—"}`}
+                          >
+                            {s.cotizacion?.numeroCotizacion || "—"} ⇄
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">{s.cotizacion?.numeroCotizacion || "—"}</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-center">
                         <DotChip chip={badgeGeneral(s.estadoGeneral)} dot={dotGeneral(s.estadoGeneral)}>{s.estadoGeneral}</DotChip>
                       </td>

@@ -133,8 +133,7 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
                     </div>
                   </td>
                   {mostrarEstadoServicio && (
-                    <td className={`px-4 py-3.5 text-gray-600 whitespace-nowrap ${colOtEstrecha ? "w-20 max-w-[5rem] truncate" : ""}`}
-                      title={colOtEstrecha ? numerosOT(otsDeCot) || "" : undefined}>
+                    <td className={`px-4 py-3.5 text-gray-600 ${colOtEstrecha ? "w-20 max-w-[5rem] whitespace-normal break-words" : "whitespace-nowrap"}`}>
                       {numerosOT(otsDeCot) || <span className="text-gray-300">—</span>}
                     </td>
                   )}
