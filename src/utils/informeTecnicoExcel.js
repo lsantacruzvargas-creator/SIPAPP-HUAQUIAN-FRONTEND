@@ -104,13 +104,10 @@ const comprimirImagenParaExcel = (buffer, extension) =>
 //    scaleWithDoc="0"/>, que quedó así en varias plantillas después de
 //    que el usuario sacó las imágenes de ahí y las puso como dibujos
 //    normales), no hay nada que restaurar acá.
-async function restaurarMetadatosDePagina(bufferPlantillaOriginal, bufferExportado) {
-  const zipOriginal = await JSZip.loadAsync(bufferPlantillaOriginal);
+async function restaurarMetadatosDeUnaHoja(zipOriginal, zipSalida, sheetPath) {
   const sheetPathOriginal = Object.keys(zipOriginal.files).find((f) => /^xl\/worksheets\/sheet\d*\.xml$/.test(f));
   const sheetXmlOriginal = await zipOriginal.files[sheetPathOriginal].async("string");
 
-  const zipSalida = await JSZip.loadAsync(bufferExportado);
-  const sheetPath = Object.keys(zipSalida.files).find((f) => /^xl\/worksheets\/sheet\d*\.xml$/.test(f));
   const sheetRelsPath = sheetPath.replace("worksheets/", "worksheets/_rels/") + ".rels";
 
   let sheetXml = await zipSalida.files[sheetPath].async("string");
@@ -202,8 +199,33 @@ async function restaurarMetadatosDePagina(bufferPlantillaOriginal, bufferExporta
 
   zipSalida.file(sheetPath, sheetXml);
   zipSalida.file(sheetRelsPath, sheetRelsXml);
+}
+
+// Aplica restaurarMetadatosDeUnaHoja a cada hoja de un libro exportado —
+// `buffersPlantillaOriginal[i]` es la plantilla original de la hoja i-ésima,
+// en el mismo orden en que se agregaron al workbook (exceljs numera
+// sheet1.xml, sheet2.xml... en orden de inserción). Con un solo elemento en
+// el array hace exactamente lo mismo que antes de generalizarse — así
+// exportarInformeTecnicoExcel (descarga de 1 solo informe) sigue produciendo
+// un archivo idéntico al de siempre.
+async function restaurarMetadatosDePaginaEnZip(buffersPlantillaOriginal, bufferExportado) {
+  const zipSalida = await JSZip.loadAsync(bufferExportado);
+  const sheetPaths = Object.keys(zipSalida.files)
+    .filter((f) => /^xl\/worksheets\/sheet\d+\.xml$/.test(f))
+    .sort((a, b) => Number(a.match(/(\d+)/)[1]) - Number(b.match(/(\d+)/)[1]));
+
+  for (let i = 0; i < sheetPaths.length; i++) {
+    const bufferPlantilla = buffersPlantillaOriginal[i];
+    if (!bufferPlantilla) continue;
+    const zipOriginal = await JSZip.loadAsync(bufferPlantilla);
+    await restaurarMetadatosDeUnaHoja(zipOriginal, zipSalida, sheetPaths[i]);
+  }
 
   return zipSalida.generateAsync({ type: "arraybuffer" });
+}
+
+async function restaurarMetadatosDePagina(bufferPlantillaOriginal, bufferExportado) {
+  return restaurarMetadatosDePaginaEnZip([bufferPlantillaOriginal], bufferExportado);
 }
 
 // Se intentó restaurar el logo de "INFORME SUMINISTRO.xlsx" (vive como
@@ -1163,16 +1185,23 @@ const elementosSinMapear = (seccion, mapa, campos) => {
   return [];
 };
 
-// Exporta un InformeTecnico ya guardado a un .xlsx: cada campo con celda
-// mapeada en MAPEOS se escribe directamente en su posición original de la
-// plantilla (conserva 100% el formato/logo/merges/anchos/bordes/colores —
-// se usa exceljs en vez de xlsx/SheetJS porque esta última, incluso sin
-// tocar nada, no conserva el estilo de las celdas al releer y regrabar un
-// archivo; exceljs sí preserva todo lo que no se toca explícitamente).
-// Lo que no tiene celda conocida (o excede el número de líneas/fotos que la
-// plantilla reserva) se anexa como bloque legible debajo del contenido
-// original, para garantizar que nunca se pierda un dato capturado.
-export async function exportarInformeTecnicoExcel(informe, ot) {
+// Arma la hoja de un InformeTecnico ya guardado dentro de un workbook propio
+// (uno por informe — cada plantilla es su propio archivo .xlsx en public/):
+// cada campo con celda mapeada en MAPEOS se escribe directamente en su
+// posición original de la plantilla (conserva 100% el formato/logo/merges/
+// anchos/bordes/colores — se usa exceljs en vez de xlsx/SheetJS porque esta
+// última, incluso sin tocar nada, no conserva el estilo de las celdas al
+// releer y regrabar un archivo; exceljs sí preserva todo lo que no se toca
+// explícitamente). Lo que no tiene celda conocida (o excede el número de
+// líneas/fotos que la plantilla reserva) se anexa como bloque legible debajo
+// del contenido original, para garantizar que nunca se pierda un dato
+// capturado.
+// No descarga nada — devuelve el workbook temporal (`wb`/`ws`) y el buffer
+// de la plantilla original (necesario para restaurarMetadatosDePagina más
+// tarde). Dos consumidores: exportarInformeTecnicoExcel (1 informe, 1
+// descarga, comportamiento sin cambios) y exportarInformesTecnicosExcelCombinado
+// (N informes trasplantados a un solo libro, ver más abajo).
+async function construirHojaInformeTecnico(informe) {
   const def = tipoInformePorValor(informe.tipo);
   if (!def) throw new Error("Tipo de informe desconocido");
 
@@ -1507,14 +1536,11 @@ export async function exportarInformeTecnicoExcel(informe, ot) {
     }
   }
 
-  // Nombre + N° de informe + N° de OT (nunca el _id de Mongo, pedido
-  // explícito del usuario) — si la OT no tiene numeroOT cargado (campo
-  // manual, no todas lo tienen), cae a su código interno en vez de omitirlo.
-  const numeroOT = ot?.numeroOT || ot?.codigo || "";
-  const nombreArchivo = `${def.label} - ${informe.codigo || "informe"}${numeroOT ? ` - OT ${numeroOT}` : ""}.xlsx`;
-  const bufferSalidaSinMetadatos = await wb.xlsx.writeBuffer();
-  const bufferSalida = await restaurarMetadatosDePagina(buf, bufferSalidaSinMetadatos);
-  const blob = new Blob([bufferSalida], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  return { wb, ws, def, bufferPlantilla: buf };
+}
+
+const descargarBuffer = (buffer, nombreArchivo) => {
+  const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -1523,4 +1549,99 @@ export async function exportarInformeTecnicoExcel(informe, ot) {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+};
+
+// Exporta un InformeTecnico ya guardado a un .xlsx individual — API pública
+// sin cambios, mismo archivo de siempre.
+export async function exportarInformeTecnicoExcel(informe, ot) {
+  const { wb, def, bufferPlantilla } = await construirHojaInformeTecnico(informe);
+  // Nombre + N° de informe + N° de OT (nunca el _id de Mongo, pedido
+  // explícito del usuario) — si la OT no tiene numeroOT cargado (campo
+  // manual, no todas lo tienen), cae a su código interno en vez de omitirlo.
+  const numeroOT = ot?.numeroOT || ot?.codigo || "";
+  const nombreArchivo = `${def.label} - ${informe.codigo || "informe"}${numeroOT ? ` - OT ${numeroOT}` : ""}.xlsx`;
+  const bufferSalidaSinMetadatos = await wb.xlsx.writeBuffer();
+  const bufferSalida = await restaurarMetadatosDePagina(bufferPlantilla, bufferSalidaSinMetadatos);
+  descargarBuffer(bufferSalida, nombreArchivo);
+}
+
+// Nombre de hoja válido para Excel: máx. 31 caracteres, sin : \ / ? * [ ], y
+// único dentro del libro (si choca con uno ya usado, se le agrega " (2)",
+// " (3)"... recortando el nombre base lo necesario para no pasarse de 31).
+const nombreHojaUnico = (base, usados) => {
+  const limpio = (base || "Informe").replace(/[:\\/?*[\]]/g, "-").slice(0, 31) || "Informe";
+  let nombre = limpio;
+  let i = 2;
+  while (usados.has(nombre)) {
+    const sufijo = ` (${i})`;
+    nombre = limpio.slice(0, 31 - sufijo.length) + sufijo;
+    i++;
+  }
+  usados.add(nombre);
+  return nombre;
+};
+
+// Une varios informes técnicos en un solo libro .xlsx — una hoja por
+// informe — en vez de descargarlos como archivos sueltos. Pensado para el
+// caso de una OT padre con varias sub-OTs, cada una con su propio informe:
+// reutiliza tal cual el armado de cada hoja (construirHojaInformeTecnico:
+// misma plantilla, mismo llenado de campos/fotos) y solo cambia el paso
+// final — en vez de que cada informe dispare su propia descarga, la hoja ya
+// armada (celdas+estilos+merges+fotos) se trasplanta a un workbook
+// combinado antes de generar un único archivo.
+// `items`: [{ informe, ot }, ...]. `nombreOTPadre` es opcional, solo para el
+// nombre del archivo final (si no se pasa, se usa el numeroOT del primer
+// item).
+export async function exportarInformesTecnicosExcelCombinado(items, nombreOTPadre) {
+  if (!items.length) return;
+  if (items.length === 1) return exportarInformeTecnicoExcel(items[0].informe, items[0].ot);
+
+  const wbCombinado = new ExcelJS.Workbook();
+  const buffersPlantilla = [];
+  const nombresUsados = new Set();
+
+  for (const { informe, ot } of items) {
+    const { wb: wbTemp, ws: wsTemp, def, bufferPlantilla } = await construirHojaInformeTecnico(informe);
+    const numeroOT = ot?.numeroOT || ot?.codigo || "";
+    const nombreBase = numeroOT ? `${numeroOT} - ${def.label}` : def.label;
+    const wsOut = wbCombinado.addWorksheet(nombreHojaUnico(nombreBase, nombresUsados));
+    // ws.model expone los merges como `merges` (array de rangos) pero su propio
+    // setter los espera como `mergeCells` — inconsistencia de exceljs (4.4.0):
+    // sin este remapeo, un `wsOut.model = wsTemp.model` a secas pierde en
+    // silencio todos los merges de la plantilla (recuadros de fotos,
+    // checklists de doble columna, etc.). `media: []` porque los imageId que
+    // trae el modelo apuntan al índice de imágenes de wbTemp, no de
+    // wbCombinado — las fotos se re-agregan aparte, abajo, con su buffer real.
+    wsOut.model = { ...wsTemp.model, id: wsOut.id, name: wsOut.name, mergeCells: wsTemp.model.merges, media: [] };
+    // Row.model (exceljs 4.4.0), al reconstruir una hoja desde su .model, ignora
+    // por completo las celdas de tipo "merge" (case Cell.Types.Merge: break en
+    // row.js) — es decir, las celdas NO-maestras de un rango combinado. Esas
+    // celdas sí traen su propio estilo real en la plantilla (cada una aporta un
+    // borde del recuadro visual completo — solo el VALOR vive en la maestra),
+    // pero al clonar la hoja arriba quedan con estilo en blanco → el recuadro
+    // pierde todos sus bordes menos el de la esquina superior-izquierda
+    // (reportado por el usuario, 2026-09-04: "algunas celdas pierden su
+    // marco"). Se reaplica el estilo real celda por celda desde la hoja
+    // fuente — los merges y valores ya quedaron bien puestos por el .model de
+    // arriba, esto solo repara el borde/relleno/fuente de cada celda.
+    wsTemp.eachRow({ includeEmpty: true }, (rowTemp, numeroFila) => {
+      rowTemp.eachCell({ includeEmpty: true }, (celdaTemp, numeroCol) => {
+        if (celdaTemp.style && Object.keys(celdaTemp.style).length) {
+          wsOut.getCell(numeroFila, numeroCol).style = celdaTemp.style;
+        }
+      });
+    });
+    wsTemp.getImages().forEach((img) => {
+      const media = wbTemp.getImage(img.imageId);
+      const nuevoId = wbCombinado.addImage(media);
+      wsOut.addImage(nuevoId, img.range);
+    });
+    buffersPlantilla.push(bufferPlantilla);
+  }
+
+  const numeroOTArchivo = nombreOTPadre || items[0].ot?.numeroOT || items[0].ot?.codigo || "";
+  const nombreArchivo = `Informes técnicos${numeroOTArchivo ? ` - OT ${numeroOTArchivo}` : ""}.xlsx`;
+  const bufferSinMetadatos = await wbCombinado.xlsx.writeBuffer();
+  const bufferSalida = await restaurarMetadatosDePaginaEnZip(buffersPlantilla, bufferSinMetadatos);
+  descargarBuffer(bufferSalida, nombreArchivo);
 }

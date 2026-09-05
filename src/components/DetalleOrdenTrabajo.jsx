@@ -13,7 +13,7 @@ import TablaServiciosExternos from "./TablaServiciosExternos";
 import TablaScroll from "./TablaScroll";
 import ModalGenerarGRE from "./ModalGenerarGRE";
 import ConfirmacionAccion from "./ConfirmacionAccion";
-import { exportarInformeTecnicoExcel } from "../utils/informeTecnicoExcel";
+import { exportarInformeTecnicoExcel, exportarInformesTecnicosExcelCombinado } from "../utils/informeTecnicoExcel";
 import {
   FlujoNegocio, TarjetaRelacion, Chip,
   badgePago, badgeOT, badgeGeneral, money, BotonAnular, BotonCerrarCadena, BotonDesanular, BannerAnulado, bloqueadoPorCadenaCerrada,
@@ -437,6 +437,19 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
       const inf = informes.find(i => i._id === id);
       if (inf) await exportarInformeTecnicoExcel(inf, inf.ordenTrabajo);
     }
+    setDescargando(false);
+  };
+
+  // Mismos informes seleccionados, pero en un solo libro (una hoja por
+  // informe) en vez de N archivos sueltos — pedido explícito del usuario
+  // para OTs padre con varias sub-OTs/informes.
+  const descargarSeleccionadosComoLibro = async () => {
+    setDescargando(true);
+    const items = informesSeleccionados
+      .map(id => informes.find(i => i._id === id))
+      .filter(Boolean)
+      .map(inf => ({ informe: inf, ot: inf.ordenTrabajo }));
+    if (items.length) await exportarInformesTecnicosExcelCombinado(items, ot.numeroOT || ot.codigo);
     setDescargando(false);
   };
 
@@ -893,6 +906,14 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
                   className="text-sm bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 disabled:opacity-50 transition font-medium">
                   {descargando ? "Descargando…" : `Descargar seleccionados (${informesSeleccionados.length})`}
                 </button>
+                {informesSeleccionados.length > 1 && (
+                  <button type="button" disabled={descargando}
+                    onClick={descargarSeleccionadosComoLibro}
+                    title="Descarga los informes seleccionados como un solo archivo .xlsx, una hoja por informe"
+                    className="text-sm border border-teal-600 text-teal-700 px-4 py-2 rounded-lg hover:bg-teal-50 disabled:opacity-50 transition font-medium">
+                    {descargando ? "Descargando…" : "Descargar en un libro"}
+                  </button>
+                )}
                 </div>
               </div>
               <TablaScroll className="overflow-x-auto">
