@@ -55,8 +55,18 @@ const titulosOT = (ots) =>
 // conversión a la otra moneda usando el Tipo de Cambio compartido — la
 // cotización nunca recalcula subtotal/igv/total, solo se muestra la
 // conversión acá para comparar de un vistazo.
+// `c.subtotal` es el subtotal CRUDO de ítems (sin descuento ni margen) — en
+// formatos con gastos administrativos + utilidad (Alicorp/Intradevco/
+// Masterbread/Gloria) o con un simple descuento (formato estándar), el
+// "Total sin IGV" real difiere del subtotal crudo. `c.total` (con IGV) SÍ es
+// siempre el monto final y correcto en los 3 formatos (siempre
+// `total = totalSinIgv * 1.18`, ver calcular()/calcularGloria()/
+// calcularAlicorp() en DetalleCotizacion.jsx/cotizacionItems.js), así que se
+// deriva de ahí en vez de usar el subtotal directamente. Reportado por el
+// usuario, 2026-09-07 — la columna quedaba desactualizada para cotizaciones
+// con esos factores.
 const totalesDuales = (c, tipoCambio) => {
-  const total = Number(c.subtotal || Number(c.total) / 1.18) || 0;
+  const total = c.total != null ? (Number(c.total) || 0) / 1.18 : Number(c.subtotal) || 0;
   const tc = Number(tipoCambio) || 0;
   if (c.moneda === "USD") {
     return { pen: tc > 0 ? total * tc : null, usd: total };
