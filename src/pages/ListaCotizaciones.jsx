@@ -94,17 +94,17 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
             <tr>
               <th className={`${TH} text-left`}>N° Cotización</th>
               {mostrarEstadoServicio && <th className={`${TH} text-left ${colOtEstrecha ? "w-20" : ""}`}>N° OT</th>}
-              {mostrarEstadoServicio && <th className={`${TH} text-center`}>Fecha de salida</th>}
-              {mostrarEstadoServicio && <th className={`${TH} text-center`}>Estado de servicio</th>}
               <th className={`${TH} text-left`}>Empresa</th>
+              <th className={`${TH} text-left`}>Planta</th>
               <th className={`${TH} text-left`}>Contacto</th>
               <th className={`${TH} text-left`}>Título cotización</th>
-              {mostrarTituloOT && <th className={`${TH} text-left`}>Título orden de trabajo</th>}
-              <th className={`${TH} text-left`}>Planta</th>
               {puedeVerPrecios && <th className={`${TH} text-right`}>Total sin IGV (S/)</th>}
               {puedeVerPrecios && <th className={`${TH} text-right`}>Total sin IGV (US$)</th>}
               <th className={`${TH} text-center`}>Aprobado</th>
               <th className={`${TH} text-center`}>Enviado</th>
+              {mostrarTituloOT && <th className={`${TH} text-left`}>Título orden de trabajo</th>}
+              {mostrarEstadoServicio && <th className={`${TH} text-center`}>Estado de servicio</th>}
+              {mostrarEstadoServicio && <th className={`${TH} text-center`}>Fecha de salida</th>}
               <th className={`${TH} text-center`}>Informe enviado</th>
               {mostrarDiasInforme && <th className={`${TH} text-center`}>Días desde informe enviado</th>}
             </tr>
@@ -147,31 +147,14 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
                       {numerosOT(otsDeCot) || <span className="text-gray-300">—</span>}
                     </td>
                   )}
-                  {mostrarEstadoServicio && (
-                    <td className="px-4 py-3.5 text-center text-gray-500 whitespace-nowrap">
-                      {otPrincipal?.fechaSalida ? formatearFecha(otPrincipal.fechaSalida) : <span className="text-gray-300">—</span>}
-                    </td>
-                  )}
-                  {mostrarEstadoServicio && (
-                    <td className="px-4 py-3.5 text-center">
-                      {otPrincipal
-                        ? <DotChip chip={badgeGeneral(otPrincipal.estadoGeneral)} dot={dotGeneral(otPrincipal.estadoGeneral)}>{otPrincipal.estadoGeneral}</DotChip>
-                        : <span className="text-gray-300">—</span>}
-                    </td>
-                  )}
                   <td className="px-4 py-3.5 text-gray-700">
                     {c.empresa?.razonSocial || <span className="text-gray-300">—</span>}
                   </td>
+                  <td className="px-4 py-3.5 text-gray-600">{c.planta || <span className="text-gray-300">—</span>}</td>
                   <td className="px-4 py-3.5 text-gray-600">
                     {c.personaContacto || c.contactoNombre || <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-4 py-3.5 text-gray-700">{c.titulo}</td>
-                  {mostrarTituloOT && (
-                    <td className="px-4 py-3.5 text-gray-700">
-                      {titulosOT(otsDeCot) || <span className="text-gray-300">—</span>}
-                    </td>
-                  )}
-                  <td className="px-4 py-3.5 text-gray-600">{c.planta || <span className="text-gray-300">—</span>}</td>
                   {puedeVerPrecios && (
                     <td className="px-4 py-3.5 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap">
                       {pen != null ? pen.toLocaleString("es-PE", { minimumFractionDigits: 2 }) : "—"}
@@ -196,6 +179,23 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
                       </span>
                     )}
                   </td>
+                  {mostrarTituloOT && (
+                    <td className="px-4 py-3.5 text-gray-700">
+                      {titulosOT(otsDeCot) || <span className="text-gray-300">—</span>}
+                    </td>
+                  )}
+                  {mostrarEstadoServicio && (
+                    <td className="px-4 py-3.5 text-center">
+                      {otPrincipal
+                        ? <DotChip chip={badgeGeneral(otPrincipal.estadoGeneral)} dot={dotGeneral(otPrincipal.estadoGeneral)}>{otPrincipal.estadoGeneral}</DotChip>
+                        : <span className="text-gray-300">—</span>}
+                    </td>
+                  )}
+                  {mostrarEstadoServicio && (
+                    <td className="px-4 py-3.5 text-center text-gray-500 whitespace-nowrap">
+                      {otPrincipal?.fechaSalida ? formatearFecha(otPrincipal.fechaSalida) : <span className="text-gray-300">—</span>}
+                    </td>
+                  )}
                   <td className="px-4 py-3.5 text-center">
                     {c._esOT ? <span className="text-gray-300">—</span> : (
                       <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full uppercase tracking-wide whitespace-nowrap ${c.informeEnviado ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>

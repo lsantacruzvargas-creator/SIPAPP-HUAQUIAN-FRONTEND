@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import { formatearFecha } from "../utils/fecha";
-import ModalCrearFactura from "./ModalCrearFactura";
 import {
   FlujoNegocio, TarjetaRelacion, Chip,
   badgePago, badgeOT, money, BotonAnular, BotonCerrarCadena, BotonDesanular, BannerAnulado, bloqueadoPorCadenaCerrada,
@@ -45,7 +45,8 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
   const [error, setError]         = useState("");
   const [cargandoFactura, setCargandoFactura] = useState(false);
   const [cargandoCot, setCargandoCot] = useState(false);
-  const [crearFacturaOpen, setCrearFacturaOpen] = useState(false);
+  const [cargandoCrearFactura, setCargandoCrearFactura] = useState(false);
+  const navigate = useNavigate();
   const [ordenActual, setOrdenActual] = useState(orden);
   const [guardandoConfirmacion, setGuardandoConfirmacion] = useState("");
   const rolActual = getUsuario()?.rol;
@@ -110,6 +111,25 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
     const full = lista.find(c => c._id === cot._id) || cot;
     setCargandoCot(false);
     onNavegar?.({ tipo: "cotizacion", data: full });
+  };
+
+  // Emitir Factura desde una OC: lleva a la página completa de Emitir CPE
+  // (en vez del pequeño ModalCrearFactura) con emisor/receptor/ítems y
+  // precios precargados desde la Cotización vinculada — la OC no tiene
+  // ítems propios (ver OrdenCompra.js), solo un monto global.
+  const crearFacturaDesdeOC = async () => {
+    if (cargandoCrearFactura) return;
+    setCargandoCrearFactura(true);
+    let cotizacionCompleta = null;
+    if (cot) {
+      const res = await fetchAuth("/cotizaciones");
+      const lista = res.ok ? await res.json() : [];
+      cotizacionCompleta = lista.find(c => c._id === cot._id) || null;
+    }
+    setCargandoCrearFactura(false);
+    navigate("/facturacion-electronica/emitir", {
+      state: { prellenarDesdeOC: { oc: orden, cotizacion: cotizacionCompleta } },
+    });
   };
 
   const cargarOTeInformes = () => {
@@ -473,24 +493,25 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
             <TarjetaRelacion tipo="oc" codigo={orden.codigo} numero={orden.numeroOrden} actual />
 
             <TarjetaRelacion tipo="factura" codigo={factura?.codigo} numero={factura?.numeroFactura} vacio={!factura}
-              onClick={factura ? abrirFactura : undefined} cargando={cargandoFactura}
-              onCrear={!factura && !orden.anulado && puedeCrearFacturaRol ? () => setCrearFacturaOpen(true) : undefined} crearLabel="Factura">
+              onClick={factura ? abrirFactura : undefined} cargando={cargandoFactura || cargandoCrearFactura}
+              onCrear={!factura && !orden.anulado && puedeCrearFacturaRol ? crearFacturaDesdeOC : undefined} crearLabel="Factura">
               {puedeVerPrecios && (factura?.totalAPagar || factura?.total) > 0 && (
                 <p className="text-xs text-gray-500">{money(factura.totalAPagar ?? factura.total)}</p>
               )}
               {factura?.estadoPago && <Chip className={badgePago(factura.estadoPago)}>{factura.estadoPago}</Chip>}
+              {factura && !orden.anulado && puedeCrearFacturaRol && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); crearFacturaDesdeOC(); }}
+                  className="text-xs text-blue-600 hover:text-blue-800 underline mt-0.5"
+                >
+                  + Crear otra factura
+                </button>
+              )}
             </TarjetaRelacion>
           </section>
         </div>
       </div>
-
-      {crearFacturaOpen && (
-        <ModalCrearFactura
-          ocInicial={orden}
-          onClose={() => setCrearFacturaOpen(false)}
-          onCreada={(nueva) => { setCrearFacturaOpen(false); onNavegar?.({ tipo: "factura", data: nueva }); }}
-        />
-      )}
     </div>
   );
 }

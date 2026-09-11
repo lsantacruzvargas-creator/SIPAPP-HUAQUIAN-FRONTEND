@@ -297,7 +297,7 @@ export function BotonAnular({ onAnular }) {
         </p>
         <textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} rows={3} autoFocus
           placeholder="Motivo de la anulación…"
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300 resize-none" />
+          className="w-full bg-white text-gray-800 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300 resize-none" />
         <div className="flex gap-3 justify-end">
           <button onClick={() => { setAbierto(false); setMotivo(""); }} disabled={enviando}
             className="text-sm border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 transition disabled:opacity-50">

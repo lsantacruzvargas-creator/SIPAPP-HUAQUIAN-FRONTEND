@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { fetchAuth } from "../utils/fetchAuth";
 import TablaScroll from "../components/TablaScroll";
 import {
@@ -41,6 +41,7 @@ function Oblig() {
 
 export default function EmitirComprobante() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [rucEmisor] = useState(RUC_EMISOR);
   const [tipoDoc, setTipoDoc] = useState("01");
   const [serie, setSerie] = useState(SERIE_POR_TIPO["01"]);
@@ -74,6 +75,12 @@ export default function EmitirComprobante() {
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
   const [resultado, setResultado] = useState(null);
+  // Presente solo cuando se llega desde "Crear Factura" de la tarjeta de
+  // relación de una Orden de Compra (ver DetalleOrdenCompra.jsx) — al emitir
+  // con éxito, además crea el registro interno Factura vinculado a esta OC
+  // (mismo paso 2 que hacía ModalCrearFactura.jsx).
+  const [ocOrigen, setOcOrigen] = useState(null);
+  const [facturaInterna, setFacturaInterna] = useState(null);
 
   const esNota = tipoDoc === "07" || tipoDoc === "08";
 
@@ -94,11 +101,62 @@ export default function EmitirComprobante() {
     })));
   };
 
+  // Precarga emisor (fijo), receptor, ítems y precios, y N° de OC a partir
+  // de la Cotización vinculada a la orden de compra — la OC en sí no tiene
+  // ítems propios, solo un monto global (ver OrdenCompra.js).
+  const aplicarPrellenadoOC = (oc, cotizacion) => {
+    setOcOrigen(oc);
+    setTipoDoc("01");
+    setSerie(SERIE_POR_TIPO["01"]);
+    const emp = oc.empresa;
+    if (emp) {
+      setReceptor({ schemeID: "6", numDoc: emp.ruc || "", nombre: emp.razonSocial || "" });
+    }
+    const esServicio = cotizacion?.tipo === "servicio";
+    const unidad = esServicio ? "ZZ" : "NIU";
+    setTipoBienServicio(esServicio ? "servicio" : "bien");
+    if (cotizacion?.moneda) setMoneda(cotizacion.moneda);
+    // Ítems Gloria del grupo "mano_obra" usan personas×horas×tarifaHora en
+    // vez de cantidad/precio (ver Cotizacion.js itemSchema) — se traduce a
+    // cantidad/valorUnitario equivalentes. Filas puramente informativas o
+    // de agrupación (sin cantidad ni precio) se descartan del prellenado.
+    const itemsValidos = (cotizacion?.items || [])
+      .map((i) => {
+        const esManoObra = i.grupo === "mano_obra";
+        const cantidad = esManoObra
+          ? (Number(i.personas) || 0) * (Number(i.horas) || 0)
+          : Number(i.cantidad) || 0;
+        const valorUnitario = esManoObra ? Number(i.tarifaHora) || 0 : Number(i.precio) || 0;
+        return { descripcion: i.descripcion, cantidad, valorUnitario };
+      })
+      .filter((i) => i.cantidad > 0 && i.valorUnitario > 0);
+    if (itemsValidos.length) {
+      setItems(itemsValidos.map((i) => ({
+        _key: Date.now() + Math.random(),
+        descripcion: i.descripcion,
+        cantidad: i.cantidad,
+        unidad,
+        valorUnitario: i.valorUnitario,
+        precioUnitario: precioUnitarioDesdeValor(i.valorUnitario, "10"),
+        afectacion: "10",
+        descuentoPorcentaje: 0,
+      })));
+    } else {
+      setItems([{ ...itemVacioComprobante(), descripcion: oc.descripcion || oc.titulo || "", unidad }]);
+    }
+    setNumeroOrdenCompra(oc.numeroOrden || oc.codigo || "");
+    setOrdenCompraId(oc._id || "");
+  };
+
   useEffect(() => {
     const c = location.state?.comprobante;
     if (c) {
       setTipoDoc(location.state.tipoDocDestino || "07");
       aplicarComprobanteReferencia(c);
+    }
+    const pre = location.state?.prellenarDesdeOC;
+    if (pre?.oc) {
+      aplicarPrellenadoOC(pre.oc, pre.cotizacion);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -359,12 +417,45 @@ export default function EmitirComprobante() {
       const res  = await fetchAuth(endpoint, { method: "POST", body: JSON.stringify(body) });
       const data = await res.json();
       setResultado(data);
-      if (!data.ok) setError(data.mensaje || data.error || "El comprobante fue rechazado por SUNAT.");
+      if (!data.ok) {
+        setError(data.mensaje || data.error || "El comprobante fue rechazado por SUNAT.");
+      } else if (ocOrigen) {
+        await crearFacturaInterna(data);
+      }
     } catch {
       setError("Error de conexión");
     } finally {
       setCargando(false);
     }
+  };
+
+  // Paso 2 (solo cuando se emite desde "Crear Factura" de una OC): crea el
+  // registro interno Factura con el número ya emitido en SUNAT, vinculado a
+  // la OC de origen — mismo paso que hacía ModalCrearFactura.jsx.
+  const crearFacturaInterna = async (dataCpe) => {
+    const factPayload = {
+      numeroFactura:      dataCpe.serie,
+      fechaEmision:       new Date().toISOString().split("T")[0],
+      subtotal:           totales.base,
+      descripcion:        ocOrigen.descripcion || ocOrigen.titulo || "",
+      encargado:          ocOrigen.encargado || "",
+      planta:             ocOrigen.planta || "",
+      numeroGuiaEmision:  ocOrigen.numeroGuiaEmision || "",
+      numeroGuiaRemision: ocOrigen.numeroGuiaRemision || "",
+      ordenCompra:        ocOrigen._id,
+      empresa:            ocOrigen.empresa?._id || ocOrigen.empresa,
+      codigoSap:          ocOrigen.codigoSap,
+      fechaSalida:        ocOrigen.fechaSalida,
+    };
+    if (formaPago === "Credito" && cuotas.length) {
+      factPayload.cuotas = cuotas.map((c) => ({ monto: Number(c.monto), fechaVencimiento: c.fechaVencimiento }));
+    }
+    const resF = await fetchAuth("/facturas", { method: "POST", body: JSON.stringify(factPayload) });
+    if (!resF.ok) {
+      setError(`El comprobante ${dataCpe.serie} se emitió correctamente, pero no se pudo crear el registro interno de Factura. Verifica manualmente.`);
+      return;
+    }
+    setFacturaInterna(await resF.json());
   };
 
   const nuevo = () => {
@@ -389,6 +480,8 @@ export default function EmitirComprobante() {
     setDetraccionCuentaBancaria("");
     setNumeroOrdenCompra("");
     setOrdenCompraId("");
+    setOcOrigen(null);
+    setFacturaInterna(null);
     setResultado(null);
     setError("");
   };
@@ -409,6 +502,15 @@ export default function EmitirComprobante() {
         <div className="bg-amber-50 border border-amber-200 text-amber-700 text-sm rounded-lg px-4 py-3 mb-5">
           Comprobante <strong>{resultado.serie}</strong> EN PROCESO — SUNAT aún no confirma el resultado.
           Verifica el estado más tarde en la lista de comprobantes.
+        </div>
+      )}
+      {facturaInterna && (
+        <div className="bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg px-4 py-3 mb-5 flex items-center justify-between gap-4">
+          <span>Factura <strong>{facturaInterna.codigo}</strong> creada y vinculada a la orden de compra.</span>
+          <button type="button" onClick={() => navigate("/ordenes-compra")}
+            className="shrink-0 text-green-700 underline hover:text-green-900 transition">
+            Volver a Órdenes de Compra
+          </button>
         </div>
       )}
       {error && (
@@ -512,7 +614,7 @@ export default function EmitirComprobante() {
                               <td className="px-3 py-2 text-gray-400">Cuota{String(idx + 1).padStart(3, "0")}</td>
                               <td className="px-3 py-2">
                                 <input type="number" min="0" step="0.01" value={c.monto}
-                                  onChange={(e) => handleCuota(c._key, "monto", e.target.value)}
+                                  onChange={(e) => handleCuota(c._key, "monto", e.target.value)} onWheel={(e) => e.target.blur()}
                                   disabled={ro} required
                                   className="w-full input-field w-auto" />
                               </td>
@@ -659,7 +761,7 @@ export default function EmitirComprobante() {
                     </td>
                     <td className="px-3 py-2">
                       <input type="number" min="0" step="0.01" value={item.cantidad}
-                        onChange={(e) => handleItem(item._key, "cantidad", e.target.value)}
+                        onChange={(e) => handleItem(item._key, "cantidad", e.target.value)} onWheel={(e) => e.target.blur()}
                         required disabled={ro}
                         className="w-full input-field w-auto" />
                     </td>
@@ -673,7 +775,7 @@ export default function EmitirComprobante() {
                     </td>
                     <td className="px-3 py-2">
                       <input type="number" min="0" step="0.01" value={item.valorUnitario}
-                        onChange={(e) => handleItem(item._key, "valorUnitario", e.target.value)}
+                        onChange={(e) => handleItem(item._key, "valorUnitario", e.target.value)} onWheel={(e) => e.target.blur()}
                         required disabled={ro}
                         className="w-full input-field w-auto" />
                     </td>
@@ -687,7 +789,7 @@ export default function EmitirComprobante() {
                     </td>
                     <td className="px-3 py-2">
                       <input type="number" min="0" max="100" step="1" value={item.descuentoPorcentaje}
-                        onChange={(e) => handleItem(item._key, "descuentoPorcentaje", e.target.value)}
+                        onChange={(e) => handleItem(item._key, "descuentoPorcentaje", e.target.value)} onWheel={(e) => e.target.blur()}
                         disabled={ro}
                         className="w-full input-field w-auto" />
                     </td>
@@ -723,7 +825,7 @@ export default function EmitirComprobante() {
                   <td className="px-3 py-2 text-right">
                     {ro ? otrosCargosNum.toFixed(2) : (
                       <input type="number" min="0" step="0.01" value={otrosCargos}
-                        onChange={(e) => setOtrosCargos(e.target.value)}
+                        onChange={(e) => setOtrosCargos(e.target.value)} onWheel={(e) => e.target.blur()}
                         placeholder="0.00"
                         className="w-full input-field w-auto text-right" />
                     )}
@@ -735,7 +837,7 @@ export default function EmitirComprobante() {
                   <td className="px-3 py-2 text-right">
                     {ro ? montoRedondeoNum.toFixed(2) : (
                       <input type="number" step="0.01" value={montoRedondeo}
-                        onChange={(e) => setMontoRedondeo(e.target.value)}
+                        onChange={(e) => setMontoRedondeo(e.target.value)} onWheel={(e) => e.target.blur()}
                         placeholder="0.00"
                         className="w-full input-field w-auto text-right" />
                     )}
