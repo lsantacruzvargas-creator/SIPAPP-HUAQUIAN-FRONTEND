@@ -15,7 +15,7 @@ const MESES = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
 
-const FILTROS_VACIO = { empresa: "", planta: "", ano: "", mes: "", oc: "", busqueda: "" };
+const FILTROS_VACIO = { empresa: "", planta: "", ano: "", mes: "", oc: "", busqueda: "", informeEnviado: false };
 
 const VISTAS = [
   { valor: "todasLasCotizaciones", label: "Todas las cotizaciones" },
@@ -357,6 +357,7 @@ export default function ListaCotizaciones() {
       (!filtros.ano || fecha.getFullYear() === parseInt(filtros.ano)) &&
       (!filtros.mes || fecha.getMonth() + 1 === parseInt(filtros.mes)) &&
       (!filtros.oc  || (filtros.oc === "con" ? tieneOC(c) : !tieneOC(c))) &&
+      (!filtros.informeEnviado || c.informeEnviado) &&
       (!q ||
         c.titulo?.toLowerCase().includes(q) ||
         c.numeroCotizacion?.toLowerCase().includes(q) ||
@@ -529,6 +530,18 @@ export default function ListaCotizaciones() {
             <option key={valor} value={valor}>Ordenar: {label}</option>
           ))}
         </select>
+
+        <button
+          type="button"
+          onClick={() => setFiltros((f) => ({ ...f, informeEnviado: !f.informeEnviado }))}
+          className={`px-3 py-2 rounded-lg text-sm border transition ${
+            filtros.informeEnviado
+              ? "bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-700"
+              : "border-gray-300 text-gray-600 hover:bg-gray-50"
+          }`}
+        >
+          Informe enviado
+        </button>
 
         <button
           onClick={() => { setFiltros(FILTROS_VACIO); setVista("todasLasCotizaciones"); }}
