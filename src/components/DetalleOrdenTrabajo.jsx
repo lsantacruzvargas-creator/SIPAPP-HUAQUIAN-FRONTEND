@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import { formatearFecha } from "../utils/fecha";
+import { estadoComprobanteClase } from "../utils/catalogosSunat";
 import ModalOrdenCompra from "./ModalOrdenCompra";
 import SelectorEmpresas from "./SelectorEmpresas";
 import ModalSeleccionarTipoInforme from "./ModalSeleccionarTipoInforme";
@@ -12,6 +13,7 @@ import ModalRequerimiento from "./ModalRequerimiento";
 import TablaServiciosExternos from "./TablaServiciosExternos";
 import TablaScroll from "./TablaScroll";
 import ModalGenerarGRE from "./ModalGenerarGRE";
+import ModalDetalleGuia from "./ModalDetalleGuia";
 import ConfirmacionAccion from "./ConfirmacionAccion";
 import { exportarInformeTecnicoExcel, exportarInformesTecnicosExcelCombinado } from "../utils/informeTecnicoExcel";
 import {
@@ -24,6 +26,8 @@ const RO = "bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 text-sm text-
 
 const ESTADOS = ["pendiente", "en progreso", "completado", "entregado"];
 const CATEGORIAS_SERVICIO = ["SOPORTE", "DEVOLUCION", "DIAGNOSTICO", "GARANTIA", "MANTENIMIENTO", "REPARACION", "PRESTAMO", "SUMINISTRO", "MANTENIMIENTO EN PLANTA"];
+
+const codigoDeGuia = (g) => `${g.serie}-${String(g.correlativo).padStart(4, "0")}`;
 
 const colorEstado = (e, activo) => {
   if (!activo) return "bg-gray-100 text-gray-500 hover:bg-gray-200";
@@ -125,6 +129,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
   const [informes, setInformes] = useState([]);
   const [subOTs, setSubOTs] = useState([]);
   const [greMap, setGreMap] = useState({});
+  const [guiaDetalle, setGuiaDetalle] = useState(null);
   const [requerimientos, setRequerimientos] = useState([]);
   const [crearRequerimientoOpen, setCrearRequerimientoOpen] = useState(false);
   const [servicios, setServicios] = useState([]);
@@ -189,12 +194,14 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
           .then(r => r.ok && r.json())
           .then(data => {
             if (!data?.ok) return;
+            // Por OT id -> array de guías (antes era un string ya formateado,
+            // no permitía abrir el detalle de cada GRE desde la tarjeta de
+            // relación).
             const map = {};
             data.data.forEach(g => {
-              const codigo = `${g.serie}-${String(g.correlativo).padStart(4, "0")}`;
               (g.ordenesTrabajo || []).forEach(id => {
                 const key = id?._id || id;
-                map[key] = map[key] ? `${map[key]}, ${codigo}` : codigo;
+                map[key] = map[key] ? [...map[key], g] : [g];
               });
             });
             setGreMap(map);
@@ -458,6 +465,16 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
   // El estado del padre pasa a ser calculado (backend, recalcularEstadoPadre) apenas tiene al
   // menos una sub-OT "sana" — las marcadas `irreparable` quedan excluidas del cálculo.
   const hayHijasSanas = subOTs.some(s => !s.irreparable);
+
+  // Todas las GRE de la OT padre + sus sub-OTs, sin duplicar (una misma GRE
+  // puede cubrir varias sub-OTs a la vez) — para la tarjeta de relación.
+  const misGres = Array.from(
+    new Map(
+      [ot._id, ...subOTs.map(s => s._id)]
+        .flatMap(id => greMap[id] || [])
+        .map(g => [g._id, g])
+    ).values()
+  );
 
   const pasos = [
     { tipo: "cotizacion", activo: !!cot, codigo: cot?.codigo },
@@ -788,13 +805,15 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
                 onClick={cot ? () => onNavegar?.({ tipo: "cotizacion", data: cot }) : undefined}
                 onCrear={!cot && !ot.anulado ? () => setConfirmandoCrearCotizacion(true) : undefined} crearLabel="Cotización">
                 <p className="text-sm text-gray-700 line-clamp-2">{cot?.titulo}</p>
-                {puedeVerPrecios && cot?.total > 0 && <p className="text-xs text-gray-500">{money(cot.total)}</p>}
+                {puedeVerPrecios && cot?.total > 0 && <p className="text-xs text-gray-500">{money(cot.total, cot.moneda)}</p>}
               </TarjetaRelacion>
             )}
 
             <TarjetaRelacion tipo="ot" codigo={ot.codigo} numero={ot.numeroOT} actual>
               {ot.estado && <Chip className={badgeOT(ot.estado)}>{ot.estado}</Chip>}
-              {greMap[ot._id] && <Chip className="bg-purple-100 text-purple-700">GRE {greMap[ot._id]}</Chip>}
+              {!!greMap[ot._id]?.length && (
+                <Chip className="bg-purple-100 text-purple-700">GRE {greMap[ot._id].map(codigoDeGuia).join(", ")}</Chip>
+              )}
             </TarjetaRelacion>
 
             <div className="space-y-2">
@@ -830,7 +849,9 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
                           ) : (
                             <Chip className="bg-amber-100 text-amber-700">{aprobadosInf}/{totalInf} informe(s) aprobado(s)</Chip>
                           )}
-                          {greMap[s._id] && <Chip className="bg-purple-100 text-purple-700">GRE {greMap[s._id]}</Chip>}
+                          {!!greMap[s._id]?.length && (
+                            <Chip className="bg-purple-100 text-purple-700">GRE {greMap[s._id].map(codigoDeGuia).join(", ")}</Chip>
+                          )}
                         </div>
                         <p className="text-sm text-gray-700 line-clamp-1">{s.titulo}</p>
                       </TarjetaRelacion>
@@ -859,23 +880,48 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
               )}
             </TarjetaRelacion>
 
-            {puedeGenerarGRE && (
+            {puedeGenerarGRE && (misGres.length === 0 ? (
               <TarjetaRelacion tipo="gre" vacio
                 onCrear={!ot.anulado ? abrirGenerarGRE : undefined} crearLabel="GRE" />
-            )}
+            ) : (
+              <TarjetaRelacion tipo="gre"
+                codigo={misGres.length === 1 ? codigoDeGuia(misGres[0]) : `${misGres.length} guías`}
+                onClick={misGres.length === 1 ? () => setGuiaDetalle(misGres[0]) : undefined}>
+                {misGres.length === 1 ? (
+                  <Chip className={estadoComprobanteClase(misGres[0].estado)}>{misGres[0].estado}</Chip>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {misGres.map(g => (
+                      <button key={g._id} type="button"
+                        onClick={(e) => { e.stopPropagation(); setGuiaDetalle(g); }}
+                        className="font-mono text-xs text-purple-700 bg-white rounded-lg px-2 py-0.5 shadow-sm hover:underline">
+                        {codigoDeGuia(g)}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {!ot.anulado && (
+                  <button type="button"
+                    onClick={(e) => { e.stopPropagation(); abrirGenerarGRE(); }}
+                    className="text-xs text-blue-600 hover:text-blue-800 underline mt-0.5">
+                    + Crear otra GRE
+                  </button>
+                )}
+              </TarjetaRelacion>
+            ))}
 
             {!esVistaLimitada && rolActual !== "coordinadora" && (
               <>
                 <TarjetaRelacion tipo="oc" codigo={oc?.codigo} numero={oc?.numeroOrden} vacio={!oc}
                   onClick={oc ? () => onNavegar?.({ tipo: "oc", data: oc, extra: factura }) : undefined}
                   onCrear={!oc && cot && !ot.anulado ? () => setCrearOCOpen(true) : undefined} crearLabel="OC">
-                  {puedeVerPrecios && oc?.monto > 0 && <p className="text-xs text-gray-500">{money(oc.monto)}</p>}
+                  {puedeVerPrecios && oc?.monto > 0 && <p className="text-xs text-gray-500">{money(oc.monto, cot?.moneda)}</p>}
                 </TarjetaRelacion>
 
                 <TarjetaRelacion tipo="factura" codigo={factura?.codigo} numero={factura?.numeroFactura} vacio={!factura}
                   onClick={factura ? () => onNavegar?.({ tipo: "factura", data: factura }) : undefined}>
                   {puedeVerPrecios && (factura?.totalAPagar || factura?.total) > 0 && (
-                    <p className="text-xs text-gray-500">{money(factura.totalAPagar ?? factura.total)}</p>
+                    <p className="text-xs text-gray-500">{money(factura.totalAPagar ?? factura.total, cot?.moneda)}</p>
                   )}
                   {factura?.estadoPago && <Chip className={badgePago(factura.estadoPago)}>{factura.estadoPago}</Chip>}
                 </TarjetaRelacion>
@@ -1070,6 +1116,10 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
           subOTs={subOTs}
           onClose={() => setGenerarGREOpen(false)}
         />
+      )}
+
+      {guiaDetalle && (
+        <ModalDetalleGuia guia={guiaDetalle} onClose={() => setGuiaDetalle(null)} />
       )}
 
       {confirmandoCrearCotizacion && (

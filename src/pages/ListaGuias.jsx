@@ -3,25 +3,15 @@ import { useNavigate } from "react-router-dom";
 import { fetchAuth } from "../utils/fetchAuth";
 import { formatearFecha } from "../utils/fecha";
 import TablaScroll from "../components/TablaScroll";
+import ModalDetalleGuia from "../components/ModalDetalleGuia";
 import {
   TIPO_GUIA,
-  MODALIDAD_TRASLADO,
-  MOTIVO_TRASLADO,
   ESTADO_COMPROBANTE,
   estadoComprobanteClase,
 } from "../utils/catalogosSunat";
 
 const FILTROS_VACIO = { tipoGuia: "", estado: "", desde: "", hasta: "" };
 const SELECT = "input-field w-auto";
-
-const labelMotivo = (v) => MOTIVO_TRASLADO.find((m) => m.valor === v)?.label ?? v;
-const labelModalidad = (v) => MODALIDAD_TRASLADO.find((m) => m.valor === v)?.label ?? v;
-
-// Un "[404] Resource not found" (código HTTP de 3 dígitos) es un fallo de la consulta del
-// ticket, no un rechazo real de SUNAT (esos van con código del catálogo CDR, siempre 4 dígitos)
-// — ver Backend/src/utils/sunatConsultaResultado.js. En ese caso "Forzar actualización" sigue
-// disponible aunque el estado guardado sea RECHAZADO.
-const esFalloDeConsulta = (mensaje) => /^\[[45]\d{2}\]/.test(mensaje || "");
 
 export default function ListaGuias() {
   const navigate = useNavigate();
@@ -32,8 +22,6 @@ export default function ListaGuias() {
   const [paginacion, setPaginacion] = useState({ total: 0, pages: 1 });
   const [seleccionada, setSeleccionada] = useState(null);
   const [cargando, setCargando] = useState(false);
-  const [errorDescarga, setErrorDescarga] = useState("");
-  const [consultando, setConsultando] = useState(false);
 
   const cargar = async () => {
     setCargando(true);
@@ -60,50 +48,6 @@ export default function ListaGuias() {
     setFiltros(FILTROS_VACIO);
     setFiltrosAplicados(FILTROS_VACIO);
     setPagina(1);
-  };
-
-  const descargar = async (tipo) => {
-    setErrorDescarga("");
-    const res = await fetchAuth(`/guias/${seleccionada._id}/${tipo}`);
-    if (!res.ok) { setErrorDescarga(`${tipo.toUpperCase()} no disponible para esta guía.`); return; }
-    const blob = await res.blob();
-    const url  = URL.createObjectURL(blob);
-    // El nombre y la extensión real (.xml o .zip) los decide el backend según el contenido —
-    // SmartPSE no siempre envuelve el XML firmado de la GRE en un ZIP.
-    const cd     = res.headers.get("Content-Disposition") || "";
-    const nombre = cd.match(/filename="([^"]+)"/)?.[1] || seleccionada.nombreArchivo;
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = nombre;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  };
-
-  // Reconsulta el estado real en SUNAT (útil para guías EN_PROCESO que SmartPSE dejó con solo
-  // ticket) — endpoint ya existente en el backend (GET /api/guias/:id/consultar) que antes no se
-  // usaba desde ningún lado del frontend.
-  const forzarActualizacion = async () => {
-    if (!seleccionada) return;
-    setConsultando(true);
-    setErrorDescarga("");
-    try {
-      const res  = await fetchAuth(`/guias/${seleccionada._id}/consultar`);
-      const data = await res.json();
-      if (!data.ok) { setErrorDescarga(data.error || "No se pudo consultar el estado en SUNAT."); return; }
-      await cargar();
-      const actualizada = {
-        ...seleccionada,
-        estado: data.estado,
-        sunat: { ...seleccionada.sunat, mensaje: data.mensaje, linkSunat: data.linkSunat },
-      };
-      setSeleccionada(actualizada);
-    } catch {
-      setErrorDescarga("Error de conexión al consultar SUNAT.");
-    } finally {
-      setConsultando(false);
-    }
   };
 
   return (
@@ -224,138 +168,7 @@ export default function ListaGuias() {
       </div>
 
       {seleccionada && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h3 className="font-semibold text-gray-800">
-                  Guía {seleccionada.serie}-{String(seleccionada.correlativo).padStart(4, "0")}
-                </h3>
-                <span className="font-mono text-xs text-gray-400">{seleccionada.nombreArchivo}</span>
-              </div>
-              <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${estadoComprobanteClase(seleccionada.estado)}`}>
-                {seleccionada.estado}
-              </span>
-            </div>
-
-            {(seleccionada.estado === "RECHAZADO" || seleccionada.estado === "ERROR") && seleccionada.sunat?.mensaje && (
-              <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 mb-4 whitespace-pre-wrap">
-                {seleccionada.sunat.mensaje}
-                {/* Detalle campo por campo del hub (cuando lo trae) — antes se
-                    descartaba y solo quedaba el mensaje genérico de arriba. */}
-                {!!seleccionada.sunat?.errores?.length && (
-                  <ul className="list-disc list-inside mt-2 space-y-0.5">
-                    {seleccionada.sunat.errores.map((e, i) => (
-                      <li key={i}>{typeof e === "string" ? e : (e.mensaje || e.descripcion || JSON.stringify(e))}</li>
-                    ))}
-                  </ul>
-                )}
-                {!!seleccionada.sunat?.observaciones?.length && (
-                  <ul className="list-disc list-inside mt-2 space-y-0.5 text-amber-700">
-                    {seleccionada.sunat.observaciones.map((o, i) => (
-                      <li key={i}>{typeof o === "string" ? o : (o.mensaje || o.descripcion || JSON.stringify(o))}</li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
-            {errorDescarga && (
-              <div className="bg-amber-50 border border-amber-200 text-amber-700 text-sm rounded-lg px-4 py-2 mb-4">
-                {errorDescarga}
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div>
-                <p className="text-xs font-medium text-gray-400 mb-1">Emisor</p>
-                <p className="text-sm text-gray-800">{seleccionada.emisor?.nombre}</p>
-                <p className="text-xs text-gray-400">{seleccionada.emisor?.numDoc}</p>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-400 mb-1">Destinatario</p>
-                <p className="text-sm text-gray-800">{seleccionada.destinatario?.nombre}</p>
-                <p className="text-xs text-gray-400">{seleccionada.destinatario?.numDoc}</p>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-400 mb-1">Motivo de traslado</p>
-                <p className="text-sm text-gray-800">{labelMotivo(seleccionada.motivoTraslado)}</p>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-400 mb-1">Modalidad</p>
-                <p className="text-sm text-gray-800">{labelModalidad(seleccionada.modalidadTraslado)}</p>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-400 mb-1">Punto de partida</p>
-                <p className="text-sm text-gray-800">{seleccionada.puntoPartida?.direccion}</p>
-                <p className="text-xs text-gray-400">Ubigeo {seleccionada.puntoPartida?.ubigeo}</p>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-400 mb-1">Punto de llegada</p>
-                <p className="text-sm text-gray-800">{seleccionada.puntoLlegada?.direccion}</p>
-                <p className="text-xs text-gray-400">Ubigeo {seleccionada.puntoLlegada?.ubigeo}</p>
-              </div>
-              {seleccionada.modalidadTraslado === "02" ? (
-                <div>
-                  <p className="text-xs font-medium text-gray-400 mb-1">Vehículo / Conductor</p>
-                  <p className="text-sm text-gray-800">{seleccionada.vehiculo?.placa}</p>
-                  <p className="text-xs text-gray-400">
-                    {seleccionada.conductor?.nombres} {seleccionada.conductor?.apellidos} — {seleccionada.conductor?.numDoc}
-                  </p>
-                </div>
-              ) : (
-                <div>
-                  <p className="text-xs font-medium text-gray-400 mb-1">Transportista</p>
-                  <p className="text-sm text-gray-800">{seleccionada.transportista?.razonSocial}</p>
-                  <p className="text-xs text-gray-400">{seleccionada.transportista?.ruc}</p>
-                </div>
-              )}
-            </div>
-
-            <table className="erp-table w-full text-sm mb-4">
-              <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-100">
-                <tr>
-                  <th className="px-3 py-2 text-left">Descripción</th>
-                  <th className="px-3 py-2 text-right">Cant.</th>
-                  <th className="px-3 py-2 text-right">Unidad</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {seleccionada.items?.map((it, idx) => (
-                  <tr key={idx}>
-                    <td className="px-3 py-2">{it.descripcion}</td>
-                    <td className="px-3 py-2 text-right">{it.cantidad}</td>
-                    <td className="px-3 py-2 text-right">{it.unidad}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            <div className="flex justify-end gap-3 pt-2">
-              {(seleccionada.estado === "EN_PROCESO" ||
-                (seleccionada.estado === "RECHAZADO" && esFalloDeConsulta(seleccionada.sunat?.mensaje))) && (
-                <button onClick={forzarActualizacion} disabled={consultando}
-                  className="border border-gray-300 text-gray-800 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition disabled:opacity-50">
-                  {consultando ? "Consultando SUNAT…" : "↻ Forzar actualización con SUNAT"}
-                </button>
-              )}
-              <button onClick={() => descargar("xml")} className="border border-gray-300 text-gray-800 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition">
-                Descargar XML
-              </button>
-              <button onClick={() => descargar("cdr")} className="border border-gray-300 text-gray-800 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition">
-                Descargar CDR
-              </button>
-              {seleccionada.sunat?.linkSunat && (
-                <a href={seleccionada.sunat.linkSunat} target="_blank" rel="noopener noreferrer"
-                  className="border border-gray-300 text-gray-800 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition">
-                  PDF SUNAT ↗
-                </a>
-              )}
-              <button onClick={() => { setSeleccionada(null); setErrorDescarga(""); }} className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-700 transition">
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
+        <ModalDetalleGuia guia={seleccionada} onClose={() => setSeleccionada(null)} onActualizada={cargar} />
       )}
     </div>
   );

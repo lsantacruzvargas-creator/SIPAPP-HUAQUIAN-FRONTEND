@@ -213,17 +213,17 @@ export function placaValida(placa) {
   return /^[A-Z0-9]{5,8}$/.test(normalizarPlaca(placa));
 }
 
-// Cuenta de detracciones del Banco de la Nación: 4 dígitos de agencia + 10
-// dígitos de cuenta (confirmado contra el XML de referencia real de
-// Greenter, docs/xml/Factura-Detraccion.xml — "0004-3342343243"). Se
-// normaliza a solo dígitos y se reinserta el guion en la posición 4 para
-// que el usuario pueda escribir con o sin guion.
+// Cuenta de detracciones del Banco de la Nación: 11 dígitos sin separador
+// (confirmado contra una factura real emitida por SUNAT — recuadro
+// "Información de la detracción" mostrando "00013180369" — y contra el
+// estándar de cuentas del BN, que siempre son de 11 dígitos. Corrige un
+// supuesto previo de "4 + 10 dígitos con guion" tomado de un fixture de
+// Greenter que no representaba el formato real).
 export function normalizarCuentaDetraccion(cuenta) {
-  const soloDigitos = (cuenta || "").replace(/\D/g, "").slice(0, 14);
-  return soloDigitos.length > 4 ? `${soloDigitos.slice(0, 4)}-${soloDigitos.slice(4)}` : soloDigitos;
+  return (cuenta || "").replace(/\D/g, "").slice(0, 11);
 }
 export function cuentaDetraccionValida(cuenta) {
-  return /^\d{4}-\d{10}$/.test(normalizarCuentaDetraccion(cuenta));
+  return /^\d{11}$/.test(normalizarCuentaDetraccion(cuenta));
 }
 
 export const TIPO_MONEDA = [

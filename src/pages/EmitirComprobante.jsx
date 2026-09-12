@@ -62,7 +62,6 @@ export default function EmitirComprobante() {
   const [detraccionAplica, setDetraccionAplica] = useState(false);
   const [detraccionCodigoBien, setDetraccionCodigoBien] = useState("");
   const [detraccionPorcentaje, setDetraccionPorcentaje] = useState("");
-  const [detraccionMontoNeto, setDetraccionMontoNeto] = useState("");
   const [detraccionCuentaBancaria, setDetraccionCuentaBancaria] = useState("");
   const [numeroOrdenCompra, setNumeroOrdenCompra] = useState("");
   const [ordenCompraId, setOrdenCompraId] = useState("");
@@ -256,6 +255,15 @@ export default function EmitirComprobante() {
   const totalGeneral = totales.total + otrosCargosNum + montoRedondeoNum;
   const sumaCuotas = cuotas.reduce((s, c) => s + (Number(c.monto) || 0), 0);
 
+  // Monto neto a depositar = detraccionPorcentaje% del total a pagar — ya no es un input libre,
+  // se deriva siempre del total y el porcentaje vigente (evita que quede desincronizado si el
+  // usuario cambia ítems/porcentaje después de haberlo tipeado a mano). El depósito en el Banco
+  // de la Nación va en soles enteros, no en céntimos — mismo redondeo (Math.round, .5 sube al
+  // entero superior) que ya usa DetalleOrdenCompra.jsx para la detracción de compra.
+  const detraccionMontoNeto = detraccionAplica
+    ? Math.round(totalGeneral * (Number(detraccionPorcentaje) || 0) / 100).toFixed(2)
+    : "";
+
   const ro = !!resultado?.ok;
 
   const ordenesCompraFiltradas = ordenesCompra.filter((o) => {
@@ -319,7 +327,7 @@ export default function EmitirComprobante() {
       if (!detraccionPorcentaje || Number(detraccionPorcentaje) <= 0) return "El porcentaje de detracción debe ser mayor a 0.";
       if (!detraccionMontoNeto || Number(detraccionMontoNeto) <= 0) return "El monto neto a depositar debe ser mayor a 0.";
       if (!detraccionCuentaBancaria.trim()) return "La cuenta del Banco de la Nación es requerida.";
-      if (!cuentaDetraccionValida(detraccionCuentaBancaria)) return "La cuenta del Banco de la Nación debe tener el formato 0000-0000000000 (4 + 10 dígitos).";
+      if (!cuentaDetraccionValida(detraccionCuentaBancaria)) return "La cuenta del Banco de la Nación debe tener 11 dígitos.";
     }
     if (esNota) {
       if (!referencia.id) return "Selecciona el comprobante a modificar.";
@@ -885,7 +893,18 @@ export default function EmitirComprobante() {
               <div className="mt-4 pt-4 border-t border-gray-100">
                 <label className="flex items-center gap-2 text-sm font-medium text-gray-500 mb-3">
                   <input type="checkbox" checked={detraccionAplica} disabled={ro}
-                    onChange={(e) => setDetraccionAplica(e.target.checked)} />
+                    onChange={(e) => {
+                      const marcado = e.target.checked;
+                      setDetraccionAplica(marcado);
+                      // 037 (Demás servicios gravados con IGV, 12%) es por lejos el más común en
+                      // este ERP — se precarga como default para no obligar a buscarlo cada vez,
+                      // el usuario puede cambiarlo si el caso es otro. El monto neto se deriva solo
+                      // (ver `detraccionMontoNeto` más arriba), no hace falta setearlo acá.
+                      if (marcado && !detraccionCodigoBien) {
+                        setDetraccionCodigoBien("037");
+                        setDetraccionPorcentaje("12");
+                      }
+                    }} />
                   Operación sujeta a detracción
                 </label>
                 {detraccionAplica && (
@@ -914,13 +933,12 @@ export default function EmitirComprobante() {
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">Monto neto a depositar<Oblig /></label>
-                      <input type="number" min="0" step="0.01" value={detraccionMontoNeto} placeholder="0.00"
-                        onChange={(e) => setDetraccionMontoNeto(e.target.value)} onWheel={(e) => e.target.blur()} disabled={ro} required
+                      <input type="number" value={detraccionMontoNeto} placeholder="0.00" disabled required
                         className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
                     </div>
                     <div className="col-span-4">
                       <label className="block text-xs font-medium text-gray-500 mb-1">Cuenta Banco de la Nación<Oblig /></label>
-                      <input value={detraccionCuentaBancaria} placeholder="0000-0000000000" maxLength={15}
+                      <input value={detraccionCuentaBancaria} placeholder="00000000000" maxLength={11}
                         onChange={(e) => setDetraccionCuentaBancaria(normalizarCuentaDetraccion(e.target.value))} disabled={ro} required
                         className={`w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500 ${detraccionCuentaBancaria && !cuentaDetraccionValida(detraccionCuentaBancaria) ? "border-red-300" : ""}`} />
                     </div>

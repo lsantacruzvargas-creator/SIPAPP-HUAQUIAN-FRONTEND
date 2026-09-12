@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import { formatearFecha } from "../utils/fecha";
 import { exportarCotizacionPdf } from "../utils/cotizacionPdf";
@@ -8,8 +9,10 @@ import {
   calcSubtotalGloria, calcularGloria, calcSubtotal, calcularAlicorp,
   itemDesdeDb, itemInvalido, RUC_GLORIA, esFormatoAlicorp,
 } from "../utils/cotizacionItems";
+import { estadoComprobanteClase } from "../utils/catalogosSunat";
 import ModalCrearOT from "./ModalCrearOT";
 import ModalOrdenCompra from "./ModalOrdenCompra";
+import ModalDetalleGuia from "./ModalDetalleGuia";
 import BuscadorOrdenTrabajo from "./BuscadorOrdenTrabajo";
 import SelectorEmpresas from "./SelectorEmpresas";
 import ConfirmacionAccion from "./ConfirmacionAccion";
@@ -22,6 +25,7 @@ import {
 } from "./detalleShared";
 
 const INP = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 w-full transition";
+const codigoDeGuia = (g) => `${g.serie}-${String(g.correlativo).padStart(4, "0")}`;
 
 // El descuento global es sobre la SUMA de subtotales (no por ítem, ver
 // items[].descuento) y se aplica antes del IGV — `subtotal` sigue siendo el
@@ -43,6 +47,7 @@ function calcular(sub, descuentoPct = 0) {
 }
 
 export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuardada, onNavegar }) {
+  const navigate = useNavigate();
   const [cot, setCot] = useState(inicial);
   const subtotalInicial = inicial.subtotal ?? 0;
   // `inicial.empresa.ruc` ya viene poblado (ver GET/PUT /cotizaciones,
@@ -102,6 +107,8 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   );
   const [listaEmpresaAbierta, setListaEmpresaAbierta] = useState(false);
   const [ots, setOts] = useState([]);
+  const [gres, setGres] = useState([]);
+  const [guiaDetalle, setGuiaDetalle] = useState(null);
   const [informes, setInformes] = useState([]);
   const [oc, setOc] = useState(null);
   const [factura, setFactura] = useState(null);
@@ -135,6 +142,8 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   // diferencia de `puedeEditar`, sí se permite con la cotización ya
   // enviada/aprobada (mismo criterio que el backend, ver puedeGenerarOTDesdeItem).
   const puedeGenerarOT = ["admin", "asistente", "facturacion", "jefatura", "planner", "coordinadora"].includes(rolActual);
+  // Mismo set de roles que ve el card de GRE en DetalleOrdenTrabajo.jsx.
+  const puedeGenerarGRE = ["admin", "asistente", "facturacion", "almacenero", "jefatura", "planner", "coordinadora"].includes(rolActual);
   // Asistente solo puede enviar cotizaciones ya aprobadas — Admin conserva
   // la potestad de enviar sin esperar la aprobación (ver mismo criterio en
   // el backend, PATCH /cotizaciones/:id/enviar).
@@ -153,6 +162,14 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
     ]).then(([otsData, ocs, facts]) => {
       const otsFound = otsData.filter(o => (o.cotizacion?._id || o.cotizacion) === cot._id);
       setOts(otsFound);
+      if (puedeGenerarGRE && otsFound.length > 0) {
+        const ids = otsFound.map(o => o._id);
+        fetchAuth(`/guias?ordenesTrabajo=${ids.join(",")}&estado=ACEPTADO&limit=1000`)
+          .then(r => r.ok && r.json())
+          .then(data => setGres(data?.ok ? data.data : []));
+      } else {
+        setGres([]);
+      }
       const ocFound = ocs.find(o => (o.cotizacion?._id || o.cotizacion) === cot._id) || null;
       setOc(ocFound);
       // La factura de la cadena comparte numeroDocumento; si no, se resuelve por la OC.
@@ -244,6 +261,25 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
       setBuscadorOTOpen(false);
       cargarRelaciones();
     }
+  };
+
+  // Solo tiene sentido cuando hay una sola OT vinculada a la cotización — con
+  // más de una sería ambiguo a cuál atar la GRE desde este nivel (para ese
+  // caso, crearla desde el detalle de la OT puntual).
+  const crearGREDesdeCot = () => {
+    const unicaOT = ots.length === 1 ? ots[0] : null;
+    if (!unicaOT) return;
+    navigate("/facturacion-electronica/guias/emitir", {
+      state: {
+        prellenarGRE: {
+          items: [{ descripcion: unicaOT.titulo, cantidad: 1, unidad: "NIU" }],
+          destinatario: unicaOT.empresa
+            ? { schemeID: "6", numDoc: unicaOT.empresa.ruc || "", nombre: unicaOT.empresa.razonSocial || "" }
+            : undefined,
+          ordenesTrabajo: [unicaOT._id],
+        },
+      },
+    });
   };
 
   const toggleSeleccion = (idx) => setSeleccionados(prev => {
@@ -1149,6 +1185,36 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
               </div>
             )}
 
+            {puedeGenerarGRE && ots.length > 0 && (gres.length === 0 ? (
+              <TarjetaRelacion tipo="gre" vacio
+                onCrear={!cot.anulado && ots.length === 1 ? crearGREDesdeCot : undefined} crearLabel="GRE" />
+            ) : (
+              <TarjetaRelacion tipo="gre"
+                codigo={gres.length === 1 ? codigoDeGuia(gres[0]) : `${gres.length} guías`}
+                onClick={gres.length === 1 ? () => setGuiaDetalle(gres[0]) : undefined}>
+                {gres.length === 1 ? (
+                  <Chip className={estadoComprobanteClase(gres[0].estado)}>{gres[0].estado}</Chip>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {gres.map(g => (
+                      <button key={g._id} type="button"
+                        onClick={(e) => { e.stopPropagation(); setGuiaDetalle(g); }}
+                        className="font-mono text-xs text-purple-700 bg-white rounded-lg px-2 py-0.5 shadow-sm hover:underline">
+                        {codigoDeGuia(g)}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {!cot.anulado && ots.length === 1 && (
+                  <button type="button"
+                    onClick={(e) => { e.stopPropagation(); crearGREDesdeCot(); }}
+                    className="text-xs text-blue-600 hover:text-blue-800 underline mt-0.5">
+                    + Crear otra GRE
+                  </button>
+                )}
+              </TarjetaRelacion>
+            ))}
+
             <TarjetaRelacion
               tipo="informe"
               codigo={informes.length ? `${informes.length} avance${informes.length !== 1 ? "s" : ""}` : null}
@@ -1164,7 +1230,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
               <TarjetaRelacion tipo="oc" codigo={oc?.codigo} numero={oc?.numeroOrden} vacio={!oc}
                 onClick={oc ? () => onNavegar?.({ tipo: "oc", data: oc, extra: factura }) : undefined}
                 onCrear={!oc && !cot.anulado && cot.aprobado && cot.enviado ? () => setCrearOCOpen(true) : undefined} crearLabel="OC">
-                {puedeVerPrecios && oc?.monto > 0 && <p className="text-xs text-gray-500">{money(oc.monto)}</p>}
+                {puedeVerPrecios && oc?.monto > 0 && <p className="text-xs text-gray-500">{money(oc.monto, cot.moneda)}</p>}
               </TarjetaRelacion>
             )}
 
@@ -1172,7 +1238,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
               <TarjetaRelacion tipo="factura" codigo={factura?.codigo} numero={factura?.numeroFactura} vacio={!factura}
                 onClick={factura ? () => onNavegar?.({ tipo: "factura", data: factura }) : undefined}>
                 {puedeVerPrecios && (factura?.totalAPagar || factura?.total) > 0 && (
-                  <p className="text-xs text-gray-500">{money(factura.totalAPagar ?? factura.total)}</p>
+                  <p className="text-xs text-gray-500">{money(factura.totalAPagar ?? factura.total, cot.moneda)}</p>
                 )}
                 {factura?.estadoPago && <Chip className={badgePago(factura.estadoPago)}>{factura.estadoPago}</Chip>}
               </TarjetaRelacion>
@@ -1327,6 +1393,10 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
           onClose={() => setCrearOCOpen(false)}
           onCreada={() => { setCrearOCOpen(false); cargarRelaciones(); }}
         />
+      )}
+
+      {guiaDetalle && (
+        <ModalDetalleGuia guia={guiaDetalle} onClose={() => setGuiaDetalle(null)} />
       )}
     </div>
   );
