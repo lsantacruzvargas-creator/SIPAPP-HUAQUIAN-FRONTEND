@@ -35,6 +35,18 @@ export const HUAQUIAN = {
   correo: "ventas@huaquian.com",
 };
 
+// Nombre del PDF descargado, compartido por los 3 formatos (estándar/Gloria/
+// "Alicorp") — pedido explícito del usuario, 2026-09-12: "N° cotización -
+// año actual - título de cotización". El título es texto libre (puede traer
+// "/", ":", etc.) — se sanea a los caracteres inválidos en nombres de
+// archivo de Windows antes de armar el `.pdf`.
+export function nombreArchivoCotizacionPdf(cotizacion) {
+  const numero = cotizacion.numeroCotizacion || cotizacion.codigo || "—";
+  const anioActual = new Date().getFullYear();
+  const titulo = cotizacion.titulo || "";
+  return `${numero} - ${anioActual} - ${titulo}`.replace(/[\\/:*?"<>|]/g, "-").trim() + ".pdf";
+}
+
 const BANCOS = {
   bcpCuentaSoles: "191-2364174-0-44",
   bcpCciSoles: "002-19100236417404456",
@@ -151,7 +163,11 @@ export const exportarCotizacionPdf = async (cotizacion) => {
     ["N° CELULAR:", cotizacion.numeroCelular],
   ];
   const filaDerH = 5.6;
-  const cajaDerH = filasDer.length * filaDerH;
+  // +4 para igualar el margen superior (la caja arranca en `y - 4`, 4mm
+  // antes de la primera fila) — sin este ajuste la caja quedaba 4mm más
+  // baja que el texto, y la última fila (N° Celular) se salía del borde
+  // inferior. Reportado por el usuario, 2026-09-12.
+  const cajaDerH = filasDer.length * filaDerH + 4;
   doc.setDrawColor(0);
   doc.rect(colDerX, y - 4, colDerW, cajaDerH);
   let yDer = y;
@@ -383,5 +399,5 @@ export const exportarCotizacionPdf = async (cotizacion) => {
 
   }
 
-  doc.save(`Cotización N° ${cotizacion.numeroCotizacion || cotizacion.codigo}.pdf`);
+  doc.save(nombreArchivoCotizacionPdf(cotizacion));
 };

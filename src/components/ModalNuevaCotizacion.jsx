@@ -30,20 +30,22 @@ function calcular(sub, descuentoPct = 0) {
 const FORM_VACIO = {
   empresa: "", tipo: "venta", numeroCotizacion: "", atencion: "",
   fecha: new Date().toISOString().split("T")[0], fechaRecibida: "",
-  // Estos 3 van con su valor por defecto YA cargado en el estado (no solo
+  // Estos van con su valor por defecto YA cargado en el estado (no solo
   // mostrado en el input) — antes el input mostraba "2 días hábiles"/etc.
   // como mero placeholder visual (`value={form.x || "default"}`) pero el
   // estado real quedaba en "" si el técnico no lo tocaba, así que se
   // guardaba vacío y el PDF (sin ese mismo fallback) imprimía "—" aunque en
-  // pantalla se viera lleno. Reportado por el usuario, 2026-09-04.
+  // pantalla se viera lleno. Reportado por el usuario, 2026-09-04 y
+  // 2026-09-12 (validezOferta/asesorComercial/numeroCelular/area quedaron
+  // fuera de la primera ronda).
   titulo: "", encargado: "", planta: "", personaContacto: "", condicionPago: "Factura 30 días",
-  plazoEntrega: "2 días hábiles", lugarEntrega: "", validezOferta: "",
+  plazoEntrega: "2 días hábiles", lugarEntrega: "", validezOferta: "15 días",
   numeroGuiaEmision: "", numeroGuiaRemision: "", codigoSap: "", fechaSalida: "",
-  asesorComercial: "", numeroCelular: "", numeroSolicitudPedido: "",
+  asesorComercial: "Jose Mateo", numeroCelular: "+51 966 757 528", numeroSolicitudPedido: "",
   numeroPeticionOferta: "", tiempoGarantia: "6 meses",
-  area: "", omAviso: "", numeroGuia: "", jefeSupervisorSolicitante: "", compradorResponsable: "",
+  area: "INGENIERIA DE MANTENIMIENTO", omAviso: "", numeroGuia: "", jefeSupervisorSolicitante: "", compradorResponsable: "",
   textoBreveServicio: "",
-  subtotal: "", descuentoPorcentaje: "", gastosGeneralesPorcentaje: "2", utilidadPorcentaje: "10", moneda: "PEN",
+  subtotal: "", descuentoPorcentaje: "", gastosGeneralesPorcentaje: "5", utilidadPorcentaje: "10", moneda: "PEN",
 };
 
 const PASOS_VACIOS = [
@@ -104,11 +106,11 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
   // montar), se ajustan reactivamente al detectar el formato, pero solo si
   // el usuario no los tocó a mano (siguen en alguno de los 2 sets de default).
   useEffect(() => {
-    const gastosEsDefault = ["2", "10", ""].includes(form.gastosGeneralesPorcentaje);
+    const gastosEsDefault = ["5", "10", ""].includes(form.gastosGeneralesPorcentaje);
     const utilidadEsDefault = ["5", "10", ""].includes(form.utilidadPorcentaje);
     if (!gastosEsDefault || !utilidadEsDefault) return;
-    if (esAlicorp) setForm(f => ({ ...f, gastosGeneralesPorcentaje: "10", utilidadPorcentaje: "5" }));
-    else if (esGloria) setForm(f => ({ ...f, gastosGeneralesPorcentaje: "2", utilidadPorcentaje: "10" }));
+    if (esAlicorp) setForm(f => ({ ...f, gastosGeneralesPorcentaje: "5", utilidadPorcentaje: "10" }));
+    else if (esGloria) setForm(f => ({ ...f, gastosGeneralesPorcentaje: "5", utilidadPorcentaje: "10" }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [esAlicorp, esGloria]);
 
@@ -303,18 +305,18 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 block mb-1">Validez de la oferta</label>
-                  <input name="validezOferta" value={form.validezOferta || "15 días"} onChange={handleChange} placeholder="Ej. 15 días" className={INP} />
+                  <input name="validezOferta" value={form.validezOferta} onChange={handleChange} placeholder="Ej. 15 días" className={INP} />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs text-gray-500 block mb-1">Asesor comercial</label>
-                  <input name="asesorComercial" value={form.asesorComercial || "Jose Mateo"} onChange={handleChange} placeholder="Nombre del asesor" className={INP} />
+                  <input name="asesorComercial" value={form.asesorComercial} onChange={handleChange} placeholder="Nombre del asesor" className={INP} />
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 block mb-1">N° Celular</label>
-                  <input name="numeroCelular" value={form.numeroCelular || "+51 966 757 528"} onChange={handleChange} placeholder="—" className={INP} />
+                  <input name="numeroCelular" value={form.numeroCelular} onChange={handleChange} placeholder="—" className={INP} />
                 </div>
               </div>
             </div>
@@ -392,7 +394,7 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs text-gray-500 block mb-1">Área</label>
-                  <input name="area" value={form.area || " INGENIERIA DE MANTENIMIENTO"} onChange={handleChange} placeholder="—" className={INP} />
+                  <input name="area" value={form.area} onChange={handleChange} placeholder="—" className={INP} />
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 block mb-1">OM / Aviso</label>

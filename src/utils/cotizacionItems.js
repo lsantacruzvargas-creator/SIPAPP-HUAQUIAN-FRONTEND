@@ -106,7 +106,7 @@ export const calcSubtotalGloria = (item) =>
 // de Gloria: SUB-TOTAL + GASTOS GENERALES + UTILIDAD, y recién sobre esa base
 // se calcula el IGV. `total` acá es "VALOR TOTAL DE LA OFERTA" — se guarda en
 // el mismo campo `cotizacion.total` que usa el resto de la app.
-export function calcularGloria(subtotalItems, gastosPct = 2, utilidadPct = 10) {
+export function calcularGloria(subtotalItems, gastosPct = 5, utilidadPct = 10) {
   const subtotal = Math.round(Number(subtotalItems) * 100) / 100 || 0;
   const gastosGenerales = Math.round(subtotal * (Number(gastosPct) || 0) / 100 * 100) / 100;
   const utilidad = Math.round(subtotal * (Number(utilidadPct) || 0) / 100 * 100) / 100;
@@ -159,7 +159,7 @@ export const itemVacioAlicorp = (grupo) => ({
 // el valor con IGV — pero `total` acá sigue siendo el monto CON IGV para que
 // el resto de la cadena (OC/Factura) reciba el monto real a cobrar, igual
 // que el resto de la app. `totalSinIgv` es el que efectivamente se imprime.
-export function calcularAlicorp(subtotalItems, gastosAdminPct = 10, utilidadPct = 5) {
+export function calcularAlicorp(subtotalItems, gastosAdminPct = 5, utilidadPct = 10) {
   const subtotal = Math.round(Number(subtotalItems) * 100) / 100 || 0;
   const gastosAdmin = Math.round(subtotal * (Number(gastosAdminPct) || 0) / 100 * 100) / 100;
   const utilidad = Math.round(subtotal * (Number(utilidadPct) || 0) / 100 * 100) / 100;

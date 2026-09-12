@@ -1,6 +1,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { HUAQUIAN } from "./cotizacionPdf";
+import { HUAQUIAN, nombreArchivoCotizacionPdf } from "./cotizacionPdf";
 import { formatearFecha } from "./fecha";
 import { GRUPOS_GLORIA, calcSubtotalGloria, calcularGloria, descripcionConSubItems } from "./cotizacionItems";
 
@@ -408,5 +408,5 @@ export const exportarCotizacionGloriaPdf = async (cotizacion) => {
   //   doc.addImage(marcasFooter, "PNG", (PAGE_W - w) / 2, y, w, h);
   // }
 
-  doc.save(`Cotización Gloria N° ${cotizacion.numeroCotizacion || cotizacion.codigo}.pdf`);
+  doc.save(nombreArchivoCotizacionPdf(cotizacion));
 };

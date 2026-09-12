@@ -1,6 +1,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { HUAQUIAN } from "./cotizacionPdf";
+import { HUAQUIAN, nombreArchivoCotizacionPdf } from "./cotizacionPdf";
 import { GRUPOS_ALICORP, calcSubtotal, calcularAlicorp, descripcionConSubItems } from "./cotizacionItems";
 
 // Cargar así (no `import logo from "./logo.png"`) para que un archivo
@@ -293,5 +293,5 @@ export const exportarCotizacionAlicorpPdf = async (cotizacion) => {
   clausula("Tiempo de pago      :   ", cotizacion.condicionPago);
   clausula("Garantia                    :  ", cotizacion.tiempoGarantia);
 
-  doc.save(`Cotización ${cotizacion.empresa?.razonSocial || ""} N° ${codigoCotizacion}.pdf`.replace(/\s+/g, " "));
+  doc.save(nombreArchivoCotizacionPdf(cotizacion));
 };

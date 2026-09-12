@@ -50,27 +50,29 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   const navigate = useNavigate();
   const [cot, setCot] = useState(inicial);
   const subtotalInicial = inicial.subtotal ?? 0;
-  // `inicial.empresa.ruc` ya viene poblado (ver GET/PUT /cotizaciones,
-  // populate("empresa", "razonSocial alias ruc")) — se puede resolver acá
-  // mismo, antes de que `empresas` (la lista completa) termine de cargar.
-  const esAlicorpInicial = esFormatoAlicorp(inicial.empresa?.ruc);
   const [form, setForm] = useState({
     subtotal: subtotalInicial > 0 ? String(subtotalInicial) : "",
     descuentoPorcentaje: inicial.descuentoPorcentaje ? String(inicial.descuentoPorcentaje) : "",
-    gastosGeneralesPorcentaje: inicial.gastosGeneralesPorcentaje != null ? String(inicial.gastosGeneralesPorcentaje) : (esAlicorpInicial ? "10" : "2"),
-    utilidadPorcentaje: inicial.utilidadPorcentaje != null ? String(inicial.utilidadPorcentaje) : (esAlicorpInicial ? "5" : "10"),
+    // Gastos administrativos 5% / Utilidad 10% es el default único para
+    // Gloria y "Alicorp" (Alicorp/Intradevco/Masterbread) por igual — antes
+    // Alicorp usaba 10%/5%, unificado a pedido explícito del usuario,
+    // 2026-09-12.
+    gastosGeneralesPorcentaje: inicial.gastosGeneralesPorcentaje != null ? String(inicial.gastosGeneralesPorcentaje) : "5",
+    utilidadPorcentaje: inicial.utilidadPorcentaje != null ? String(inicial.utilidadPorcentaje) : "10",
     textoBreveServicio: inicial.textoBreveServicio || "",
     empresa: inicial.empresa?._id || "",
     tipo: inicial.tipo || "venta",
     moneda: inicial.moneda || "PEN",
-    // Mismo fix que ModalNuevaCotizacion.jsx: estos 3 valores por defecto
+    // Mismo fix que ModalNuevaCotizacion.jsx: estos valores por defecto
     // van directo al estado, no solo mostrados con `|| "default"` en el
     // input — si no, quedaban vacíos al guardar aunque en pantalla se
     // vieran llenos, y el PDF (sin ese fallback) imprimía "—".
+    // "Validez de la oferta"/"Asesor comercial"/"N° celular" (más abajo)
+    // tenían el mismo bug, no se corrigieron en la primera ronda.
     condicionPago: inicial.condicionPago || "Factura 30 días",
     plazoEntrega: inicial.plazoEntrega || "2 días hábiles",
     lugarEntrega: inicial.lugarEntrega || "",
-    validezOferta: inicial.validezOferta || "",
+    validezOferta: inicial.validezOferta || "15 días",
     fecha: inicial.fecha ? new Date(inicial.fecha).toISOString().split("T")[0] : "",
     fechaRecibida: inicial.fechaRecibida ? new Date(inicial.fechaRecibida).toISOString().split("T")[0] : "",
     titulo: inicial.titulo || "",
@@ -83,8 +85,8 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
     numeroGuiaRemision: inicial.numeroGuiaRemision || "",
     codigoSap: inicial.codigoSap || "",
     fechaSalida: inicial.fechaSalida ? new Date(inicial.fechaSalida).toISOString().split("T")[0] : "",
-    asesorComercial: inicial.asesorComercial || "",
-    numeroCelular: inicial.numeroCelular || "",
+    asesorComercial: inicial.asesorComercial || "Jose Mateo",
+    numeroCelular: inicial.numeroCelular || "+51 966 757 528",
     numeroSolicitudPedido: inicial.numeroSolicitudPedido || "",
     numeroPeticionOferta: inicial.numeroPeticionOferta || "",
     tiempoGarantia: inicial.tiempoGarantia || "6 meses",
@@ -770,7 +772,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
                   </div>
                   <div>
                     <label className="text-xs text-gray-500 block mb-1">Validez de la oferta</label>
-                    <input name="validezOferta" value={form.validezOferta || "15 días"} onChange={handleChange}
+                    <input name="validezOferta" value={form.validezOferta} onChange={handleChange}
                       placeholder="Ej. 15 días" className={INP} />
                   </div>
                 </div>
@@ -778,12 +780,12 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs text-gray-500 block mb-1">Asesor comercial</label>
-                    <input name="asesorComercial" value={form.asesorComercial || "Jose Mateo"} onChange={handleChange}
+                    <input name="asesorComercial" value={form.asesorComercial} onChange={handleChange}
                       placeholder="Nombre del asesor" className={INP} />
                   </div>
                   <div>
                     <label className="text-xs text-gray-500 block mb-1">N° Celular</label>
-                    <input name="numeroCelular" value={form.numeroCelular || "+51 966 757 528"} onChange={handleChange}
+                    <input name="numeroCelular" value={form.numeroCelular} onChange={handleChange}
                       placeholder="—" className={INP} />
                   </div>
                 </div>
