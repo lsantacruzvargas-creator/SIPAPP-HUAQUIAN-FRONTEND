@@ -1228,13 +1228,11 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
               )}
             </TarjetaRelacion>
 
-            {rolActual !== "coordinadora" && (
-              <TarjetaRelacion tipo="oc" codigo={oc?.codigo} numero={oc?.numeroOrden} vacio={!oc}
-                onClick={oc ? () => onNavegar?.({ tipo: "oc", data: oc, extra: factura }) : undefined}
-                onCrear={!oc && !cot.anulado && cot.aprobado && cot.enviado ? () => setCrearOCOpen(true) : undefined} crearLabel="OC">
-                {puedeVerPrecios && oc?.monto > 0 && <p className="text-xs text-gray-500">{money(oc.monto, cot.moneda)}</p>}
-              </TarjetaRelacion>
-            )}
+            <TarjetaRelacion tipo="oc" codigo={oc?.codigo} numero={oc?.numeroOrden} vacio={!oc}
+              onClick={oc ? () => onNavegar?.({ tipo: "oc", data: oc, extra: factura }) : undefined}
+              onCrear={!oc && !cot.anulado && cot.aprobado && cot.enviado ? () => setCrearOCOpen(true) : undefined} crearLabel="OC">
+              {puedeVerPrecios && oc?.monto > 0 && <p className="text-xs text-gray-500">{money(oc.monto, cot.moneda)}</p>}
+            </TarjetaRelacion>
 
             {rolActual !== "coordinadora" && (
               <TarjetaRelacion tipo="factura" codigo={factura?.codigo} numero={factura?.numeroFactura} vacio={!factura}

@@ -463,7 +463,15 @@ export default function EmitirComprobante() {
       setError(`El comprobante ${dataCpe.serie} se emitió correctamente, pero no se pudo crear el registro interno de Factura. Verifica manualmente.`);
       return;
     }
-    setFacturaInterna(await resF.json());
+    const factura = await resF.json();
+    setFacturaInterna(factura);
+    // Enlaza el Comprobante ya emitido con esta Factura recién creada — la Factura no podía
+    // existir antes (necesita el número ya emitido en SUNAT), así que el vínculo se completa acá,
+    // no en el POST /cpe/factura de arriba (ver vincularFactura en comprobante.controller.js).
+    await fetchAuth(`/cpe/${dataCpe.id}/vincular-factura`, {
+      method: "PATCH",
+      body: JSON.stringify({ facturaInterna: factura._id }),
+    });
   };
 
   const nuevo = () => {

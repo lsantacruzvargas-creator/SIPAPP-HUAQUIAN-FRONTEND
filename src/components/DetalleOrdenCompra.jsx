@@ -457,8 +457,8 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
                 <div>
                   <label className="text-xs text-gray-500 block mb-1">Subtotal sin IGV</label>
                   <input type="number" name="subtotal" value={form.subtotal} onChange={handleChange}
-                    disabled={!puedeVerPrecios}
-                    step="0.01" min="0" placeholder="0.00" className={`${INP} text-lg font-semibold`} />
+                    disabled
+                    step="0.01" min="0" placeholder="0.00" className={`${INP} text-lg font-semibold disabled:bg-gray-50 disabled:text-gray-500`} />
                 </div>
                 <div className="grid grid-cols-3 gap-3 text-sm">
                   <div className="text-center">
