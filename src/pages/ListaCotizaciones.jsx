@@ -98,14 +98,14 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
               <th className={`${TH} text-left`}>Planta</th>
               <th className={`${TH} text-left`}>Contacto</th>
               <th className={`${TH} text-left`}>Título cotización</th>
-              {puedeVerPrecios && <th className={`${TH} text-right`}>Total sin IGV (S/)</th>}
-              {puedeVerPrecios && <th className={`${TH} text-right`}>Total sin IGV (US$)</th>}
               <th className={`${TH} text-center`}>Aprobado</th>
               <th className={`${TH} text-center`}>Enviado</th>
-              {mostrarTituloOT && <th className={`${TH} text-left`}>Título orden de trabajo</th>}
               {mostrarEstadoServicio && <th className={`${TH} text-center`}>Estado de servicio</th>}
               {mostrarEstadoServicio && <th className={`${TH} text-center`}>Fecha de salida</th>}
+              {puedeVerPrecios && <th className={`${TH} text-right`}>Total sin IGV (S/)</th>}
+              {puedeVerPrecios && <th className={`${TH} text-right`}>Total sin IGV (US$)</th>}
               <th className={`${TH} text-center`}>Informe enviado</th>
+              {mostrarTituloOT && <th className={`${TH} text-left`}>Título orden de trabajo</th>}
               {mostrarDiasInforme && <th className={`${TH} text-center`}>Días desde informe enviado</th>}
             </tr>
           </thead>
@@ -155,16 +155,6 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
                     {c.personaContacto || c.contactoNombre || <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-4 py-3.5 text-gray-700">{c.titulo}</td>
-                  {puedeVerPrecios && (
-                    <td className="px-4 py-3.5 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap">
-                      {pen != null ? pen.toLocaleString("es-PE", { minimumFractionDigits: 2 }) : "—"}
-                    </td>
-                  )}
-                  {puedeVerPrecios && (
-                    <td className="px-4 py-3.5 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap">
-                      {usd != null ? usd.toLocaleString("es-PE", { minimumFractionDigits: 2 }) : "—"}
-                    </td>
-                  )}
                   <td className="px-4 py-3.5 text-center">
                     {c._esOT ? <span className="text-gray-300">—</span> : (
                       <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full uppercase tracking-wide whitespace-nowrap ${c.aprobado ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
@@ -179,11 +169,6 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
                       </span>
                     )}
                   </td>
-                  {mostrarTituloOT && (
-                    <td className="px-4 py-3.5 text-gray-700">
-                      {titulosOT(otsDeCot) || <span className="text-gray-300">—</span>}
-                    </td>
-                  )}
                   {mostrarEstadoServicio && (
                     <td className="px-4 py-3.5 text-center">
                       {otPrincipal
@@ -196,6 +181,16 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
                       {otPrincipal?.fechaSalida ? formatearFecha(otPrincipal.fechaSalida) : <span className="text-gray-300">—</span>}
                     </td>
                   )}
+                  {puedeVerPrecios && (
+                    <td className="px-4 py-3.5 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap">
+                      {pen != null ? pen.toLocaleString("es-PE", { minimumFractionDigits: 2 }) : "—"}
+                    </td>
+                  )}
+                  {puedeVerPrecios && (
+                    <td className="px-4 py-3.5 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap">
+                      {usd != null ? usd.toLocaleString("es-PE", { minimumFractionDigits: 2 }) : "—"}
+                    </td>
+                  )}
                   <td className="px-4 py-3.5 text-center">
                     {c._esOT ? <span className="text-gray-300">—</span> : (
                       <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full uppercase tracking-wide whitespace-nowrap ${c.informeEnviado ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
@@ -203,6 +198,11 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
                       </span>
                     )}
                   </td>
+                  {mostrarTituloOT && (
+                    <td className="px-4 py-3.5 text-gray-700">
+                      {titulosOT(otsDeCot) || <span className="text-gray-300">—</span>}
+                    </td>
+                  )}
                   {mostrarDiasInforme && (
                     <td className="px-4 py-3.5 text-center text-gray-600 tabular-nums">
                       {(() => {
