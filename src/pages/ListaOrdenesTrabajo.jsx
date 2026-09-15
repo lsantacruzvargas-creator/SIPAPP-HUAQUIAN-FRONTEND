@@ -665,14 +665,20 @@ export default function ListaOrdenesTrabajo() {
         <>
           {/* Vista global: todas las OTs juntas (sin separar por asignación
               ni track), respondiendo al mismo filtro de Estado de arriba —
-              "Todo estado" muestra la unión exacta de las 5 tablas de abajo. */}
-          <TablaOTs
-            titulo="Todas las Órdenes de Trabajo"
-            acento="bg-indigo-500"
-            ordenes={todasOTs}
-            onSelect={setSeleccionada}
-            vacioMsg={hayFiltro || filtroEstadoPlanner !== "todos" ? "Sin resultados para los filtros aplicados" : "Sin órdenes de trabajo"}
-          />
+              "Todo estado" muestra la unión exacta de las 5 tablas de abajo.
+              Solo se muestra con "Todo estado": si se elige una categoría
+              puntual, esta tabla (que ya no filtra nada) quedaba mostrando
+              siempre TODAS las OTs por encima de la tabla ya filtrada de
+              abajo — reportado por el usuario, 2026-09-15. */}
+          {filtroEstadoPlanner === "todos" && (
+            <TablaOTs
+              titulo="Todas las Órdenes de Trabajo"
+              acento="bg-indigo-500"
+              ordenes={todasOTs}
+              onSelect={setSeleccionada}
+              vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de trabajo"}
+            />
+          )}
 
           {mostrarPlanner("noAsignada") && (
             <TablaOTs

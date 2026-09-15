@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { formatearFecha } from "./fecha";
+import { numeroALetras } from "./numeroALetras";
 
 // Se cargan desde /public (no un import de módulo) para que, si el archivo
 // todavía no fue subido, solo falle la carga de esa imagen puntual en vez
@@ -17,8 +18,7 @@ function cargarImagen(url) {
 // Paleta y datos fijos de Huaquian, tomados de Plantilla-cotizacion.xlsx
 // (raíz del proyecto) — no varían por cotización, así que van hardcodeados
 // acá igual que ya hacía el header anterior con los datos de la empresa.
-const NAVY = [0, 0, 40];       // #000028 — barras de sección y banner
-const AZUL = [0, 74, 173];     // #004AAD — badge "COTIZACIÓN N°"
+const NAVY = [0, 0, 40];       // #000028 — barras de sección, banner y placa "COTIZACIÓN"
 const AZUL_CLARO = [173, 193, 229]; // #ADC1E5 — fila "VALOR DE LA OFERTA"
 const GRIS_CLARO = [232, 232, 232]; // #E8E8E8 — encabezados de tabla
 
@@ -52,11 +52,16 @@ const BANCOS = {
   bcpCciSoles: "002-19100236417404456",
   bcpCuentaDolares: "191-2559651-1-69",
   bcpCciDolares: "002-191002255965116958",
+  bbvaCuentaSoles: "0011-0189-01-00067659",
+  bbvaCciSoles: "011-189-0001-0006765981",
   bnCuentaDetraccion: "00-062-084456",
 };
 
 const GARANTIA_TEXTO = "En condiciones normales de uso";
 const POLIZA_TEXTO = "- Responsabilidad / Seguro complementario de trabajo de riesgo";
+// Texto fijo de NUEVO FORMATO DE COTIZACION.xlsx fila 64 — no viene de ningún
+// campo del formulario, igual que GARANTIA_TEXTO/POLIZA_TEXTO.
+const REPUESTOS_TEXTO = "* La presente cotización no incluye el suministro ni el reemplazo de repuestos. Cualquier componente que requiera sustitución será informado al cliente y su cambio se realizará únicamente previa aprobación y coordinación correspondiente.";
 
 export const exportarCotizacionPdf = async (cotizacion) => {
   const doc = new jsPDF();
@@ -66,12 +71,13 @@ export const exportarCotizacionPdf = async (cotizacion) => {
   const PAGE_H = doc.internal.pageSize.getHeight();
   const CONTENT_W = PAGE_W - M * 2;
 
-  const [icono, headerBanner, marcasFooter, bcpLogo, bnLogo] = await Promise.all([
+  // Los logos de bancos (bcp_logo.png/banco_nacion_logo.png) ya no se
+  // dibujan en METODO DE PAGO — NUEVO FORMATO DE COTIZACION.xlsx no los
+  // trae, solo el texto de las cuentas.
+  const [icono, headerBanner, marcasFooter] = await Promise.all([
     cargarImagen("/assets/logos/huaquian_icon.png"),
     cargarImagen("/assets/logos/huaquian_header.png"),
-    cargarImagen("/assets/logos/marcas_footer.png"),
-    cargarImagen("/assets/logos/bcp_logo.png"),
-    cargarImagen("/assets/logos/banco_nacion_logo.png"),
+    cargarImagen("/assets/logos/marcas_footer2.png"),
   ]);
 
   // ─── Marca de agua: ícono + marcas representadas, en TODAS las hojas ───
@@ -86,21 +92,32 @@ export const exportarCotizacionPdf = async (cotizacion) => {
       const wSize = 100;
       doc.addImage(icono, "PNG", 96 - (PAGE_W - wSize) / 2, (PAGE_H - wSize) / 2 - 35, wSize + 40, wSize + 40);
     }
-    if (marcasFooter) {
-      const w = CONTENT_W * 0.85;
-      const h = w * (marcasFooter.naturalHeight / marcasFooter.naturalWidth);
-      doc.addImage(marcasFooter, "PNG", (PAGE_W - w) / 2, (PAGE_H - h) / 2 + 110, w, h);
-    }
+    // marcasFooter YA NO se dibuja acá como marca de agua — es la MISMA
+    // imagen que el "Pie de página" (más abajo) dibuja sólida al final del
+    // contenido; en cotizaciones cortas ambos caían en la misma zona visible
+    // de la página y se veían superpuestos (una copia pálida detrás de la
+    // sólida). Reportado por el usuario, 2026-09-15.
     doc.restoreGraphicsState();
   };
   dibujarMarcaDeAgua();
 
-  // ─── Banner de encabezado (navy, ancho completo) ───
+  // ─── Membrete (izquierda) — logo Huaquian + partners autorizados +
+  // dirección/contacto + rubro, todo ya integrado en la imagen extraída de
+  // NUEVO FORMATO DE COTIZACION.xlsx (reemplaza el banner navy angosto
+  // anterior; ya no hace falta redibujar RAZÓN SOCIAL/RUC/DIRECCIÓN/
+  // REPRESENTANTE/TELÉFONO/CORREO como texto aparte, viene todo en la imagen).
+  // Se escala por ALTO fija (no por ancho completo): el aspect ratio real de
+  // esta imagen (1800×600) es mucho más "cuadrado" que el banner viejo
+  // (1600×123) — estirarla a los 186mm de CONTENT_W la haría ocupar 62mm de
+  // alto, más de lo que el propio Excel le da (columnas A:L, dejando M:O
+  // libres para la placa de COTIZACIÓN N°/RUC/fecha en la misma fila).
   let y = 6;
+  const membreteH = 42;
+  let membreteBottom;
   if (headerBanner) {
-    const h = CONTENT_W * (headerBanner.naturalHeight / headerBanner.naturalWidth);
-    doc.addImage(headerBanner, "PNG", M, y, CONTENT_W, h);
-    y += h + 6;
+    const w = membreteH * (headerBanner.naturalWidth / headerBanner.naturalHeight);
+    doc.addImage(headerBanner, "PNG", M, y, w, membreteH);
+    membreteBottom = y + membreteH;
   } else {
     doc.setFillColor(...NAVY);
     doc.rect(M, y, CONTENT_W, 14, "F");
@@ -108,31 +125,45 @@ export const exportarCotizacionPdf = async (cotizacion) => {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
     doc.text("HUAQUIAN", M + 4, y + 9);
-    y += 14 + 6;
+    membreteBottom = y + 14;
   }
 
-  // ─── Badge "COTIZACIÓN N°" (arriba a la derecha) ───
-  const badgeH = 8, badgeW1 = 40, badgeW2 = 28;
-  const badgeX = PAGE_W - M - badgeW1 - badgeW2;
-  doc.setFillColor(...AZUL);
-  doc.rect(badgeX, y, badgeW1, badgeH, "F");
+  // ─── Placa "COTIZACIÓN" (arriba a la derecha, misma fila que el
+  // membrete) — un solo marco: barra "COTIZACIÓN" arriba, número debajo
+  // centrado, RUC y fecha debajo de eso, todo dentro del mismo borde.
+  // Corregido 2026-09-15 a pedido del usuario: antes N°/RUC/fecha quedaban
+  // repartidos en dos bloques sueltos (uno al lado, otro debajo sin marco);
+  // debe verse exactamente como NUEVO FORMATO DE COTIZACION.xlsx.
+  y += 6;
+  const boxW = 48, barH = 7, boxX = PAGE_W - M - boxW;
+  const fechaStr = cotizacion.fecha ? formatearFecha(cotizacion.fecha) : "—";
+  const boxCenter = boxX + boxW / 2;
+
+  doc.setFillColor(...NAVY);
+  doc.rect(boxX, y, boxW, barH, "F");
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.text("COTIZACIÓN N°", badgeX + badgeW1 / 2, y + badgeH / 2 + 1.2, { align: "center" });
-  doc.setDrawColor(0);
-  doc.rect(badgeX + badgeW1, y, badgeW2, badgeH);
-  doc.setTextColor(...AZUL);
-  doc.setFontSize(11);
-  doc.text(String(cotizacion.numeroCotizacion || cotizacion.codigo || "—"), badgeX + badgeW1 + badgeW2 / 2, y + badgeH / 2 + 1.5, { align: "center" });
+  doc.setFontSize(14);
+  doc.text("COTIZACIÓN", boxCenter, y + barH / 2 + 1.3, { align: "center" });
   doc.setTextColor(0, 0, 0);
 
-  const yBadgeBottom = y + badgeH;
-  y += badgeH + 6;
+  let yBox = y + barH + 7;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(17);
+  doc.text(String(cotizacion.numeroCotizacion || cotizacion.codigo || "—"), boxCenter, yBox, { align: "center" });
+  yBox += 5.5;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  doc.text(HUAQUIAN.ruc, boxCenter, yBox, { align: "center" });
+  yBox += 4.5;
+  doc.text(fechaStr, boxCenter, yBox, { align: "center" });
+  yBox += 3;
 
-  // ─── Datos de Huaquian (izquierda) + caja de datos comerciales (derecha) ───
-  const colIzqW = 110, colDerX = M + colIzqW + 4, colDerW = CONTENT_W - colIzqW - 4;
-  let yIzq = y;
+  doc.setDrawColor(0);
+  doc.rect(boxX, y, boxW, yBox - y);
+
+  y = Math.max(membreteBottom, yBox) + 4;
+
   const labelValor = (x, yy, label, valor, maxW) => {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8.5);
@@ -147,46 +178,12 @@ export const exportarCotizacionPdf = async (cotizacion) => {
     doc.text(valor || "—", x + labelW, yy);
     return 1;
   };
-  yIzq += labelValor(M, yIzq, "RAZÓN SOCIAL: ", HUAQUIAN.razonSocial) * 4.2;
-  yIzq += labelValor(M, yIzq, "RUC: ", HUAQUIAN.ruc) * 4.2;
-  yIzq += labelValor(M, yIzq, "DIRECCIÓN: ", HUAQUIAN.direccion, colIzqW) * 4.2;
-  yIzq += labelValor(M, yIzq, "REPRESENTANTE DE LA EMPRESA: ", HUAQUIAN.representante, colIzqW) * 4.2;
-  yIzq += labelValor(M, yIzq, "TELÉFONO: ", HUAQUIAN.telefono) * 4.2;
-  yIzq += labelValor(M, yIzq, "CORREO: ", HUAQUIAN.correo) * 4.2;
 
-  const fechaStr = cotizacion.fecha ? formatearFecha(cotizacion.fecha) : "—";
-  const filasDer = [
-    ["FECHA:", fechaStr],
-    ["TIEMPO DE ENTREGA DEL SERVICIO:", cotizacion.plazoEntrega],
-    ["VALIDEZ DE LA OFERTA:", cotizacion.validezOferta],
-    ["ASESOR COMERCIAL:", cotizacion.asesorComercial],
-    ["N° CELULAR:", cotizacion.numeroCelular],
-  ];
-  const filaDerH = 5.6;
-  // +4 para igualar el margen superior (la caja arranca en `y - 4`, 4mm
-  // antes de la primera fila) — sin este ajuste la caja quedaba 4mm más
-  // baja que el texto, y la última fila (N° Celular) se salía del borde
-  // inferior. Reportado por el usuario, 2026-09-12.
-  const cajaDerH = filasDer.length * filaDerH + 4;
-  doc.setDrawColor(0);
-  doc.rect(colDerX, y - 4, colDerW, cajaDerH);
-  let yDer = y;
-  doc.setFontSize(7.5);
-  filasDer.forEach(([label, valor]) => {
-    doc.setFont("helvetica", "bold");
-    doc.text(label, colDerX + colDerW - 2, yDer, { align: "right" });
-    yDer += 3.2;
-    doc.setFont("helvetica", "normal");
-    doc.text(valor || "—", colDerX + colDerW - 2, yDer, { align: "right" });
-    yDer += filaDerH - 3.2;
-  });
-
-  y = Math.max(yIzq, yDer, yBadgeBottom + cajaDerH) + 4;
-
-  // ─── Barra de sección navy, ancho completo ───
-  const barraSeccion = (titulo, yy, h = 6) => {
+  // ─── Barra de sección navy — `w` angosta cuando comparte fila con la
+  // tarjeta del asesor comercial (ver METODO DE PAGO / CONDICIONES GENERALES).
+  const barraSeccion = (titulo, yy, h = 6, w = CONTENT_W) => {
     doc.setFillColor(...NAVY);
-    doc.rect(M, yy, CONTENT_W, h, "F");
+    doc.rect(M, yy, w, h, "F");
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
@@ -201,14 +198,18 @@ export const exportarCotizacionPdf = async (cotizacion) => {
   doc.setFontSize(8.5);
   let yClIzq = y, yClDer = y;
   yClIzq += labelValor(M, yClIzq, "RAZÓN SOCIAL: ", empresa?.razonSocial, clienteColW) * 4.2;
-  yClIzq += labelValor(M, yClIzq, "ÁREA: ", cotizacion.area, clienteColW) * 4.2;
+  // yClIzq += labelValor(M, yClIzq, "ÁREA: ", cotizacion.area, clienteColW) * 4.2;
   yClIzq += labelValor(M, yClIzq, "OM / AVISO: ", cotizacion.omAviso, clienteColW) * 4.2;
   yClIzq += labelValor(M, yClIzq, "N° DE GUIA: ", cotizacion.numeroGuia, clienteColW) * 4.2;
   const xClDer = M + clienteColW + 4;
   yClDer += labelValor(xClDer, yClDer, "JEFE / SUPERVISOR SOLICITANTE: ", cotizacion.jefeSupervisorSolicitante, clienteColW) * 4.2;
   yClDer += labelValor(xClDer, yClDer, "COMPRADOR RESPONSABLE: ", cotizacion.compradorResponsable, clienteColW) * 4.2;
-  yClDer += labelValor(xClDer, yClDer, "N° DE SOLICITUD DE PEDIDO: ", cotizacion.numeroSolicitudPedido, clienteColW) * 4.2;
-  yClDer += labelValor(xClDer, yClDer, "N° DE PETICIÓN DE OFERTA: ", cotizacion.numeroPeticionOferta, clienteColW) * 4.2;
+  // No es un input del form — sale del contacto de empresa ya seleccionado
+  // (ver correoContacto en DetalleCotizacion.jsx:datosParaPdf), igual que
+  // el teléfono que ya se ve junto al selector de contacto.
+  yClDer += labelValor(xClDer, yClDer, "CORREO: ", cotizacion.correoContacto, clienteColW) * 4.2;
+  // yClDer += labelValor(xClDer, yClDer, "N° DE SOLICITUD DE PEDIDO: ", cotizacion.numeroSolicitudPedido, clienteColW) * 4.2;
+  // yClDer += labelValor(xClDer, yClDer, "N° DE PETICIÓN DE OFERTA: ", cotizacion.numeroPeticionOferta, clienteColW) * 4.2;
   y = Math.max(yClIzq, yClDer) + 4;
 
   // ─── DETALLES DEL SERVICIO ───
@@ -296,9 +297,28 @@ export const exportarCotizacionPdf = async (cotizacion) => {
   });
   y = doc.lastAutoTable.finalY + 4;
 
+  // ─── "SON: <monto en letras>" — pedido explícito del usuario, 2026-09-15:
+  // se autocompleta desde el total/moneda, NO es un input del formulario
+  // (ver NUEVO FORMATO DE COTIZACION.xlsx fila 42, "SON: XXXXXXXXX").
+  if (y + 12 > PAGE_H - 15) { doc.addPage(); dibujarMarcaDeAgua(); y = 15; }
+  const totW = 80, totX = PAGE_W - M - totW;
+  const sonLabel = "SON: ";
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8.5);
+  const sonLabelW = doc.getTextWidth(sonLabel);
+  doc.text(sonLabel, M, y);
+  doc.setFont("helvetica", "normal");
+  const sonTexto = numeroALetras(Number(cotizacion.total) || 0, cotizacion.moneda === "USD" ? "USD" : "PEN");
+  // const sonAnchoDisponible = totX - 4 - (M + sonLabelW);
+    const sonAnchoDisponible = 150;
+
+  const sonLineas = doc.splitTextToSize(sonTexto, sonAnchoDisponible);
+  doc.text(sonLineas, M + sonLabelW, y);
+  y += sonLineas.length * 4.2 + 4;
+
   // ─── Totales (VALOR DE LA OFERTA / I.G.V. / VALOR TOTAL) ───
   if (y + 24 > PAGE_H - 15) { doc.addPage(); dibujarMarcaDeAgua(); y = 15; }
-  const totW = 80, totX = PAGE_W - M - totW, filaTotH = 7;
+  const filaTotH = 7;
   // El descuento global (sobre la suma de subtotales, antes del IGV) solo
   // se muestra si se aplicó — ver mismo cálculo en DetalleCotizacion.jsx.
   const descuentoPct = Number(cotizacion.descuentoPorcentaje) || 0;
@@ -306,11 +326,16 @@ export const exportarCotizacionPdf = async (cotizacion) => {
   // — no todos los que llaman a esta función lo mandan (ej. la cotización
   // recién guardada del backend solo trae `descuentoPorcentaje`).
   const descuentoMonto = (Number(cotizacion.subtotal) || 0) * (descuentoPct / 100);
+  // SUBTOTAL = VALOR DE LA OFERTA - DESCUENTO — fila nueva pedida por el
+  // usuario, 2026-09-15, solo de presentación (el IGV ya se calculaba sobre
+  // este mismo monto, ver totalesMostrados en DetalleCotizacion.jsx).
+  const subtotalNeto = (Number(cotizacion.subtotal) || 0) - descuentoMonto;
   const totales = [
     ["VALOR DE LA OFERTA", `${simboloDoc} ${Number(cotizacion.subtotal).toFixed(2)}`, AZUL_CLARO, false],
     ...(descuentoPct > 0 ? [
       [`DESCUENTO (${descuentoPct}%)`, `- ${simboloDoc} ${descuentoMonto.toFixed(2)}`, [255, 255, 255], false],
     ] : []),
+    ["SUBTOTAL", `${simboloDoc} ${subtotalNeto.toFixed(2)}`, [255, 255, 255], false],
     ["I.G.V. (18%)", `${simboloDoc} ${Number(cotizacion.igv).toFixed(2)}`, [255, 255, 255], false],
     ["VALOR TOTAL DE LA OFERTA", `${simboloDoc} ${Number(cotizacion.total).toFixed(2)}`, [255, 255, 255], true],
   ];
@@ -327,75 +352,143 @@ export const exportarCotizacionPdf = async (cotizacion) => {
   });
   y += 6;
 
-  // ─── TERMINOS Y CONDICIONES ───
-  if (y + 40 > PAGE_H - 15) { doc.addPage(); dibujarMarcaDeAgua(); y = 15; }
-  const yTerminosBarra = y;
-  y = barraSeccion("TERMINOS Y CONDICIONES", y);
-  const yTerminosInicio = y;
-  doc.setFontSize(8.5);
-  doc.setFont("helvetica", "bold");
-  doc.text("FORMAS DE PAGO: ", M + 2, y);
-  doc.setFont("helvetica", "normal");
-  doc.text(cotizacion.condicionPago || "—", M + 2 + doc.getTextWidth("FORMAS DE PAGO: "), y);
-  y += 4.5;
-  doc.text("* PRECIOS INCLUYEN IGV", M + 2, y); y += 4.5;
-  doc.setFont("helvetica", "bold");
-  doc.text("GARANTÍA: ", M + 2, y);
-  doc.setFont("helvetica", "normal");
-  doc.text(GARANTIA_TEXTO, M + 2 + doc.getTextWidth("GARANTÍA: "), y); y += 4.5;
-  doc.setFont("helvetica", "bold");
-  doc.text("TIEMPO DE GARANTIA: ", M + 2, y);
-  doc.setFont("helvetica", "normal");
-  doc.text(cotizacion.tiempoGarantia || "—", M + 2 + doc.getTextWidth("TIEMPO DE GARANTIA: "), y); y += 4.5;
-  doc.setFont("helvetica", "bold");
-  doc.text("POLIZAS DE GARANTÍA: ", M + 2, y); y += 4.5;
-  doc.setFont("helvetica", "normal");
-  doc.text(POLIZA_TEXTO, M + 2, y); y += 4;
-  doc.setDrawColor(0);
-  doc.rect(M, yTerminosBarra, CONTENT_W, (y - yTerminosInicio) + 6 + (yTerminosInicio - yTerminosBarra));
-  y += 6;
+  // ─── METODO DE PAGO + CONDICIONES GENERALES (columna izquierda) con la
+  // tarjeta del Asesor Comercial a la derecha, abarcando ambas secciones —
+  // layout de NUEVO FORMATO DE COTIZACION.xlsx (METODO DE PAGO fila 51,
+  // CONDICIONES GENERALES fila 58, tarjeta de asesor merge L56:O61).
+  if (y + 95 > PAGE_H - 15) { doc.addPage(); dibujarMarcaDeAgua(); y = 15; }
+  const yBloqueInicio = y;
+  const asesorW = 44, asesorX = PAGE_W - M - asesorW;
+  const colPagoW = CONTENT_W - asesorW - 4 - 33;
 
-  // ─── METODO DE PAGO ───
-  if (y + 34 > PAGE_H - 15) { doc.addPage(); dibujarMarcaDeAgua(); y = 15; }
+  // METODO DE PAGO — cuenta + CCI del mismo banco en UNA sola línea (como
+  // NUEVO FORMATO DE COTIZACION.xlsx filas 52-56: "CTA CTE BCP SOLES : ...
+  // CCI : ..."), con el mismo estilo (bold+normal, 8.5pt) que CONDICIONES
+  // GENERALES en vez del 8pt/dos líneas de antes. Pedido explícito del
+  // usuario, 2026-09-15.
   const yPagoBarra = y;
-  y = barraSeccion("METODO DE PAGO", y);
+  y = barraSeccion("METODO DE PAGO", y, 6, colPagoW);
   const yPagoInicio = y;
-  const logoAltoBanco = 6;
-  if (bcpLogo) {
-    const w = logoAltoBanco * (bcpLogo.naturalWidth / bcpLogo.naturalHeight);
-    doc.addImage(bcpLogo, "PNG", M + 2, y, w, logoAltoBanco);
-  }
-  y += logoAltoBanco + 3;
-  doc.setFontSize(8);
-  const lineaPago = (label, valor) => {
+  y += 1;
+  doc.setFontSize(7);
+  const lineaPago = (label, valor, ciCi) => {
     doc.setFont("helvetica", "bold");
     doc.text(label, M + 2, y);
     doc.setFont("helvetica", "normal");
-    doc.text(valor, M + 2 + doc.getTextWidth(label), y);
-    y += 4;
+    let x = M + 2 + doc.getTextWidth(label);
+    doc.text(valor, x, y);
+    if (ciCi) {
+      x += doc.getTextWidth(valor) + 6;
+      doc.setFont("helvetica", "bold");
+      doc.text("CCI : ", x, y);
+      doc.setFont("helvetica", "normal");
+      doc.text(ciCi, x + doc.getTextWidth("CCI : "), y);
+    }
+    y += 4.2;
   };
-  lineaPago("* N° DE CUENTA EN SOLES: ", BANCOS.bcpCuentaSoles);
-  lineaPago(" N° DE CCI EN SOLES: ", BANCOS.bcpCciSoles);
-  lineaPago("* N° DE CUENTA EN DOLARES: ", BANCOS.bcpCuentaDolares);
-  lineaPago(" N° DE CCI EN DOLARES: ", BANCOS.bcpCciDolares);
+  lineaPago("CTA CTE BCP SOLES : ", BANCOS.bcpCuentaSoles, BANCOS.bcpCciSoles);
+  lineaPago("CTA CTE BCP DOLARES :  ", BANCOS.bcpCuentaDolares, BANCOS.bcpCciDolares);
+  lineaPago("CTA CTE BBVA SOLES :  ", BANCOS.bbvaCuentaSoles, BANCOS.bbvaCciSoles);
   y += 1;
-  if (bnLogo) {
-    const w = logoAltoBanco * (bnLogo.naturalWidth / bnLogo.naturalHeight);
-    doc.addImage(bnLogo, "PNG", M + 2, y, w, logoAltoBanco);
-  }
-  y += logoAltoBanco + 3;
-  lineaPago("* N° DE CUENTA DETRACCIÓN: ", BANCOS.bnCuentaDetraccion);
+  lineaPago("CUENTA DETRACCION : ", BANCOS.bnCuentaDetraccion);
+  doc.setFont("helvetica", "bold");
+  doc.text("A nombre de : ", M + 2 + doc.getTextWidth("CUENTA DETRACCION : ") + doc.getTextWidth(BANCOS.bnCuentaDetraccion) + 6, y - 4.2);
+  doc.setFont("helvetica", "normal");
+  const xANombre = M + 2 + doc.getTextWidth("CUENTA DETRACCION :  ") + doc.getTextWidth(BANCOS.bnCuentaDetraccion) + 6 + doc.getTextWidth("A nombre de : ");
+  doc.text("HUAQUIAN S.A.C", xANombre + 2, y - 4.2);
   doc.setDrawColor(0);
-  doc.rect(M, yPagoBarra, CONTENT_W, (y - yPagoInicio) + 2 + (yPagoInicio - yPagoBarra));
-  y += 4;
+  doc.rect(M, yPagoBarra, colPagoW , (y - yPagoInicio)  + (yPagoInicio - yPagoBarra)-2);
+  y += 6;
+
+  // CONDICIONES GENERALES (antes "TERMINOS Y CONDICIONES") — renombrada y
+  // reorganizada en pares para calzar con el nuevo formato.
+  const yCondBarra = y;
+  y = barraSeccion("CONDICIONES GENERALES", y, 6, colPagoW);
+  const yCondInicio = y;
+  doc.setFontSize(8.5);
+  const mitadCond = (colPagoW - 4) / 2;
+  const xCondDer = M + mitadCond + 4;
+  const parLabelValor = (x, yy, label, valor, maxW) => {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7);
+    const w = doc.getTextWidth(label);
+    doc.text(label, x, yy);
+    doc.setFont("helvetica", "normal");
+    const lineas = doc.splitTextToSize(valor || "—", maxW - w);
+    doc.text(lineas, x + w, yy);
+    return lineas.length;
+  };
+  let yCondIzq = y, yCondDer = y;
+  yCondIzq += parLabelValor(M + 2, yCondIzq, "TIEMPO DE ENTREGA: ", cotizacion.plazoEntrega, mitadCond) * 4.2;
+  yCondDer += parLabelValor(xCondDer, yCondDer, "GARANTÍA: ", GARANTIA_TEXTO, mitadCond) * 4.2;
+  yCondIzq += parLabelValor(M + 2, yCondIzq, "VALIDEZ DE LA OFERTA: ", cotizacion.validezOferta, mitadCond) * 4.2;
+  yCondDer += parLabelValor(xCondDer, yCondDer, "TIEMPO DE GARANTIA: ", cotizacion.tiempoGarantia, mitadCond) * 4.2;
+
+
+  yCondIzq += parLabelValor(M + 2, yCondIzq, "FORMA DE PAGO: ", cotizacion.condicionPago, mitadCond) * 4.2;
+  y = Math.max(yCondIzq, yCondDer) + 1;
+  // y += parLabelValor(M + 2, y, "FORMA DE PAGO: ", cotizacion.condicionPago, colPagoW - 4) * 4.2;
+  // doc.setFont("helvetica", "bold");
+  // doc.text("POLIZAS DE GARANTÍA: ", M + 2, y); y += 4.2;
+  // doc.setFont("helvetica", "normal");
+  // doc.text(POLIZA_TEXTO, M + 2, y); y += 4.2;
+  doc.setFont("helvetica", "bold");
+  doc.text("OBSERVACIONES:", M + 2, y); y += 4.2;
+  doc.setFont("helvetica", "normal");
+  doc.text("* El valor total de la oferta INCLUYE IGV", M + 2, y); y += 4.2;
+  const repuestosLineas = doc.splitTextToSize(REPUESTOS_TEXTO, colPagoW - 4);
+  doc.text(repuestosLineas, M + 2, y); y += repuestosLineas.length * 4.2;
+  y += 2;
+  doc.setDrawColor(0);
+  doc.rect(M, yCondBarra, colPagoW, (y - yCondInicio) + 2 + (yCondInicio - yCondBarra)- 8);
+
+  // Tarjeta del Asesor Comercial — a la derecha. El marco se ajusta a su
+  // propio contenido (no se estira a la altura completa de METODO DE PAGO +
+  // CONDICIONES GENERALES, que es más alta) y queda centrada verticalmente
+  // dentro de ese bloque — antes el marco quedaba enorme con mucho espacio
+  // vacío abajo. Corregido 2026-09-15 a pedido del usuario.
+  const yBloqueFin = y;
+  const asesorCenter = asesorX + asesorW / 2;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8.5);
+  const asesorNombreLineas = doc.splitTextToSize(cotizacion.asesorComercial || "—", asesorW - 4);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  const correoAsesorLineas = doc.splitTextToSize(HUAQUIAN.correo, asesorW - 4);
+
+  const padVert = 5, rolH = 5.5, celularH = 4;
+  const nombreH = asesorNombreLineas.length * 4;
+  const correoH = correoAsesorLineas.length * 3.4;
+  const asesorH = padVert * 2 + nombreH + 1 + rolH + correoH + 1 + celularH;
+  const asesorY = yBloqueInicio + Math.max(0, (yBloqueFin - yBloqueInicio - asesorH) / 2);
+
+  doc.setDrawColor(0);
+  doc.rect(asesorX, asesorY, asesorW, asesorH);
+
+  let yAs = asesorY + padVert + 3;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8.5);
+  doc.text(asesorNombreLineas, asesorCenter, yAs, { align: "center" });
+  yAs += nombreH + 1;
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(7.5);
+  doc.text("Asesor Comercial", asesorCenter, yAs, { align: "center" });
+  yAs += rolH;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.text(correoAsesorLineas, asesorCenter, yAs, { align: "center" });
+  yAs += correoH + 1;
+  doc.text(cotizacion.numeroCelular || "—", asesorCenter, yAs, { align: "center" });
+
+  y = yBloqueFin + 6;
 
   // ─── Pie de página: grid de marcas representadas ───
   if (marcasFooter) {
-    const h = CONTENT_W * (marcasFooter.naturalHeight / marcasFooter.naturalWidth) * 0.5;
+    const h = CONTENT_W * (marcasFooter.naturalHeight / marcasFooter.naturalWidth) * 1.05;
     const w = h * (marcasFooter.naturalWidth / marcasFooter.naturalHeight);
     if (y + h > PAGE_H - 6) { doc.addPage(); dibujarMarcaDeAgua(); y = 15; }
     doc.addImage(marcasFooter, "PNG", (PAGE_W - w) / 2, y, w, h);
-        // doc.addImage(marcasFooter, "PNG", 15, y, 180, 70);
+    // doc.addImage(marcasFooter, "PNG", 15, y, 180, 70);
 
   }
 

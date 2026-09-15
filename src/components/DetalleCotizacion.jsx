@@ -364,6 +364,11 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
     asesorComercial: form.asesorComercial,
     numeroCelular: form.numeroCelular,
     personaContacto: form.personaContacto,
+    // No es un campo del form — sale del contacto de empresa ya seleccionado
+    // (contactoSel), igual que el teléfono que ya se muestra debajo del
+    // selector de "Persona de contacto". Pedido explícito del usuario,
+    // 2026-09-15: "correo -> viene de la lista de contactos de empresas".
+    correoContacto: contactoSel?.correo || "",
     numeroSolicitudPedido: form.numeroSolicitudPedido,
     numeroPeticionOferta: form.numeroPeticionOferta,
     tiempoGarantia: form.tiempoGarantia,
