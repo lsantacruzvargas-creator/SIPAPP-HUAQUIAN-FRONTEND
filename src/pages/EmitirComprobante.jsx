@@ -264,6 +264,17 @@ export default function EmitirComprobante() {
     ? Math.round(totalGeneral * (Number(detraccionPorcentaje) || 0) / 100).toFixed(2)
     : "";
 
+  // El comprador deposita la detracción directo al Banco de la Nación —
+  // eso NO se le paga al vendedor, así que lo que realmente queda
+  // pendiente de cobrar (y lo que deben sumar las cuotas de crédito) es el
+  // total menos ese depósito, no el total completo. `totalGeneral` (el
+  // total legal del comprobante, el que va al XML/SUNAT) no cambia — esto
+  // es solo para la validación/visualización de cuotas. Pedido explícito
+  // del usuario, 2026-09-15.
+  const montoNetoPendiente = detraccionAplica
+    ? totalGeneral - (Number(detraccionMontoNeto) || 0)
+    : totalGeneral;
+
   const ro = !!resultado?.ok;
 
   const ordenesCompraFiltradas = ordenesCompra.filter((o) => {
@@ -315,8 +326,8 @@ export default function EmitirComprobante() {
         if (!c.monto || Number(c.monto) <= 0) return "Cada cuota debe tener un monto mayor a 0.";
         if (!c.fechaVencimiento) return "Cada cuota debe tener una fecha de vencimiento.";
       }
-      if (Math.abs(sumaCuotas - totalGeneral) > 0.01) {
-        return `La suma de las cuotas (${moneda} ${sumaCuotas.toFixed(2)}) debe ser igual al monto neto pendiente (${moneda} ${totalGeneral.toFixed(2)}).`;
+      if (Math.abs(sumaCuotas - montoNetoPendiente) > 0.01) {
+        return `La suma de las cuotas (${moneda} ${sumaCuotas.toFixed(2)}) debe ser igual al monto neto pendiente (${moneda} ${montoNetoPendiente.toFixed(2)}).`;
       }
     }
     if (tipoDoc === "03" && totalGeneral >= 700 && receptor.schemeID === "0") {
@@ -492,7 +503,6 @@ export default function EmitirComprobante() {
     setDetraccionAplica(false);
     setDetraccionCodigoBien("");
     setDetraccionPorcentaje("");
-    setDetraccionMontoNeto("");
     setDetraccionCuentaBancaria("");
     setNumeroOrdenCompra("");
     setOrdenCompraId("");
@@ -611,7 +621,7 @@ export default function EmitirComprobante() {
                     <div className="flex items-center justify-between mb-2">
                       <label className="block text-xs font-medium text-gray-500">Cuotas de pago<Oblig /></label>
                       <span className="text-xs text-gray-400">
-                        Monto neto pendiente: {moneda} {totalGeneral.toFixed(2)}
+                        Monto neto pendiente: {moneda} {montoNetoPendiente.toFixed(2)}
                       </span>
                     </div>
                     <div className="border border-gray-100 rounded-lg overflow-hidden">
@@ -655,7 +665,7 @@ export default function EmitirComprobante() {
                             className="text-sm text-gray-500 hover:text-gray-800 transition">
                             + Agregar cuota
                           </button>
-                          <span className={`text-xs font-medium ${Math.abs(sumaCuotas - totalGeneral) < 0.01 ? "text-green-600" : "text-red-500"}`}>
+                          <span className={`text-xs font-medium ${Math.abs(sumaCuotas - montoNetoPendiente) < 0.01 ? "text-green-600" : "text-red-500"}`}>
                             Suma de cuotas: {moneda} {sumaCuotas.toFixed(2)}
                           </span>
                         </div>
@@ -904,12 +914,13 @@ export default function EmitirComprobante() {
                     onChange={(e) => {
                       const marcado = e.target.checked;
                       setDetraccionAplica(marcado);
-                      // 037 (Demás servicios gravados con IGV, 12%) es por lejos el más común en
-                      // este ERP — se precarga como default para no obligar a buscarlo cada vez,
-                      // el usuario puede cambiarlo si el caso es otro. El monto neto se deriva solo
-                      // (ver `detraccionMontoNeto` más arriba), no hace falta setearlo acá.
+                      // 020 (Mantenimiento y reparación de bienes muebles, 12%) es por lejos el
+                      // más común en este ERP — se precarga como default para no obligar a
+                      // buscarlo cada vez, el usuario puede cambiarlo si el caso es otro. El monto
+                      // neto se deriva solo (ver `detraccionMontoNeto` más arriba), no hace falta
+                      // setearlo acá.
                       if (marcado && !detraccionCodigoBien) {
-                        setDetraccionCodigoBien("037");
+                        setDetraccionCodigoBien("020");
                         setDetraccionPorcentaje("12");
                       }
                     }} />
