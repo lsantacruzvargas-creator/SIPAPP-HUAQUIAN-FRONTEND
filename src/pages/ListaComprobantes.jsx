@@ -32,6 +32,7 @@ export default function ListaComprobantes() {
   const [seleccionado, setSeleccionado] = useState(null);
   const [cargando, setCargando] = useState(false);
   const [errorDescarga, setErrorDescarga] = useState("");
+  const [consultando, setConsultando] = useState(false);
 
   const cargar = async () => {
     setCargando(true);
@@ -77,6 +78,26 @@ export default function ListaComprobantes() {
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
+  };
+
+  // Reconsulta el resultado en el hub SUNAT — necesario porque un "Reintentar" hecho
+  // directamente en el panel del hub (SmartPSE) no le avisa a este ERP; sin este botón
+  // el estado guardado acá se queda pegado en RECHAZADO/EN_PROCESO para siempre. Mismo
+  // patrón que forzarActualizacion() en ModalDetalleGuia.jsx.
+  const consultarEstado = async () => {
+    setConsultando(true);
+    setErrorDescarga("");
+    try {
+      const res  = await fetchAuth(`/cpe/${seleccionado._id}/consultar`);
+      const data = await res.json();
+      if (!data.ok) { setErrorDescarga(data.error || "No se pudo consultar el estado en SUNAT."); return; }
+      setSeleccionado((prev) => ({ ...prev, estado: data.estado, sunat: { ...prev.sunat, mensaje: data.mensaje } }));
+      await cargar();
+    } catch {
+      setErrorDescarga("Error de conexión al consultar SUNAT.");
+    } finally {
+      setConsultando(false);
+    }
   };
 
   return (
@@ -272,6 +293,15 @@ export default function ListaComprobantes() {
             </table>
 
             <div className="flex justify-end gap-3 pt-2">
+              {(seleccionado.estado === "RECHAZADO" || seleccionado.estado === "ERROR" || seleccionado.estado === "EN_PROCESO") && (
+                <button
+                  onClick={consultarEstado}
+                  disabled={consultando}
+                  className="border border-blue-300 text-blue-700 px-4 py-2 rounded-lg text-sm hover:bg-blue-50 transition disabled:opacity-50"
+                >
+                  {consultando ? "Consultando…" : "Consultar estado en SUNAT"}
+                </button>
+              )}
               {seleccionado.estado === "ACEPTADO" && (seleccionado.tipoDoc === "01" || seleccionado.tipoDoc === "03") && (
                 <button
                   onClick={() => navigate("/facturacion-electronica/emitir", { state: { comprobante: seleccionado } })}
