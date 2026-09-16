@@ -101,7 +101,46 @@ function CeldaMontoPagado({ factura, rolActual, handlePagoMonto }) {
   );
 }
 
-function TablaFacturas({ titulo, acento, facturas, onSelect, handlePagoMonto, handleCuotaPagoCheck, vacioMsg }) {
+// Mismo patrón que CeldaMontoPagado, pero por cuota — reemplaza el checkbox
+// todo-o-nada anterior: un input para anotar cuánto se pagó de ESTA cuota,
+// confirmado con el botón ✓ (la confirmación al llegar a "pagado" la maneja
+// handleCuotaPagoMonto más arriba, igual que con la factura completa).
+// Pedido explícito del usuario, 2026-09-16.
+function CeldaMontoPagadoCuota({ factura, cuota, rolActual, handleCuotaPagoMonto }) {
+  const [monto, setMonto] = useState(String(cuota.montoPagado ?? 0));
+  const [guardando, setGuardando] = useState(false);
+  const [montoPrevio, setMontoPrevio] = useState(cuota.montoPagado);
+  if (cuota.montoPagado !== montoPrevio) {
+    setMontoPrevio(cuota.montoPagado);
+    setMonto(String(cuota.montoPagado ?? 0));
+  }
+
+  const bloqueada = cuota.pagado && rolActual !== "admin";
+  const disabled = factura.anulado || bloqueada;
+  const cambiado = Number(monto) !== Number(cuota.montoPagado ?? 0);
+
+  const confirmar = async () => {
+    setGuardando(true);
+    await handleCuotaPagoMonto(factura._id, cuota._id, monto);
+    setGuardando(false);
+  };
+
+  return (
+    <div className="flex items-center justify-center gap-1"
+      title={factura.anulado ? "Factura anulada" : bloqueada ? "Solo un administrador puede deshacer un pago" : undefined}>
+      <input type="number" min="0" step="0.01" value={monto} disabled={disabled}
+        onChange={e => setMonto(e.target.value)}
+        onKeyDown={e => { if (e.key === "Enter" && cambiado) confirmar(); }}
+        className="w-20 border border-gray-200 rounded-lg px-1.5 py-1 text-xs text-right disabled:opacity-40 disabled:cursor-not-allowed" />
+      <button type="button" onClick={confirmar} disabled={disabled || guardando || !cambiado}
+        className="text-xs text-emerald-600 hover:text-emerald-800 disabled:opacity-30 disabled:cursor-not-allowed font-semibold px-1">
+        {guardando ? "…" : "✓"}
+      </button>
+    </div>
+  );
+}
+
+function TablaFacturas({ titulo, acento, facturas, onSelect, handlePagoMonto, handleCuotaPagoMonto, handleDetraccionPagoCheck, vacioMsg }) {
   const rolActual = getUsuario()?.rol;
   // Las anuladas siguen visibles en la tabla, pero no cuentan en los totales
   const noAnuladas = facturas.filter(f => !f.anulado);
@@ -191,8 +230,25 @@ function TablaFacturas({ titulo, acento, facturas, onSelect, handlePagoMonto, ha
                       <td className={`${TD_NUM} text-gray-600`}>
                         {Number(f.total ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2 })}
                       </td>
-                      <td className={`${TD_NUM} text-gray-400`}>
-                        {Number(f.detraccion ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2 })}
+                      <td className={`${TD_NUM} text-gray-400`} onClick={e => e.stopPropagation()}>
+                        <div className="flex flex-col items-end gap-1">
+                          <span>{Number(f.detraccion ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2 })}</span>
+                          {Number(f.detraccion) > 0 && (() => {
+                            const bloqueadaDetraccion = f.detraccionPagada && rolActual !== "admin";
+                            const disabledDetraccion = f.anulado || bloqueadaDetraccion;
+                            return (
+                              <label className={`flex items-center gap-1 text-[11px] select-none ${f.detraccionPagada ? "text-emerald-600" : "text-gray-400"} ${disabledDetraccion ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
+                                title={f.anulado ? "Factura anulada" : bloqueadaDetraccion ? "Solo un administrador puede deshacer un pago" : undefined}>
+                                <input type="checkbox"
+                                  checked={!!f.detraccionPagada}
+                                  disabled={disabledDetraccion}
+                                  onChange={e => handleDetraccionPagoCheck(f._id, e.target.checked)}
+                                  className="w-3.5 h-3.5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-400" />
+                                Detracción pagada
+                              </label>
+                            );
+                          })()}
+                        </div>
                       </td>
                       <td className={`${TD_NUM} font-bold text-gray-900`}>
                         {Number(f.totalAPagar ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2 })}
@@ -212,10 +268,7 @@ function TablaFacturas({ titulo, acento, facturas, onSelect, handlePagoMonto, ha
                     </tr>
                   );
 
-                  const filasCuotas = (f.cuotas || []).map((c, idx) => {
-                    const bloqueada = c.pagado && rolActual !== "admin";
-                    const disabled = f.anulado || bloqueada;
-                    return (
+                  const filasCuotas = (f.cuotas || []).map((c, idx) => (
                       <tr key={c._id} className="bg-indigo-50/20">
                         <td className="px-3 py-2"></td>
                         <td className="px-3 py-2 text-indigo-700 font-medium whitespace-nowrap pl-6">
@@ -235,19 +288,10 @@ function TablaFacturas({ titulo, acento, facturas, onSelect, handlePagoMonto, ha
                           {Number(c.monto).toLocaleString("es-PE", { minimumFractionDigits: 2 })}
                         </td>
                         <td className="px-3 py-2 text-center" onClick={e => e.stopPropagation()}>
-                          <label className={`flex items-center gap-1.5 text-xs text-gray-500 select-none justify-center ${disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
-                            title={f.anulado ? "Factura anulada" : bloqueada ? "Solo un administrador puede deshacer un pago" : undefined}>
-                            <input type="checkbox"
-                              checked={c.pagado}
-                              disabled={disabled}
-                              onChange={e => handleCuotaPagoCheck(f._id, c._id, e.target.checked)}
-                              className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-400" />
-                            Pagado
-                          </label>
+                          <CeldaMontoPagadoCuota factura={f} cuota={c} rolActual={rolActual} handleCuotaPagoMonto={handleCuotaPagoMonto} />
                         </td>
                       </tr>
-                    );
-                  });
+                  ));
 
                   return [filaPrincipal, ...filasCuotas];
                 })}
@@ -423,17 +467,21 @@ export default function ListaFacturas() {
   // (Backend/src/routes/facturas.js:/:id/cuotas/:cuotaId/pagar), no se
   // reemplaza la factura completa con la respuesta del server para no perder
   // los campos `_numeroOT`/`_numeroCotizacion` que solo viven en el frontend.
-  const ejecutarCuotaPagoCheck = async (facturaId, cuotaId, pagada) => {
+  // Reemplaza el viejo checkbox todo-o-nada: se anota un monto, igual que
+  // handlePagoMonto a nivel factura. Pedido explícito del usuario, 2026-09-16.
+  const ejecutarCuotaPagoMonto = async (facturaId, cuotaId, montoIngresado) => {
     const factura = facturas.find(f => f._id === facturaId);
     const cuota = factura?.cuotas?.find(c => c._id === cuotaId);
     if (!factura || !cuota) return;
 
+    const pago = Math.max(0, Number(montoIngresado) || 0);
+    const pagada = pago >= Number(cuota.monto);
     const cuotasActualizadas = factura.cuotas.map(c =>
-      c._id === cuotaId ? { ...c, pagado: pagada, fechaPago: pagada ? new Date().toISOString() : null } : c
+      c._id === cuotaId ? { ...c, montoPagado: pago, pagado: pagada, fechaPago: pagada ? new Date().toISOString() : null } : c
     );
     const total = cuotasActualizadas.length;
     const pagadas = cuotasActualizadas.filter(c => c.pagado).length;
-    const montoPagado = cuotasActualizadas.filter(c => c.pagado).reduce((s, c) => s + c.monto, 0);
+    const montoPagado = cuotasActualizadas.reduce((s, c) => s + (Number(c.montoPagado) || 0), 0);
     const estadoPago = pagadas === 0 ? "sin pago" : pagadas === total ? "pagado" : "pago parcial";
     const estadoCadena = estadoPago === "pagado" ? "cerrado" : "abierto";
 
@@ -451,7 +499,7 @@ export default function ListaFacturas() {
       const res = await fetchAuth(`/facturas/${facturaId}/cuotas/${cuotaId}/pagar`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pagado: pagada }),
+        body: JSON.stringify({ montoPagado: pago }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
     } catch {
@@ -460,20 +508,62 @@ export default function ListaFacturas() {
     }
   };
 
-  const handleCuotaPagoCheck = async (facturaId, cuotaId, pagada) => {
+  const handleCuotaPagoMonto = async (facturaId, cuotaId, montoIngresado) => {
     const factura = facturas.find(f => f._id === facturaId);
     const cuota = factura?.cuotas?.find(c => c._id === cuotaId);
     if (!factura || !cuota) return;
 
+    const pago = Math.max(0, Number(montoIngresado) || 0);
+    const pagadaAntes = cuota.pagado;
+    const pagadaAhora = pago >= Number(cuota.monto);
+
+    if (pagadaAntes && !pagadaAhora && getUsuario()?.rol !== "admin") {
+      setAvisoPermiso("Solo un administrador puede deshacer un pago ya confirmado.");
+      return;
+    }
+    if (pagadaAhora && !pagadaAntes) {
+      setConfirmandoPago({ tipo: "cuota", facturaId, cuotaId, montoIngresado });
+      return;
+    }
+    await ejecutarCuotaPagoMonto(facturaId, cuotaId, montoIngresado);
+  };
+
+  // La detracción se paga aparte (depósito al Banco de la Nación) — su
+  // estado es independiente de estadoPago/montoPagado, por eso no entra en
+  // el KPI "Total pagado" del Dashboard. Pedido explícito del usuario,
+  // 2026-09-16.
+  const ejecutarDetraccionPagoCheck = async (id, pagada) => {
+    const factura = facturas.find(f => f._id === id);
+    if (!factura) return;
+
+    const previo = { detraccionPagada: factura.detraccionPagada };
+    setFacturas(prev => prev.map(f => f._id === id ? { ...f, detraccionPagada: pagada } : f));
+    try {
+      const res = await fetchAuth(`/facturas/${id}/detraccion-pagada`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pagada }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    } catch {
+      setFacturas(prev => prev.map(f => f._id === id ? { ...f, ...previo } : f));
+      setAvisoPermiso("No se pudo guardar el estado de la detracción. Verifica que el servidor esté disponible e intenta de nuevo.");
+    }
+  };
+
+  const handleDetraccionPagoCheck = async (id, pagada) => {
+    const factura = facturas.find(f => f._id === id);
+    if (!factura) return;
+
     if (pagada) {
-      setConfirmandoPago({ tipo: "cuota", facturaId, cuotaId, pagada });
+      setConfirmandoPago({ tipo: "detraccion", id, pagada });
       return;
     }
     if (getUsuario()?.rol !== "admin") {
       setAvisoPermiso("Solo un administrador puede deshacer un pago.");
       return;
     }
-    await ejecutarCuotaPagoCheck(facturaId, cuotaId, pagada);
+    await ejecutarDetraccionPagoCheck(id, pagada);
   };
 
   const cerradas = filtradas.filter(f => f.estadoCadena === "cerrado");
@@ -580,7 +670,8 @@ export default function ListaFacturas() {
         facturas={abiertas}
         onSelect={setSeleccionada}
         handlePagoMonto={handlePagoMonto}
-        handleCuotaPagoCheck={handleCuotaPagoCheck}
+        handleCuotaPagoMonto={handleCuotaPagoMonto}
+        handleDetraccionPagoCheck={handleDetraccionPagoCheck}
         vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin facturas registradas"}
       />
 
@@ -590,7 +681,8 @@ export default function ListaFacturas() {
         facturas={cerradas}
         onSelect={setSeleccionada}
         handlePagoMonto={handlePagoMonto}
-        handleCuotaPagoCheck={handleCuotaPagoCheck}
+        handleCuotaPagoMonto={handleCuotaPagoMonto}
+        handleDetraccionPagoCheck={handleDetraccionPagoCheck}
         vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin facturas cerradas"}
       />
     </div>
@@ -626,12 +718,17 @@ export default function ListaFacturas() {
 
     {confirmandoPago && (
       <ConfirmacionAccion
-        mensaje={confirmandoPago.tipo === "factura" ? "¿Confirmas marcar esta factura como pagada?" : "¿Confirmas marcar esta cuota como pagada?"}
+        mensaje={
+          confirmandoPago.tipo === "factura" ? "¿Confirmas marcar esta factura como pagada?" :
+          confirmandoPago.tipo === "detraccion" ? "¿Confirmas marcar la detracción de esta factura como pagada?" :
+          "¿Confirmas marcar esta cuota como pagada?"
+        }
         onCancelar={() => setConfirmandoPago(null)}
         onConfirmar={async () => {
           setProcesandoPago(true);
           if (confirmandoPago.tipo === "factura") await ejecutarPagoMonto(confirmandoPago.id, confirmandoPago.montoIngresado);
-          else await ejecutarCuotaPagoCheck(confirmandoPago.facturaId, confirmandoPago.cuotaId, confirmandoPago.pagada);
+          else if (confirmandoPago.tipo === "detraccion") await ejecutarDetraccionPagoCheck(confirmandoPago.id, confirmandoPago.pagada);
+          else await ejecutarCuotaPagoMonto(confirmandoPago.facturaId, confirmandoPago.cuotaId, confirmandoPago.montoIngresado);
           setProcesandoPago(false);
           setConfirmandoPago(null);
         }}

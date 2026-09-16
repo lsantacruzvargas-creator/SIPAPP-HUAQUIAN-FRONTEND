@@ -117,6 +117,10 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   const [servicios, setServicios] = useState([]);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
+  const [modalCerrarCadenaOpen, setModalCerrarCadenaOpen] = useState(false);
+  const [fechaPagoCierre, setFechaPagoCierre] = useState(() => new Date().toISOString().slice(0, 10));
+  const [numeroFacturaCierre, setNumeroFacturaCierre] = useState("");
+  const [cerrandoCadena, setCerrandoCadena] = useState(false);
   const [crearOTOpen, setCrearOTOpen] = useState(false);
   const [crearOCOpen, setCrearOCOpen] = useState(false);
   const [buscadorOTOpen, setBuscadorOTOpen] = useState(false);
@@ -155,6 +159,13 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   // de que la cotización misma se haya enviado.
   const bloqueadoPorInforme = !cot.enviado;
   const cadenaCerrada = bloqueadoPorCadenaCerrada(cot.estadoCadena, rolActual);
+  // Mismo umbral/porcentaje de detracción que ya se usa en EmitirComprobante.jsx
+  // (SUNAT: operaciones > S/700, código 020 "Mantenimiento y reparación de
+  // bienes muebles" = 12%) — acá es solo para mostrar el desglose antes de
+  // confirmar el cierre; el cálculo real que se guarda lo hace el backend.
+  const detraccionCierreAplica = Number(cot.total) > 700;
+  const detraccionCierreMonto = detraccionCierreAplica ? Math.round(Number(cot.total) * 0.12 * 100) / 100 : 0;
+  const totalAPagarCierre = Math.round((Number(cot.total) - detraccionCierreMonto) * 100) / 100;
 
   const cargarRelaciones = () => {
     Promise.all([
@@ -525,11 +536,15 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
     }
   };
 
-  const toggleCerrarCadena = async (cerrado) => {
+  const toggleCerrarCadena = async (cerrado, fechaPago, numeroFactura) => {
     const res = await fetchAuth(`/cotizaciones/${cot._id}/cerrar-cadena`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cerrado }),
+      body: JSON.stringify({
+        cerrado,
+        ...(fechaPago ? { fechaPago } : {}),
+        ...(numeroFactura ? { numeroFactura } : {}),
+      }),
     });
     if (res.ok) {
       const actualizada = await res.json();
@@ -538,6 +553,18 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
     } else {
       setError("Error al cerrar/abrir la cadena.");
     }
+  };
+
+  // Cerrar cadena desde Cotización deja registrado el cobro (detracción +
+  // monto neto pagado) cuando esa cotización todavía no tiene una Factura
+  // vinculada — ver POST implícito en PATCH /cotizaciones/:id/cerrar-cadena.
+  // Pedido explícito del usuario, 2026-09-16.
+  const confirmarCerrarCadena = async () => {
+    setCerrandoCadena(true);
+    await toggleCerrarCadena(true, fechaPagoCierre, numeroFacturaCierre.trim());
+    setCerrandoCadena(false);
+    setModalCerrarCadenaOpen(false);
+    setNumeroFacturaCierre("");
   };
 
   const toggleAprobar = async () => {
@@ -629,7 +656,15 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
             )}
             {!cot.anulado && !cadenaCerrada && puedeAnular && <BotonAnular onAnular={anular} />}
             {esAdmin && cot.anulado && <BotonDesanular onDesanular={desanular} />}
-            {esAdmin && <BotonCerrarCadena cerrado={cadenaCerrada} onToggle={toggleCerrarCadena} />}
+            {esAdmin && (cadenaCerrada
+              ? <BotonCerrarCadena cerrado onToggle={toggleCerrarCadena} />
+              : (
+                <button onClick={() => setModalCerrarCadenaOpen(true)}
+                  className="text-xs text-white/70 hover:text-white underline transition">
+                  Cerrar cadena
+                </button>
+              )
+            )}
             {!cot.anulado && !cot.enviado && !cadenaCerrada && puedeEditar && (
               <button onClick={guardar} disabled={guardando}
                 className="bg-white text-sky-700 text-sm px-5 py-2 rounded-lg hover:bg-sky-50 disabled:opacity-60 transition font-semibold shadow-sm shrink-0">
@@ -1402,6 +1437,58 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
 
       {guiaDetalle && (
         <ModalDetalleGuia guia={guiaDetalle} onClose={() => setGuiaDetalle(null)} />
+      )}
+
+      {modalCerrarCadenaOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm">
+            <h3 className="text-base font-semibold text-gray-800 mb-1">Cerrar cadena</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              Se cerrará a mano toda la cadena de este documento (Cotización, OT, OC, Informes y Factura
+              relacionados) y quedará registrado el cobro con la fecha que elijas abajo.
+            </p>
+            <div className="bg-gray-50 rounded-lg border border-gray-100 p-3 mb-4 text-sm space-y-1.5">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Monto de la cotización</span>
+                <span className="font-medium text-gray-800">{money(cot.subtotal, cot.moneda)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">I.G.V.</span>
+                <span className="font-medium text-gray-800">{money(cot.igv, cot.moneda)}</span>
+              </div>
+              <div className="flex justify-between border-t border-gray-200 pt-1.5">
+                <span className="text-gray-500">Total</span>
+                <span className="font-semibold text-gray-800">{money(cot.total, cot.moneda)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Detracción{detraccionCierreAplica ? " (12%)" : ""}</span>
+                <span className="font-medium text-gray-800">
+                  {detraccionCierreAplica ? `- ${money(detraccionCierreMonto, cot.moneda)}` : "No aplica"}
+                </span>
+              </div>
+              <div className="flex justify-between border-t border-gray-200 pt-1.5">
+                <span className="text-gray-700 font-semibold">Total a pagar</span>
+                <span className="font-bold text-gray-900">{money(totalAPagarCierre, cot.moneda)}</span>
+              </div>
+            </div>
+            <label className="text-xs text-gray-500 block mb-1">Fecha de pago</label>
+            <input type="date" value={fechaPagoCierre} onChange={(e) => setFechaPagoCierre(e.target.value)}
+              className={`${INP} mb-3`} />
+            <label className="text-xs text-gray-500 block mb-1">N° de factura (opcional)</label>
+            <input type="text" value={numeroFacturaCierre} onChange={(e) => setNumeroFacturaCierre(e.target.value)}
+              placeholder="F00X-XXXX" className={`${INP} mb-4`} />
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setModalCerrarCadenaOpen(false)} disabled={cerrandoCadena}
+                className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition disabled:opacity-50">
+                Cancelar
+              </button>
+              <button onClick={confirmarCerrarCadena} disabled={cerrandoCadena}
+                className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-700 transition disabled:opacity-50">
+                {cerrandoCadena ? "Cerrando…" : "Cerrar cadena"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -331,6 +331,12 @@ export default function Dashboard() {
 
   const facturasSinPago = factsFiltradas.filter((f) => f.estadoPago === "sin pago").length;
 
+  // La detracción se deposita aparte (Banco de la Nación) — su estado es
+  // independiente de estadoPago/montoPagado, así que se cuenta aparte y no
+  // entra en "Total pagado"/"Por cobrar" de abajo. Pedido explícito del
+  // usuario, 2026-09-16.
+  const detraccionesPorPagar = factsFiltradas.filter((f) => !f.anulado && Number(f.detraccion) > 0 && !f.detraccionPagada).length;
+
   // El modelo Factura no tiene campo `monto` (siempre daba 0) y `montoPagado`
   // es un registro de pago parcial, no el total de la factura — el monto
   // real de una factura es `totalAPagar` (con `total` como respaldo, mismo
@@ -394,6 +400,11 @@ export default function Dashboard() {
         <KpiCard label="OTs sin Orden de Compra"         value={otsSinOC}         sub={`${otsFiltradas.length} OTs en total`} color="blue"  />
         <KpiCard label="OC sin Factura"     value={ocSinFactura}     sub={`${ocsFiltradas.length} OC en total`}  color="amber" />
         <KpiCard label="Facturas sin pago"  value={facturasSinPago}  sub={`${factsFiltradas.length} facturas en total`} color="red" />
+      </div>
+
+      {/* KPIs — fila 1b */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <KpiCard label="Detracciones por pagar" value={detraccionesPorPagar} sub={`${factsFiltradas.filter(f => Number(f.detraccion) > 0).length} facturas con detracción`} color="amber" />
       </div>
 
       {/* KPIs — fila 2 */}

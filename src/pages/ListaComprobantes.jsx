@@ -292,6 +292,38 @@ export default function ListaComprobantes() {
               </tfoot>
             </table>
 
+            {seleccionado.detraccion?.aplica && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-4">
+                <p className="text-xs font-medium text-amber-700 mb-1">Detracción</p>
+                <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-800">
+                  <span>Bien/servicio: {seleccionado.detraccion.codigoBien}</span>
+                  <span>Porcentaje: {seleccionado.detraccion.porcentaje}%</span>
+                  <span className="font-semibold">Monto detracción: {Number(seleccionado.detraccion.montoNeto).toFixed(2)}</span>
+                </div>
+              </div>
+            )}
+
+            {seleccionado.formaPago === "Credito" && !!seleccionado.cuotas?.length && (
+              <table className="erp-table w-full text-sm mb-4">
+                <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-100">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Cuota</th>
+                    <th className="px-3 py-2 text-right">Total a pagar</th>
+                    <th className="px-3 py-2 text-right">Vencimiento</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {seleccionado.cuotas.map((c, idx) => (
+                    <tr key={idx}>
+                      <td className="px-3 py-2">Cuota {String(c.numero ?? idx + 1).padStart(3, "0")}</td>
+                      <td className="px-3 py-2 text-right font-medium">{Number(c.monto).toFixed(2)}</td>
+                      <td className="px-3 py-2 text-right text-gray-500">{formatearFecha(c.fechaVencimiento)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+
             <div className="flex justify-end gap-3 pt-2">
               {(seleccionado.estado === "RECHAZADO" || seleccionado.estado === "ERROR" || seleccionado.estado === "EN_PROCESO") && (
                 <button
