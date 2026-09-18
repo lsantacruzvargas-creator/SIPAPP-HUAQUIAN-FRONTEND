@@ -26,6 +26,70 @@ function calcular(subtotal, descuentoPct) {
   return { base, igv, total, detraccion, totalAPagar: Math.round((total - detraccion) * 100) / 100 };
 }
 
+// Busca si la cadena de una OC (mismo numeroDocumento: Cotización/OT/OC) ya
+// tiene una GRE aceptada, para autocompletar `cac:DespatchDocumentReference`
+// en el XML sin que el usuario tenga que buscarla a mano — Softys (cliente)
+// exige ese tag cuando se factura un MATERIAL. Devuelve null si no hay
+// ninguna (factura de servicio, o material sin GRE emitida todavía).
+async function buscarGuiaDeCadena(numeroDocumento) {
+  if (numeroDocumento == null) return null;
+  const resOT = await fetchAuth("/ordenes-trabajo");
+  if (!resOT.ok) return null;
+  const ots = await resOT.json();
+  const idsOT = (ots || []).filter(o => o.numeroDocumento === numeroDocumento).map(o => o._id);
+  if (!idsOT.length) return null;
+  const resG = await fetchAuth(`/guias?ordenesTrabajo=${idsOT.join(",")}&estado=ACEPTADO&limit=1`);
+  if (!resG.ok) return null;
+  const dataG = await resG.json();
+  return dataG?.data?.[0] || null;
+}
+
+function BuscadorGuia({ onSelect, onClose }) {
+  const [lista, setLista] = useState([]);
+  const [q, setQ] = useState("");
+  const [cargando, setCargando] = useState(true);
+  useEffect(() => {
+    fetchAuth("/guias?estado=ACEPTADO&limit=200").then(r => r.ok && r.json())
+      .then(d => setLista(d?.data || []))
+      .finally(() => setCargando(false));
+  }, []);
+  const filtradas = lista.filter(g => !q ||
+    [`${g.serie}-${g.correlativo}`, ...(g.ordenesTrabajo || []).map(o => o.numeroOT || o.codigo)]
+      .some(v => v?.toLowerCase().includes(q.toLowerCase())));
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[80vh]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h4 className="font-semibold text-gray-800">Buscar guía de remisión</h4>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl">✕</button>
+        </div>
+        <div className="px-4 pt-4">
+          <input autoFocus value={q} onChange={e => setQ(e.target.value)}
+            placeholder="Serie-correlativo o N° de OT…" className={INP} />
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 space-y-1">
+          {cargando ? (
+            <p className="text-sm text-gray-400 text-center py-8">Cargando…</p>
+          ) : filtradas.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">Sin resultados</p>
+          ) : filtradas.map(g => (
+            <button key={g._id} onClick={() => onSelect(g)}
+              className="w-full text-left px-4 py-3 rounded-xl hover:bg-blue-50 border border-transparent hover:border-blue-100 transition">
+              <div className="flex justify-between">
+                <span className="font-mono text-xs text-blue-600">{g.serie}-{String(g.correlativo).padStart(8, "0")}</span>
+                <span className="text-xs text-gray-400">{g.tipoGuia}</span>
+              </div>
+              {!!g.ordenesTrabajo?.length && (
+                <p className="text-sm text-gray-700 truncate">OT: {g.ordenesTrabajo.map(o => o.numeroOT || o.codigo).join(", ")}</p>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function BuscadorOrdenCompra({ onSelect, onClose }) {
   const [lista, setLista] = useState([]);
   const [q, setQ] = useState("");
@@ -104,6 +168,23 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
   const [guardando, setGuardando] = useState(false);
   const [error, setError]         = useState("");
   const [exito, setExito]         = useState(null);
+  // GRE relacionada (cac:DespatchDocumentReference en el XML) — Softys exige
+  // este tag al facturar un MATERIAL. Se autocompleta si la cadena de la OC
+  // ya tiene una GRE aceptada; si no, el usuario la busca a mano.
+  const [guiaRelacionada, setGuiaRelacionada] = useState(null);
+  const [buscadorGuia, setBuscadorGuia] = useState(false);
+  const [buscandoGuiaAuto, setBuscandoGuiaAuto] = useState(false);
+
+  useEffect(() => {
+    if (!ocInicial?.numeroDocumento) return;
+    (async () => {
+      setBuscandoGuiaAuto(true);
+      const g = await buscarGuiaDeCadena(ocInicial.numeroDocumento);
+      if (g) setGuiaRelacionada(g);
+      setBuscandoGuiaAuto(false);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const cambiarFormaPago = (v) => {
     setFormaPago(v);
@@ -142,6 +223,10 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
   const seleccionarOC = (oc) => {
     setOcVinc(oc);
     setBOC(false);
+    if (oc.numeroDocumento != null && !guiaRelacionada) {
+      setBuscandoGuiaAuto(true);
+      buscarGuiaDeCadena(oc.numeroDocumento).then(g => { if (g) setGuiaRelacionada(g); }).finally(() => setBuscandoGuiaAuto(false));
+    }
     setForm(prev => {
       const nuevoSub = prev.subtotal || (oc.subtotal > 0 ? String(oc.subtotal) : prev.subtotal);
       if (!prev.subtotal && oc.subtotal > 0) setCalc(calcular(oc.subtotal, prev.descuentoPorcentaje));
@@ -235,6 +320,7 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
         moneda: "PEN",
         numeroOrdenCompra: form.numeroOrdenCompra || "",
         ordenCompra: ocId,
+        ...(guiaRelacionada ? { guiaRelacionada: { serie: guiaRelacionada.serie, correlativo: guiaRelacionada.correlativo } } : {}),
       }),
     });
     const dataCpe = await resCpe.json();
@@ -340,6 +426,30 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
                   <button type="button" onClick={() => setBOC(true)}
                     className="shrink-0 text-xs border border-gray-300 px-3 py-2 rounded-lg hover:bg-gray-50 whitespace-nowrap transition">
                     Buscar OC
+                  </button>
+                </div>
+              )}
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">
+                N° Guía de Remisión relacionada
+                {buscandoGuiaAuto && <span className="text-gray-400 font-normal"> (buscando…)</span>}
+              </label>
+              {guiaRelacionada ? (
+                <div className="flex items-center gap-2 border border-blue-200 bg-blue-50 rounded-lg px-3 py-2">
+                  <span className="font-mono text-xs text-blue-600 flex-1">
+                    {guiaRelacionada.serie}-{String(guiaRelacionada.correlativo).padStart(8, "0")}
+                  </span>
+                  <button onClick={() => setGuiaRelacionada(null)}
+                    className="text-gray-300 hover:text-red-400 text-lg leading-none">✕
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <input value="" placeholder="Ej. T001-00001234" disabled className={INP_DIS} />
+                  <button type="button" onClick={() => setBuscadorGuia(true)}
+                    className="shrink-0 text-xs border border-gray-300 px-3 py-2 rounded-lg hover:bg-gray-50 whitespace-nowrap transition">
+                    Buscar GRE
                   </button>
                 </div>
               )}
@@ -525,6 +635,7 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
     </div>
 
     {buscadorOC && <BuscadorOrdenCompra onSelect={seleccionarOC} onClose={() => setBOC(false)} />}
+    {buscadorGuia && <BuscadorGuia onSelect={(g) => { setGuiaRelacionada(g); setBuscadorGuia(false); }} onClose={() => setBuscadorGuia(false)} />}
     </>
   );
 }

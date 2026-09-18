@@ -379,6 +379,12 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
       encargado: ot.encargado,
       numeroGuiaEmision: ot.numeroGuiaEmision,
       numeroGuiaRemision: ot.numeroGuiaRemision,
+      // La "Guía de llegada" de la OT es el mismo dato que "N° DE GUIA" en
+      // Datos del Cliente de la Cotización (ver DetalleCotizacion.jsx y
+      // cotizacionPdf.js) — antes se perdía al crear la cotización desde la
+      // OT porque son dos nombres de campo distintos para lo mismo. Pedido
+      // explícito del usuario, 2026-09-18.
+      numeroGuia: ot.numeroGuiaEmision || "",
       codigoSap: ot.codigoSap,
       fechaSalida: ot.fechaSalida,
       subtotal: 0, igv: 0, total: 0,

@@ -69,6 +69,15 @@ export default function EmitirComprobante() {
   const [ordenesCompra, setOrdenesCompra] = useState([]);
   const [buscandoOC, setBuscandoOC] = useState(false);
   const [filtroOC, setFiltroOC] = useState("");
+  // GRE relacionada (cac:DespatchDocumentReference en el XML) — Softys exige
+  // este tag al facturar un MATERIAL. Acá no hay autocompletado (eso solo
+  // aplica al crear la factura desde el modal de OC, ver ModalCrearFactura.jsx)
+  // — el usuario la busca a mano, mismo patrón que "Buscar OC".
+  const [guiaRelacionada, setGuiaRelacionada] = useState(null);
+  const [mostrarBuscadorGuia, setMostrarBuscadorGuia] = useState(false);
+  const [guiasDisponibles, setGuiasDisponibles] = useState([]);
+  const [buscandoGuia, setBuscandoGuia] = useState(false);
+  const [filtroGuia, setFiltroGuia] = useState("");
   const [buscandoDoc, setBuscandoDoc] = useState(false);
   const [confirmando, setConfirmando] = useState(false);
   const [cargando, setCargando] = useState(false);
@@ -307,6 +316,33 @@ export default function EmitirComprobante() {
     setMostrarBuscadorOC(false);
   };
 
+  const guiasFiltradas = guiasDisponibles.filter((g) => {
+    if (!filtroGuia.trim()) return true;
+    const q = filtroGuia.trim().toLowerCase();
+    return (
+      `${g.serie}-${g.correlativo}`.toLowerCase().includes(q) ||
+      (g.ordenesTrabajo || []).some((o) => (o.numeroOT || o.codigo || "").toLowerCase().includes(q))
+    );
+  });
+
+  const abrirBuscadorGuia = async () => {
+    setMostrarBuscadorGuia(true);
+    if (guiasDisponibles.length) return;
+    setBuscandoGuia(true);
+    try {
+      const res  = await fetchAuth("/guias?estado=ACEPTADO&limit=200");
+      const data = await res.json();
+      setGuiasDisponibles(data?.data || []);
+    } finally {
+      setBuscandoGuia(false);
+    }
+  };
+
+  const elegirGuia = (g) => {
+    setGuiaRelacionada(g);
+    setMostrarBuscadorGuia(false);
+  };
+
   const validar = () => {
     if (!rucEmisor) return "Selecciona la empresa emisora.";
     if (!serie.trim()) return "La serie es requerida.";
@@ -422,6 +458,7 @@ export default function EmitirComprobante() {
           informacionRelacionada: informacionRelacionada.trim(),
           numeroOrdenCompra: numeroOrdenCompra.trim(),
           ...(ordenCompraId ? { ordenCompra: ordenCompraId } : {}),
+          ...(guiaRelacionada ? { guiaRelacionada: { serie: guiaRelacionada.serie, correlativo: guiaRelacionada.correlativo } } : {}),
           ...(detraccionAplica ? {
             detraccion: {
               aplica: true,
@@ -506,6 +543,7 @@ export default function EmitirComprobante() {
     setDetraccionCuentaBancaria("");
     setNumeroOrdenCompra("");
     setOrdenCompraId("");
+    setGuiaRelacionada(null);
     setOcOrigen(null);
     setFacturaInterna(null);
     setResultado(null);
@@ -980,6 +1018,32 @@ export default function EmitirComprobante() {
                   )}
                 </div>
               </div>
+
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <label className="block text-xs font-medium text-gray-500 mb-1">N° Guía de Remisión relacionada (opcional)</label>
+                <div className="flex gap-2">
+                  {guiaRelacionada ? (
+                    <div className="flex-1 flex items-center gap-2 border border-blue-200 bg-blue-50 rounded-lg px-3 py-2">
+                      <span className="font-mono text-xs text-blue-600 flex-1">
+                        {guiaRelacionada.serie}-{String(guiaRelacionada.correlativo).padStart(8, "0")}
+                      </span>
+                      {!ro && (
+                        <button type="button" onClick={() => setGuiaRelacionada(null)}
+                          className="text-gray-300 hover:text-red-400 text-lg leading-none">✕</button>
+                      )}
+                    </div>
+                  ) : (
+                    <input value="" placeholder="Ej. T001-00001234" disabled
+                      className="flex-1 input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
+                  )}
+                  {!ro && (
+                    <button type="button" onClick={abrirBuscadorGuia}
+                      className="px-4 py-2 rounded-lg text-sm border border-gray-300 text-gray-500 hover:text-gray-800 transition">
+                      Buscar
+                    </button>
+                  )}
+                </div>
+              </div>
             </>
           )}
         </div>
@@ -1054,6 +1118,35 @@ export default function EmitirComprobante() {
                   className="w-full text-left px-3 py-2 hover:bg-gray-50 transition text-sm">
                   <div className="font-medium text-gray-800">{o.numeroOrden || o.codigo} — {o.titulo}</div>
                   <div className="text-xs text-gray-400">{o.empresa?.razonSocial || "—"} · S/ {Number(o.monto).toFixed(2)}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {mostrarBuscadorGuia && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-2xl max-h-[80vh] flex flex-col">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-semibold text-gray-800">Buscar Guía de Remisión</h3>
+              <button type="button" onClick={() => setMostrarBuscadorGuia(false)} className="text-gray-400 hover:text-gray-800">✕</button>
+            </div>
+            <input value={filtroGuia} onChange={(e) => setFiltroGuia(e.target.value)}
+              placeholder="Buscar por serie-correlativo o N° de OT..."
+              className="w-full input-field w-auto mb-3" />
+            <div className="overflow-y-auto flex-1 divide-y divide-gray-100">
+              {buscandoGuia && <p className="text-sm text-gray-400 py-4 text-center">Cargando…</p>}
+              {!buscandoGuia && guiasFiltradas.length === 0 && (
+                <p className="text-sm text-gray-400 py-4 text-center">Sin resultados.</p>
+              )}
+              {guiasFiltradas.map((g) => (
+                <button key={g._id} type="button" onClick={() => elegirGuia(g)}
+                  className="w-full text-left px-3 py-2 hover:bg-gray-50 transition text-sm">
+                  <div className="font-medium text-gray-800">{g.serie}-{String(g.correlativo).padStart(8, "0")} — {g.tipoGuia}</div>
+                  {!!g.ordenesTrabajo?.length && (
+                    <div className="text-xs text-gray-400">OT: {g.ordenesTrabajo.map((o) => o.numeroOT || o.codigo).join(", ")}</div>
+                  )}
                 </button>
               ))}
             </div>
