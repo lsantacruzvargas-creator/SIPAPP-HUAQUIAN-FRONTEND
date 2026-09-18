@@ -11,40 +11,54 @@ const TIPO_DOC_LABEL = {
 
 const simboloMoneda = (moneda) => (moneda === "USD" ? "US$" : "S/");
 
+// Se carga desde /public (no un import de módulo) para que, si el archivo
+// todavía no fue subido, solo falle la carga puntual del logo en vez de
+// romper el build — mismo patrón que cotizacionPdf.js.
+function cargarImagen(url) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+}
+
 // PDF preliminar generado por el ERP (no es la representación impresa oficial del PSE).
-// logoUrl es opcional: si no se pasa o falla al cargar, el PDF se genera igual sin logo.
-export function generarComprobantePdf(comprobante, { logoUrl } = {}) {
+// logoUrl es opcional (default: ícono de Huaquian) — si no carga, el PDF se genera
+// igual sin logo. Antes recibía un `logoUrl` pero nunca se le pasaba ninguno desde
+// ListaComprobantes.jsx, así que el logo nunca se dibujaba; además `doc.addImage`
+// necesita la imagen ya cargada (un <img>/data URI), no una ruta de texto — por eso
+// esta función ahora es async. Pedido explícito del usuario, 2026-09-18.
+export async function generarComprobantePdf(comprobante, { logoUrl = "/assets/logos/huaquian_icon.png" } = {}) {
   const doc = new jsPDF();
   const margin = 14;
   let y = 18;
-
-  if (logoUrl) {
-    try {
-      doc.addImage(logoUrl, "PNG", margin, 10, 40, 16);
-      y = 32;
-    } catch {
-      // Logo no disponible o formato no soportado: se continúa sin logo.
-    }
-  }
 
   const moneda  = comprobante.totales?.moneda || "PEN";
   const simbolo = simboloMoneda(moneda);
   const tipoLabel = TIPO_DOC_LABEL[comprobante.tipoDoc] || "COMPROBANTE ELECTRÓNICO";
   const serieCorrelativo = `${comprobante.serie}-${String(comprobante.correlativo).padStart(4, "0")}`;
 
-  // doc.setFontSize(9);
-  // doc.setFont("helvetica", "normal");
-  // doc.text("PRELIMINAR — no es representación impresa oficial", margin, y);
+  // Logo AL LADO de la razón social (no arriba) — mismo bloque de texto,
+  // solo se le corre el punto de inicio en X para dejarle sitio al logo a
+  // su izquierda.
+  const logoSize = 16;
+  let xTexto = margin;
+  const logo = logoUrl ? await cargarImagen(logoUrl) : null;
+  if (logo) {
+    doc.addImage(logo, "PNG", margin, y - 6, logoSize, logoSize);
+    xTexto = margin + logoSize + 4;
+  }
 
   y += 8;
   doc.setFontSize(14);
   doc.setFont("helvetica", "bold");
-  doc.text(comprobante.emisor?.nombre || "", margin, y);
+  doc.text(comprobante.emisor?.nombre || "", xTexto, y);
 
   y += 6;
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
-  doc.text(`RUC ${comprobante.emisor?.numDoc || ""}`, margin, y);
+  doc.text(`RUC ${comprobante.emisor?.numDoc || ""}`, xTexto, y);
 
   doc.setFontSize(12);
   doc.setFont("helvetica", "bold");
