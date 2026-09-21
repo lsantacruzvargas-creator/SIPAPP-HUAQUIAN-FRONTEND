@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { fetchAuth } from "../utils/fetchAuth";
 import {
   PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
@@ -47,25 +46,38 @@ function KpiCard({ label, value, sub, color }) {
   );
 }
 
+const fmt = (n) => `S/ ${Number(n).toLocaleString("es-PE", { minimumFractionDigits: 2 })}`;
+
 // ── Fila de conversión (una etapa de la cadena de documentos) ───────────────
 // `enlazados` = cuántos elementos de origen SÍ tienen al menos un documento
 // destino apuntándolos (por relación real, no una resta de conteos — dos
 // listas de tamaños distintos no implican que la diferencia sean los "sin
 // vincular"; con más OCs que cotizaciones esa resta daba negativo).
-function FilaConversion({ labelOrigen, labelDestino, totalOrigen, enlazados, colorBarra, colorDestino, onClickSinVincular }) {
+// `montoOrigen`/`montoDestino` son opcionales — cuando vienen, se agrega el
+// monto debajo de cada número de cantidad (origen, destino y lo pendiente).
+function FilaConversion({ labelOrigen, labelDestino, totalOrigen, enlazados, colorBarra, colorDestino, onClickSinVincular, montoOrigen, montoDestino }) {
   const sinVincular = totalOrigen - enlazados;
   const pct = totalOrigen > 0 ? Math.round((enlazados / totalOrigen) * 100) : 0;
+  const mostrarMonto = montoOrigen != null && montoDestino != null;
+  const montoPendiente = mostrarMonto ? Math.max(montoOrigen - montoDestino, 0) : 0;
+  const pctMonto = mostrarMonto && montoOrigen > 0 ? Math.round((montoDestino / montoOrigen) * 100) : 0;
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
         <div className="min-w-0">
           <p className="text-xs text-gray-400 mb-0.5">{labelOrigen}</p>
           <p className="text-2xl sm:text-3xl font-bold text-gray-800">{totalOrigen}</p>
+          {mostrarMonto && <p className="text-[18px] text-gray-400 mt-0.5 whitespace-nowrap">{fmt(montoOrigen)}</p>}
         </div>
         <div className="text-2xl font-light text-gray-300 pb-1">→</div>
         <div className="min-w-0">
           <p className="text-xs text-gray-400 mb-0.5">{labelDestino}</p>
           <p className={`text-2xl sm:text-3xl font-bold ${colorDestino}`}>{enlazados}</p>
+          {mostrarMonto && (
+            <p className="text-[18px] text-gray-500 mt-0.5 whitespace-nowrap">
+              {fmt(montoDestino)} <span className="text-gray-400">({pctMonto}%)</span>
+            </p>
+          )}
         </div>
         <div
           className={`min-w-0 ${onClickSinVincular ? "cursor-pointer hover:opacity-70 transition" : ""}`}
@@ -73,6 +85,11 @@ function FilaConversion({ labelOrigen, labelDestino, totalOrigen, enlazados, col
         >
           <p className="text-xs text-gray-400 mb-0.5">{labelOrigen} sin {labelDestino.toLowerCase()}</p>
           <p className="text-2xl sm:text-3xl font-bold text-red-500">{sinVincular}</p>
+          {mostrarMonto && (
+            <p className="text-[18px] text-red-500 mt-0.5 whitespace-nowrap">
+              {fmt(montoPendiente)} ({100 - pctMonto}%)
+            </p>
+          )}
         </div>
       </div>
       <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
@@ -85,14 +102,23 @@ function FilaConversion({ labelOrigen, labelDestino, totalOrigen, enlazados, col
   );
 }
 
-// ── Tarjeta de conversión: Cotización → OC → Factura ─────────────────────────
-function KpiContrasteCard({ cots, ocs, facts }) {
-  const navigate = useNavigate();
+// ── Tarjeta de conversión: Cotización enviada → aceptada → OC → Factura ─────
+// `ocsTodas`/`factsTodas`/`otsTodas` van SIN el filtro de fecha del
+// Dashboard — el vínculo se chequea contra el universo completo del
+// documento destino (la OT de una cotización de julio puede haberse creado
+// en agosto), solo `cots`/`ocs` (los "totalOrigen") respetan el filtro.
+function KpiContrasteCard({ cots, ocs, ocsTodas, factsTodas, otsTodas }) {
+  const montoCot = (c) => Number(c.total) || 0;
 
-  const cotizacionesConOC = new Set(ocs.map((oc) => oc.cotizacion?._id).filter(Boolean));
-  const cotsConOC = cots.filter((c) => cotizacionesConOC.has(c._id)).length;
+  // "Enviadas": todas las cotizaciones no anuladas. "Aceptadas": de esas,
+  // las que ya generaron al menos una Orden de Trabajo.
+  const cotsEnviadas = cots.filter((c) => !c.anulado);
+  const cotizacionesConOT = new Set(otsTodas.map((o) => o.cotizacion?._id).filter(Boolean));
+  const cotsAceptadas = cotsEnviadas.filter((c) => cotizacionesConOT.has(c._id));
+  const montoEnviadas = cotsEnviadas.reduce((s, c) => s + montoCot(c), 0);
+  const montoAceptadas = cotsAceptadas.reduce((s, c) => s + montoCot(c), 0);
 
-  const ocsConFactura = new Set(facts.map((f) => f.ordenCompra?._id).filter(Boolean));
+  const ocsConFactura = new Set(factsTodas.map((f) => f.ordenCompra?._id).filter(Boolean));
   const ocsConFacturaCount = ocs.filter((oc) => ocsConFactura.has(oc._id)).length;
 
   return (
@@ -101,10 +127,10 @@ function KpiContrasteCard({ cots, ocs, facts }) {
         Conversión de documentos
       </p>
       <FilaConversion
-        labelOrigen="Cotizaciones" labelDestino="Órdenes de Compra"
-        totalOrigen={cots.length} enlazados={cotsConOC}
+        labelOrigen="Cotizaciones enviadas" labelDestino="Cotizaciones aceptadas"
+        totalOrigen={cotsEnviadas.length} enlazados={cotsAceptadas.length}
+        montoOrigen={montoEnviadas} montoDestino={montoAceptadas}
         colorBarra="bg-indigo-500" colorDestino="text-indigo-700"
-        onClickSinVincular={() => navigate("/cotizaciones", { state: { filtroOC: "sin" } })}
       />
       <div className="border-t border-gray-100" />
       <FilaConversion
@@ -350,8 +376,6 @@ export default function Dashboard() {
     .filter((f) => f.estadoPago !== "pagado")
     .reduce((s, f) => s + montoFactura(f), 0);
 
-  const fmt = (n) => `S/ ${Number(n).toLocaleString("es-PE", { minimumFractionDigits: 2 })}`;
-
   if (cargando) {
     return <div className="p-8 text-sm text-gray-400">Cargando dashboard…</div>;
   }
@@ -414,7 +438,7 @@ export default function Dashboard() {
       </div>
 
       {/* Contraste OC vs Cotizaciones */}
-      <KpiContrasteCard cots={cotsFiltradas} ocs={ocsFiltradas} facts={factsFiltradas} />
+      <KpiContrasteCard cots={cotsFiltradas} ocs={ocsFiltradas} ocsTodas={ocs} factsTodas={facts} otsTodas={ots} />
 
       {/* Gráficos */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
