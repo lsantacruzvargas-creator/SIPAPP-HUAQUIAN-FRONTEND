@@ -14,7 +14,18 @@ export default function ModalOrdenCompra({ cotizacion, onClose, onCreada }) {
   // Administración no ve/edita el monto — se hereda tal cual de la cotización
   // (mismo criterio que ModalCrearOrdenCompra.jsx y Cotizaciones, Fase 16).
   const esAsistente = getUsuario()?.rol === "asistente";
-  const [monto, setMonto]               = useState(cotizacion.total ?? 0);
+  // `monto` es el SUBTOTAL sin IGV (mismo campo que se manda a calcular()) —
+  // antes este estado guardaba el total con IGV pero el input mostraba
+  // monto/1.18 con .toFixed(2) en cada render, y onChange escribía el valor
+  // tipeado directo en `monto` sin revertir esa conversión: cada tecla
+  // disparaba un recálculo que hacía "saltar" el valor mostrado a otra
+  // cifra, así que en la práctica no se podía editar aunque no tenía
+  // `disabled`. Ahora el estado y el input manejan el mismo número (el
+  // subtotal), sin conversión de por medio — permite crear una OC con
+  // monto menor al de la cotización. Pedido explícito del usuario, 2026-09-23.
+  const [monto, setMonto] = useState(() =>
+    cotizacion.subtotal != null ? Number(cotizacion.subtotal) : (Number(cotizacion.total) || 0) / 1.18
+  );
   const [numeroOrden, setNumeroOrden] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [error, setError]         = useState("");
@@ -26,7 +37,7 @@ export default function ModalOrdenCompra({ cotizacion, onClose, onCreada }) {
     if (!esAsistente && (!monto || Number(monto) <= 0)) return setError("El monto es obligatorio.");
     setGuardando(true);
     setError("");
-    const calc = calcular(Number(monto) / 1.18); // Guardamos el subtotal sin IGV
+    const calc = calcular(Number(monto)); // `monto` ya es el subtotal sin IGV
     const res = await fetchAuth("/ordenes-compra", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -111,15 +122,15 @@ export default function ModalOrdenCompra({ cotizacion, onClose, onCreada }) {
 
           {!esAsistente && (
             <div>
-              <label className="text-xs text-gray-500 block mb-1">Monto (S/)</label>
+              <label className="text-xs text-gray-500 block mb-1">Monto sin IGV (S/)</label>
               <input
                 type="number"
-                value={Number(monto/1.18).toFixed(2)}
+                value={monto}
                 onChange={(e) => setMonto(e.target.value)}
-                disabled={esAsistente}
                 className={INP}
                 min="0"
-                step="0.1"
+                step="0.01"
+                placeholder="0.00"
               />
             </div>
           )}
