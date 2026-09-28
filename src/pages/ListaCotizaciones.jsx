@@ -101,7 +101,7 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
               <th className={`${TH} text-center`}>Aprobado</th>
               <th className={`${TH} text-center`}>Enviado</th>
               {mostrarEstadoServicio && <th className={`${TH} text-center`}>Estado de servicio</th>}
-              {mostrarEstadoServicio && <th className={`${TH} text-center`}>Fecha de salida</th>}
+              {mostrarEstadoServicio && <th className={`${TH} text-center`}>Fecha de salida a cliente</th>}
               {puedeVerPrecios && <th className={`${TH} text-right`}>Total sin IGV (S/)</th>}
               {puedeVerPrecios && <th className={`${TH} text-right`}>Total sin IGV (US$)</th>}
               <th className={`${TH} text-center`}>Informe enviado</th>

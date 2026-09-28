@@ -775,7 +775,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
                 <input name="numeroGuiaRemision" value={form.numeroGuiaRemision} onChange={handleChange} placeholder="—" className={INP} />
               </div>
               <div>
-                <label className="text-xs text-gray-500 block mb-1">Fecha de salida</label>
+                <label className="text-xs text-gray-500 block mb-1">Fecha de salida a cliente</label>
                 <input type="date" name="fechaSalida" value={form.fechaSalida} onChange={handleChange} className={INP} />
               </div>
             </div>
