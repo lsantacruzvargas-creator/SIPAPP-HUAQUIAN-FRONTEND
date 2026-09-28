@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { fetchAuth } from "../utils/fetchAuth";
+import { fechaHoyLima } from "../utils/fecha";
 import TablaScroll from "../components/TablaScroll";
 import {
   AFECTACION_IGV,
@@ -491,7 +492,7 @@ export default function EmitirComprobante() {
   const crearFacturaInterna = async (dataCpe) => {
     const factPayload = {
       numeroFactura:      dataCpe.serie,
-      fechaEmision:       new Date().toISOString().split("T")[0],
+      fechaEmision:       fechaHoyLima(),
       subtotal:           totales.base,
       descripcion:        ocOrigen.descripcion || ocOrigen.titulo || "",
       encargado:          ocOrigen.encargado || "",

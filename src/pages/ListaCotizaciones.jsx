@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
-import { formatearFecha } from "../utils/fecha";
+import { formatearFecha, anioLima, mesLima } from "../utils/fecha";
 import DetalleDocumento from "../components/DetalleDocumento";
 import ModalImportarExcel, { COLS_COT_OT, COLS_COTIZACIONES } from "../components/ModalImportarExcel";
 import ModalNuevaOT from "../components/ModalNuevaOT";
@@ -326,7 +326,7 @@ export default function ListaCotizaciones() {
 
   const filas = [...cotizaciones, ...otsSinCotizacion.map(pseudoDeOT)];
 
-  const anos = [...new Set(filas.map((c) => new Date(c.fecha).getFullYear()))].sort(
+  const anos = [...new Set(filas.map((c) => anioLima(c.fecha)))].sort(
     (a, b) => b - a
   );
 
@@ -354,8 +354,8 @@ export default function ListaCotizaciones() {
     return (
       (!filtros.empresa || c.empresa?._id === filtros.empresa) &&
       (!filtros.planta || c.planta === filtros.planta) &&
-      (!filtros.ano || fecha.getFullYear() === parseInt(filtros.ano)) &&
-      (!filtros.mes || fecha.getMonth() + 1 === parseInt(filtros.mes)) &&
+      (!filtros.ano || anioLima(fecha) === parseInt(filtros.ano)) &&
+      (!filtros.mes || mesLima(fecha) === parseInt(filtros.mes)) &&
       (!filtros.oc  || (filtros.oc === "con" ? tieneOC(c) : !tieneOC(c))) &&
       (!filtros.informeEnviado || c.informeEnviado) &&
       (!q ||

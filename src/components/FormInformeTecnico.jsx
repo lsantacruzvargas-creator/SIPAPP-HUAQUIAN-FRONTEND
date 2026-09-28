@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchAuth, uploadAuth, getUsuario } from "../utils/fetchAuth";
-import { formatearFecha } from "../utils/fecha";
+import { formatearFecha, fechaHoyLima, aInputFecha } from "../utils/fecha";
 import { tipoInformePorValor, claveChecklist } from "../utils/informesTecnicos";
 import ImagenProtegida from "./ImagenProtegida";
 import TablaScroll from "./TablaScroll";
@@ -428,7 +428,7 @@ export default function FormInformeTecnico({ ordenTrabajo, tipo, informeExistent
   const [hechoPor, setHechoPor] = useState(informeExistente?.hechoPor ?? getUsuario()?.nombre ?? "");
   const [vB, setVB] = useState(informeExistente?.vB ?? "");
   const [fecha, setFecha] = useState(
-    informeExistente?.fecha ? new Date(informeExistente.fecha).toISOString().split("T")[0] : new Date().toISOString().split("T")[0]
+    informeExistente?.fecha ? aInputFecha(informeExistente.fecha) : fechaHoyLima()
   );
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");

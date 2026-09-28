@@ -2,6 +2,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { HUAQUIAN, nombreArchivoCotizacionPdf } from "./cotizacionPdf";
 import { GRUPOS_ALICORP, calcSubtotal, calcularAlicorp, descripcionConSubItems } from "./cotizacionItems";
+import { fechaHoyLima } from "./fecha";
 
 // Cargar así (no `import logo from "./logo.png"`) para que un archivo
 // todavía no subido solo falle esa imagen puntual en vez de romper todo el
@@ -151,7 +152,7 @@ export const exportarCotizacionAlicorpPdf = async (cotizacion) => {
   // El código de cotización es el correlativo de la cotización + "-" + los 2
   // últimos dígitos del año actual (ej. "10398-26") — se calcula acá, no se
   // guarda en el documento.
-  const anioYY = String(new Date().getFullYear()).slice(-2);
+  const anioYY = fechaHoyLima().slice(0, 4).slice(-2);
   const codigoCotizacion = `${cotizacion.numeroCotizacion || cotizacion.codigo || "—"}-${anioYY}`;
   labelValor(M, y, "Código de cotización:    ", codigoCotizacion); y += 4.2;
   if (cotizacion.textoBreveServicio) {

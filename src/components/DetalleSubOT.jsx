@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
-import { formatearFecha } from "../utils/fecha";
+import { formatearFecha, aInputFecha } from "../utils/fecha";
 import ModalSeleccionarTipoInforme from "./ModalSeleccionarTipoInforme";
 import FormInformeTecnico from "./FormInformeTecnico";
 import VistaInformeTecnico from "./VistaInformeTecnico";
@@ -41,7 +41,7 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
     estado:                 inicial.estado                 || "pendiente",
     entregadoPor:           inicial.entregadoPor           || "",
     fechaEntrega: inicial.fechaEntrega
-      ? new Date(inicial.fechaEntrega).toISOString().split("T")[0] : "",
+      ? aInputFecha(inicial.fechaEntrega) : "",
     numeroGuiaRemision:    inicial.numeroGuiaRemision    || "",
     observaciones:          inicial.observaciones          || "",
     irreparable:            inicial.irreparable            || false,

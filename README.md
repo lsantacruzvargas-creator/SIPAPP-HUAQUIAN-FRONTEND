@@ -112,6 +112,11 @@ Sistema aparte de las notas de avance simples (`Informe`, backend `/api/informes
 - Componentes compartidos de detalle (`TarjetaRelacion`, `FlujoNegocio`, `Chip`, `DotChip`, `money()`, helpers `badge*/dot*`) viven en `src/components/detalleShared.jsx`.
 - Páginas de lista con varias categorías usan un selector de "vista", con una tabla "Todas las X" sin filtrar como opción por defecto, más las tablas categorizadas individuales.
 - Import/Export Excel vía librería `xlsx` (`ModalImportarExcel.jsx`).
+- **Fechas siempre vía `src/utils/fecha.js`** (hora de Perú, America/Lima), nunca `toLocaleDateString()`, `toISOString().split("T")[0]` ni `getFullYear()`/`getMonth()` a secas (usan UTC o el huso del sistema operativo):
+  - Mostrar: `formatearFecha` / `formatearFechaHora`.
+  - Precargar un `<input type="date">` al editar: `aInputFecha(fecha)`. Para "hoy": `fechaHoyLima()`.
+  - Filtros por año/mes: `anioLima` / `mesLima`.
+  - Los registros anteriores al 2026-09-28 guardaron las fechas sin hora a medianoche UTC exacta (no se migraron). `fecha.js` lee ese valor exacto como día calendario en UTC, así se ven con su día correcto junto a los nuevos, que llegan a medianoche Lima.
 - Nunca `window.alert`/`confirm`/`prompt` — en Electron son diálogos nativos del SO que pueden dejar el foco de teclado/mouse sin volver al `BrowserWindow` (bug real confirmado en este proyecto). Usar siempre un modal de confirmación propio en React.
 
 ## Build de escritorio (Electron)

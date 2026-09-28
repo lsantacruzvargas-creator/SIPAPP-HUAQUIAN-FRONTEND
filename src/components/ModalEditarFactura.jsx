@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchAuth } from "../utils/fetchAuth";
-import { formatearFecha } from "../utils/fecha";
+import { formatearFecha, aInputFecha } from "../utils/fecha";
 
 const INP     = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 w-full";
 const INP_RO  = "border border-gray-100 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500 w-full";
@@ -62,7 +62,7 @@ export default function ModalEditarFactura({ factura: inicial, onClose, onGuarda
   const [form, setForm] = useState({
     numeroFactura:      inicial.numeroFactura      || "",
     fechaCancelacion:   inicial.fechaCancelacion
-      ? new Date(inicial.fechaCancelacion).toISOString().split("T")[0] : "",
+      ? aInputFecha(inicial.fechaCancelacion) : "",
     empresa:            inicial.empresa?._id       || "",
     subtotal:           subtotalInicial != null ? String(subtotalInicial) : "",
     descripcion:        inicial.descripcion        || "",

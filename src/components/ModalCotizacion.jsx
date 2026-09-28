@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
-import { formatearFecha } from "../utils/fecha";
+import { formatearFecha, aInputFecha } from "../utils/fecha";
 import { exportarCotizacionPdf } from "../utils/cotizacionPdf";
 import ModalCrearOT from "./ModalCrearOT";
 import ModalOrdenCompra from "./ModalOrdenCompra";
@@ -342,8 +342,8 @@ export default function ModalCotizacion({ cotizacion: inicial, onClose, onSaved 
       tipo: cot.tipo,
       empresa: cot.empresa?._id || "",
       condicionPago: cot.condicionPago,
-      fecha: cot.fecha ? new Date(cot.fecha).toISOString().split("T")[0] : "",
-      fechaRecibida: cot.fechaRecibida ? new Date(cot.fechaRecibida).toISOString().split("T")[0] : "",
+      fecha: cot.fecha ? aInputFecha(cot.fecha) : "",
+      fechaRecibida: cot.fechaRecibida ? aInputFecha(cot.fechaRecibida) : "",
       titulo: cot.titulo,
       numeroCotizacion: cot.numeroCotizacion || "",
       numeroGuiaEmision: cot.numeroGuiaEmision || "",

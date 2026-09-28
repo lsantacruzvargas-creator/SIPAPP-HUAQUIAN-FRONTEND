@@ -1,6 +1,6 @@
 import { useState, useEffect, Fragment } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
-import { formatearFecha } from "../utils/fecha";
+import { formatearFecha, fechaHoyLima } from "../utils/fecha";
 import { exportarCotizacionPdf } from "../utils/cotizacionPdf";
 import {
   calcSubtotal,
@@ -12,7 +12,7 @@ import {
 import CeldasNumericas from "../components/CeldasNumericas";
 import TablaScroll from "../components/TablaScroll";
 
-const hoy = () => new Date().toISOString().split("T")[0];
+const hoy = () => fechaHoyLima();
 
 export default function Cotizaciones() {
   const [empresas, setEmpresas] = useState([]);

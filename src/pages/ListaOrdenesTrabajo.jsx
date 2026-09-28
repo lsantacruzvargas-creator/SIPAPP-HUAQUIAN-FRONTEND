@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
-import { formatearFecha } from "../utils/fecha";
+import { formatearFecha, aInputFecha } from "../utils/fecha";
 import DetalleDocumento from "../components/DetalleDocumento";
 import ModalNuevaOT from "../components/ModalNuevaOT";
 import ModalImportarExcel, { COLS_OT } from "../components/ModalImportarExcel";
@@ -61,14 +61,15 @@ const diasDesdeRecibido = (fecha) => {
 };
 
 // Rango de fechas (Fecha de Ingreso) del filtro — "desde"/"hasta" son fechas
-// sin hora (input type=date) ancladas al día calendario de Lima (UTC-5 fijo),
-// mismo criterio que el filtro de Movimientos de Almacén.
+// sin hora (input type=date); se compara el día calendario de Lima como texto
+// "YYYY-MM-DD" (aInputFecha también resuelve los registros antiguos guardados
+// a medianoche UTC).
 const dentroDeRangoFecha = (fecha, desde, hasta) => {
   if (!desde && !hasta) return true;
   if (!fecha) return false;
-  const t = new Date(fecha).getTime();
-  if (desde && t < new Date(`${desde}T00:00:00-05:00`).getTime()) return false;
-  if (hasta && t > new Date(`${hasta}T23:59:59.999-05:00`).getTime()) return false;
+  const dia = aInputFecha(fecha);
+  if (desde && dia < desde) return false;
+  if (hasta && dia > hasta) return false;
   return true;
 };
 

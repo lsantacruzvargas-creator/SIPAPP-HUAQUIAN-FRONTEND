@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchAuth } from "../utils/fetchAuth";
-import { formatearFecha } from "../utils/fecha";
+import { formatearFecha, fechaHoyLima, anioLima, mesLima } from "../utils/fecha";
 import ModalOTEquipo from "../components/ModalOTEquipo";
 import TablaScroll from "../components/TablaScroll";
 
@@ -16,7 +16,7 @@ const badgeOT = (e) => {
   return "bg-gray-100 text-gray-400";
 };
 
-const hoyISO = () => new Date().toISOString().split("T")[0];
+const hoyISO = () => fechaHoyLima();
 
 const INP = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 w-full";
 const INP_RO = "border border-gray-100 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500 w-full cursor-not-allowed";
@@ -129,7 +129,7 @@ export default function IngresoEquipos() {
     setGuardando(false);
   };
 
-  const aniosLista = [...new Set(ingresos.map((i) => new Date(i.fechaIngreso).getFullYear()))].sort((a, b) => b - a);
+  const aniosLista = [...new Set(ingresos.map((i) => anioLima(i.fechaIngreso)))].sort((a, b) => b - a);
 
   const empresasLista = [
     ...new Map(
@@ -153,8 +153,8 @@ export default function IngresoEquipos() {
       || ot?.codigo?.toLowerCase().includes(txt)
       || i.numeroGuiaEmision?.toLowerCase().includes(txt);
     const matchEstado  = !estadoFiltro  || ot?.estado === estadoFiltro;
-    const matchAnio    = !anioFiltro    || fecha.getFullYear() === parseInt(anioFiltro);
-    const matchMes     = !mesFiltro     || fecha.getMonth() + 1 === parseInt(mesFiltro);
+    const matchAnio    = !anioFiltro    || anioLima(fecha) === parseInt(anioFiltro);
+    const matchMes     = !mesFiltro     || mesLima(fecha) === parseInt(mesFiltro);
     const matchEmpresa = !empresaFiltro || i.empresa?._id === empresaFiltro;
     const matchPlanta  = !plantaFiltro  || i.planta === plantaFiltro;
     return matchBusq && matchEstado && matchAnio && matchMes && matchEmpresa && matchPlanta;

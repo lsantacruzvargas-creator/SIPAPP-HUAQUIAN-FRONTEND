@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
-import { formatearFecha } from "../utils/fecha";
+import { formatearFecha, anioLima, mesLima, aInputFecha, fechaHoyLima } from "../utils/fecha";
 import DetalleDocumento from "../components/DetalleDocumento";
 import ModalCrearFactura  from "../components/ModalCrearFactura";
 import ModalImportarExcel, { COLS_FACTURAS } from "../components/ModalImportarExcel";
@@ -31,9 +31,7 @@ function BadgeCancelacion({ fecha, pagado }) {
     return <span className="inline-flex flex-col items-center"><span className="text-xs font-medium text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full line-through">Vencimiento</span><span className="text-xs text-gray-300 line-through">{str}</span></span>;
   }
 
-  const hoy   = new Date(); hoy.setHours(0, 0, 0, 0);
-  const vence = new Date(fecha); vence.setHours(0, 0, 0, 0);
-  const dias  = (vence - hoy) / 86400000;
+  const dias = (Date.parse(aInputFecha(fecha)) - Date.parse(fechaHoyLima())) / 86400000;
   if (dias < 0)  return <span className="inline-flex flex-col items-center"><span className="text-xs font-medium text-red-700 bg-red-50 px-2 py-0.5 rounded-full">Vencida</span><span className="text-xs text-red-400">{str}</span></span>;
   if (dias <= 7) return <span className="inline-flex flex-col items-center"><span className="text-xs font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">Próx. a vencer</span><span className="text-xs text-amber-500">{str}</span></span>;
   return <span className="text-xs text-gray-500">{str}</span>;
@@ -367,7 +365,7 @@ export default function ListaFacturas() {
   )].sort();
 
   const anos = [...new Set(
-    facturas.map(f => new Date(f.fechaEmision).getFullYear())
+    facturas.map(f => anioLima(f.fechaEmision))
   )].sort((a, b) => b - a);
 
   const handleFiltro = e => setFiltros({ ...filtros, [e.target.name]: e.target.value });
@@ -379,8 +377,8 @@ export default function ListaFacturas() {
     return (
       (!filtros.empresa    || f.empresa?._id === filtros.empresa) &&
       (!filtros.planta     || f.planta === filtros.planta) &&
-      (!filtros.ano        || fecha.getFullYear() === parseInt(filtros.ano)) &&
-      (!filtros.mes        || fecha.getMonth() + 1 === parseInt(filtros.mes)) &&
+      (!filtros.ano        || anioLima(fecha) === parseInt(filtros.ano)) &&
+      (!filtros.mes        || mesLima(fecha) === parseInt(filtros.mes)) &&
       (!filtros.estadoPago || f.estadoPago === filtros.estadoPago) &&
       (!q ||
         f.numeroFactura?.toLowerCase().includes(q) ||

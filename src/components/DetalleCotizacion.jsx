@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
-import { formatearFecha } from "../utils/fecha";
+import { formatearFecha, fechaHoyLima, aInputFecha } from "../utils/fecha";
 import { exportarCotizacionPdf } from "../utils/cotizacionPdf";
 import { exportarCotizacionGloriaPdf } from "../utils/cotizacionGloriaPdf";
 import { exportarCotizacionAlicorpPdf } from "../utils/cotizacionAlicorpPdf";
@@ -73,8 +73,8 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
     plazoEntrega: inicial.plazoEntrega || "2 días hábiles",
     lugarEntrega: inicial.lugarEntrega || "",
     validezOferta: inicial.validezOferta || "15 días",
-    fecha: inicial.fecha ? new Date(inicial.fecha).toISOString().split("T")[0] : "",
-    fechaRecibida: inicial.fechaRecibida ? new Date(inicial.fechaRecibida).toISOString().split("T")[0] : "",
+    fecha: inicial.fecha ? aInputFecha(inicial.fecha) : "",
+    fechaRecibida: inicial.fechaRecibida ? aInputFecha(inicial.fechaRecibida) : "",
     titulo: inicial.titulo || "",
     numeroCotizacion: inicial.numeroCotizacion || "",
     atencion: inicial.atencion || "",
@@ -84,7 +84,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
     numeroGuiaEmision: inicial.numeroGuiaEmision || "",
     numeroGuiaRemision: inicial.numeroGuiaRemision || "",
     codigoSap: inicial.codigoSap || "",
-    fechaSalida: inicial.fechaSalida ? new Date(inicial.fechaSalida).toISOString().split("T")[0] : "",
+    fechaSalida: inicial.fechaSalida ? aInputFecha(inicial.fechaSalida) : "",
     asesorComercial: inicial.asesorComercial || "Jose Mateo",
     numeroCelular: inicial.numeroCelular || "+51 966 757 528",
     numeroSolicitudPedido: inicial.numeroSolicitudPedido || "",
@@ -118,7 +118,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
   const [modalCerrarCadenaOpen, setModalCerrarCadenaOpen] = useState(false);
-  const [fechaPagoCierre, setFechaPagoCierre] = useState(() => new Date().toISOString().slice(0, 10));
+  const [fechaPagoCierre, setFechaPagoCierre] = useState(() => fechaHoyLima());
   const [numeroFacturaCierre, setNumeroFacturaCierre] = useState("");
   const [cerrandoCadena, setCerrandoCadena] = useState(false);
   const [crearOTOpen, setCrearOTOpen] = useState(false);

@@ -1,3 +1,4 @@
+import { aInputFecha } from "./fecha";
 export const UNIDADES = ["und", "kg", "g", "L", "mL", "m", "cm", "m²", "caja", "rollo", "par", "juego", "bolsa"];
 
 export const calcSubtotal = (item) =>
@@ -48,7 +49,7 @@ export const itemDesdeDb = (item) => ({
   unidad: item.unidad || "und",
   cantidad: item.cantidad,
   fechaEntrega: item.fechaEntrega
-    ? new Date(item.fechaEntrega).toISOString().split("T")[0]
+    ? aInputFecha(item.fechaEntrega)
     : "",
   precio: item.precio,
   moneda: item.moneda || "PEN",

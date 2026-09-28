@@ -1,6 +1,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { formatearFecha } from "./fecha";
+import { formatearFecha, fechaHoyLima } from "./fecha";
 import { numeroALetras } from "./numeroALetras";
 
 // Se cargan desde /public (no un import de módulo) para que, si el archivo
@@ -42,7 +42,7 @@ export const HUAQUIAN = {
 // archivo de Windows antes de armar el `.pdf`.
 export function nombreArchivoCotizacionPdf(cotizacion) {
   const numero = cotizacion.numeroCotizacion || cotizacion.codigo || "—";
-  const anioActual = new Date().getFullYear();
+  const anioActual = fechaHoyLima().slice(0, 4);
   const titulo = cotizacion.titulo || "";
   return `${numero} - ${anioActual} - ${titulo}`.replace(/[\\/:*?"<>|]/g, "-").trim() + ".pdf";
 }

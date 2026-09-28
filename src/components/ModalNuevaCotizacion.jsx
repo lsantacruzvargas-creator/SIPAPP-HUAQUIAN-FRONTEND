@@ -6,6 +6,7 @@ import TablaItemsCotizacionGloria from "./TablaItemsCotizacionGloria";
 import TablaItemsCotizacionAlicorp from "./TablaItemsCotizacionAlicorp";
 import SelectorEmpresas from "./SelectorEmpresas";
 import { FlujoNegocio, TarjetaRelacion, money } from "./detalleShared";
+import { fechaHoyLima } from "../utils/fecha";
 
 const INP = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 w-full transition";
 
@@ -29,7 +30,7 @@ function calcular(sub, descuentoPct = 0) {
 
 const FORM_VACIO = {
   empresa: "", tipo: "venta", numeroCotizacion: "", atencion: "",
-  fecha: new Date().toISOString().split("T")[0], fechaRecibida: "",
+  fecha: fechaHoyLima(), fechaRecibida: "",
   // Estos van con su valor por defecto YA cargado en el estado (no solo
   // mostrado en el input) — antes el input mostraba "2 días hábiles"/etc.
   // como mero placeholder visual (`value={form.x || "default"}`) pero el

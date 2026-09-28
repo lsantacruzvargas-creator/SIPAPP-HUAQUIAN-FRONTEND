@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchAuth, uploadAuth, abrirArchivoProtegido, getUsuario } from "../utils/fetchAuth";
-import { formatearFecha } from "../utils/fecha";
+import { formatearFecha, anioLima, mesLima } from "../utils/fecha";
 import DetalleDocumento from "../components/DetalleDocumento";
 import ModalCrearOrdenCompra   from "../components/ModalCrearOrdenCompra";
 import ModalImportarExcel, { COLS_OC, COLS_CADENA } from "../components/ModalImportarExcel";
@@ -346,7 +346,7 @@ export default function ListaOrdenesCompra() {
 
   useEffect(() => { cargar(); }, []);
 
-  const anios = [...new Set(ordenes.map((o) => new Date(o.fecha).getFullYear()))].sort((a, b) => b - a);
+  const anios = [...new Set(ordenes.map((o) => anioLima(o.fecha)))].sort((a, b) => b - a);
 
   const empresasLista = [
     ...new Map(
@@ -364,8 +364,8 @@ export default function ListaOrdenesCompra() {
 
   const filtradas = ordenes.filter((o) => {
     const fecha = new Date(o.fecha);
-    const matchAnio  = !anio || fecha.getFullYear() === Number(anio);
-    const matchMes   = !mes || fecha.getMonth() + 1 === Number(mes);
+    const matchAnio  = !anio || anioLima(fecha) === Number(anio);
+    const matchMes   = !mes || mesLima(fecha) === Number(mes);
     const txt = busqueda.toLowerCase();
     const factura = factByOCMap[o._id] || factMap[o.cotizacion?._id || o.cotizacion];
     const grupoOT = otGroupMap[o.numeroDocumento];
