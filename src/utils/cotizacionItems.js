@@ -1,5 +1,5 @@
 import { aInputFecha } from "./fecha";
-export const UNIDADES = ["und", "kg", "g", "L", "mL", "m", "cm", "m²", "caja", "rollo", "par", "juego", "bolsa"];
+export const UNIDADES = ["und", "kg", "g", "L", "mL", "m", "cm", "m²", "caja", "rollo", "par", "juego", "bolsa", "días", "H/H", "Global"];
 
 export const calcSubtotal = (item) =>
   parseFloat((item.cantidad * item.precio).toFixed(2));
