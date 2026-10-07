@@ -198,6 +198,7 @@ export default function EmitirComprobante() {
     setTipoDoc(t);
     setSerie(SERIE_POR_TIPO[t]);
     if (t === "01") setReceptor((r) => ({ ...r, schemeID: "6" }));
+    else setRetencionAplica(false);
     if (t !== "07" && t !== "08") {
       setReferencia(REFERENCIA_VACIA);
       setMotivoCodigo("");
@@ -395,7 +396,9 @@ export default function EmitirComprobante() {
       if (!detraccionCuentaBancaria.trim()) return "La cuenta del Banco de la Nación es requerida.";
       if (!cuentaDetraccionValida(detraccionCuentaBancaria)) return "La cuenta del Banco de la Nación debe tener 11 dígitos.";
     }
-    if (!esNota && retencionAplica && retencionMonto <= 0) return "El porcentaje de retención debe ser mayor a 0.";
+    if (retencionAplica && !(Number(retencionPorcentaje) > 0 && Number(retencionPorcentaje) < 100)) {
+      return "El porcentaje de retención debe ser mayor a 0 y menor a 100.";
+    }
     if (esNota) {
       if (!referencia.id) return "Selecciona el comprobante a modificar.";
       if (!motivoCodigo) return "Selecciona el motivo.";
@@ -1030,6 +1033,8 @@ export default function EmitirComprobante() {
                 )}
               </div>
 
+              {/* Solo en factura: la retención del IGV no aplica a boletas. */}
+              {tipoDoc === "01" && (
               <div className="mt-4 pt-4 border-t border-gray-100">
                 <label className="flex items-center gap-2 text-sm font-medium text-gray-500 mb-3">
                   <input type="checkbox" checked={retencionAplica} disabled={ro}
@@ -1060,6 +1065,7 @@ export default function EmitirComprobante() {
                   </div>
                 )}
               </div>
+              )}
 
               <div className="mt-4 pt-4 border-t border-gray-100">
                 <label className="block text-xs font-medium text-gray-500 mb-1">N° Orden de Compra (opcional)</label>
