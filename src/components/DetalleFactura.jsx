@@ -10,14 +10,17 @@ import {
 const INP    = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 w-full transition";
 const INP_RO = "border border-gray-100 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500 w-full cursor-not-allowed";
 
-function calcular(sub) {
+function calcular(sub, retencionPct = 0) {
   const s = Math.round(Number(sub) * 100) / 100 || 0;
   const igv = Math.round(s * 0.18 * 100) / 100;
   const total = Math.round((s + igv) * 100) / 100;
+  // Con retención del IGV no hay detracción — mismo cálculo que routes/facturas.js.
+  const pct = Number(retencionPct) || 0;
+  const retencion = pct > 0 ? Math.round(total * pct) / 100 : 0;
   // R.S. 178-2005/SUNAT: aplica solo si el total (con IGV) es >= S/ 701, y el
   // depósito se hace en números enteros (sin decimales).
-  const detraccion = total >= 701 ? Math.round(total * 0.12) : 0;
-  return { igv, total, detraccion, totalAPagar: Math.round((total - detraccion) * 100) / 100 };
+  const detraccion = pct > 0 ? 0 : (total >= 701 ? Math.round(total * 0.12) : 0);
+  return { igv, total, detraccion, retencion, totalAPagar: Math.round((total - detraccion - retencion) * 100) / 100 };
 }
 
 function BuscadorOC({ onSelect, onClose }) {
@@ -79,7 +82,8 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
     fechaSalida: inicial.fechaSalida
       ? aInputFecha(inicial.fechaSalida) : "",
   });
-  const [calc, setCalc]           = useState(calcular(subtotalInicial));
+  const retencionPct = inicial.retencionPorcentaje || 0;
+  const [calc, setCalc]           = useState(calcular(subtotalInicial, retencionPct));
   const [ocVinculada, setOC]      = useState(inicial.ordenCompra || null);
   const [empresas, setEmpresas]   = useState([]);
   const [buscadorOC, setBOC]      = useState(false);
@@ -163,7 +167,7 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    if (name === "subtotal") setCalc(calcular(value));
+    if (name === "subtotal") setCalc(calcular(value, retencionPct));
     setForm(prev => ({
       ...prev,
       [name]: value,
@@ -176,7 +180,7 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
     setBOC(false);
     setForm(prev => {
       const nuevoSub = prev.subtotal || (oc.subtotal > 0 ? String(oc.subtotal) : prev.subtotal);
-      if (!prev.subtotal && oc.subtotal > 0) setCalc(calcular(oc.subtotal));
+      if (!prev.subtotal && oc.subtotal > 0) setCalc(calcular(oc.subtotal, retencionPct));
       return {
         ...prev,
         empresa:     prev.empresa     || oc.empresa?._id || "",
@@ -477,8 +481,8 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
                   <p className="font-semibold text-gray-700">{calc.total.toFixed(2)}</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-xs text-gray-400">Detracción 12%</p>
-                  <p className="font-semibold text-gray-700">{calc.detraccion.toFixed(2)}</p>
+                  <p className="text-xs text-gray-400">{retencionPct > 0 ? `Retención ${retencionPct}%` : "Detracción 12%"}</p>
+                  <p className="font-semibold text-gray-700">{(retencionPct > 0 ? calc.retencion : calc.detraccion).toFixed(2)}</p>
                 </div>
               </div>
               <div className="flex items-center justify-between pt-3 border-t border-gray-200">

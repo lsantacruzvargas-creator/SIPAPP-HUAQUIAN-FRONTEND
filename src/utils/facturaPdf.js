@@ -66,6 +66,10 @@ export async function generarFacturaPdf({ factura, comprobante, empresa }) {
     : (factura.detraccion > 0 ? { montoNeto: factura.detraccion, porcentaje: 12 } : null);
   const bienDet = det?.codigoBien && DETRACCION_BIENES_SERVICIOS.find((b) => b.codigo === det.codigoBien);
   const montoDet = det ? Math.round(Number(det.montoNeto) || 0) : 0;
+  const ret = c
+    ? (c.retencion?.aplica ? c.retencion : null)
+    : (factura.retencion > 0 ? { monto: factura.retencion, porcentaje: factura.retencionPorcentaje } : null);
+  const montoRet = ret ? Number(ret.monto) || 0 : 0;
   const cuotas = c ? (c.cuotas || []) : (factura.cuotas || []);
 
   const formaPago = c
@@ -208,7 +212,7 @@ export async function generarFacturaPdf({ factura, comprobante, empresa }) {
 
   // ─── Detracción + información del crédito ───
   const tabW = 117, etqW = 45;
-  asegurarEspacio((8 + cuotas.length) * H);
+  asegurarEspacio((8 + (ret ? 1 : 0) + cuotas.length) * H);
   celda(M, y, tabW, H, "Operación sujeta al sistema de pago de obligaciones tributarias", { fill: AZUL, bold: true });
   const yDet = y + H;
   [
@@ -238,7 +242,12 @@ export async function generarFacturaPdf({ factura, comprobante, empresa }) {
     celda(x, yy, wC[2], H, etq2, { fill: GRIS, bold: true });
     celda(x + wC[2], yy, wC[3], H, valor2, { bold: true });
   };
-  filaCredito(y + H, "Neto a Pagar", total - montoDet, "Total de cuotas", cuotas.length || "");
+  // La fila de retención no está en la plantilla: solo aparece cuando el comprobante la lleva.
+  if (ret) {
+    y += H;
+    filaCredito(y, "Retención IGV", montoRet, "Tasa", `${ret.porcentaje}%`);
+  }
+  filaCredito(y + H, "Neto a Pagar", total - montoDet - montoRet, "Total de cuotas", cuotas.length || "");
   cuotas.forEach((q, i) =>
     filaCredito(y + (i + 2) * H, `Cuota ${q.numero ?? i + 1}`, q.monto, "Fecha de vencim.", formatearFecha(q.fechaVencimiento)));
   y += (2 + cuotas.length) * H + 5;

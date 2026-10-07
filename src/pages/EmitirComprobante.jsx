@@ -64,6 +64,8 @@ export default function EmitirComprobante() {
   const [detraccionCodigoBien, setDetraccionCodigoBien] = useState("");
   const [detraccionPorcentaje, setDetraccionPorcentaje] = useState("");
   const [detraccionCuentaBancaria, setDetraccionCuentaBancaria] = useState("");
+  const [retencionAplica, setRetencionAplica] = useState(false);
+  const [retencionPorcentaje, setRetencionPorcentaje] = useState("3");
   const [numeroOrdenCompra, setNumeroOrdenCompra] = useState("");
   const [ordenCompraId, setOrdenCompraId] = useState("");
   const [mostrarBuscadorOC, setMostrarBuscadorOC] = useState(false);
@@ -286,6 +288,12 @@ export default function EmitirComprobante() {
     ? Math.round(totalGeneral * (Number(detraccionPorcentaje) || 0) / 100).toFixed(2)
     : "";
 
+  // Retención del IGV: la retiene el cliente (agente de retención) al pagar, sobre el total.
+  // El backend la recalcula igual; acá es para mostrarla y para el neto de las cuotas.
+  const retencionMonto = retencionAplica
+    ? Math.round(totalGeneral * (Number(retencionPorcentaje) || 0)) / 100
+    : 0;
+
   // El comprador deposita la detracción directo al Banco de la Nación —
   // eso NO se le paga al vendedor, así que lo que realmente queda
   // pendiente de cobrar (y lo que deben sumar las cuotas de crédito) es el
@@ -293,9 +301,7 @@ export default function EmitirComprobante() {
   // total legal del comprobante, el que va al XML/SUNAT) no cambia — esto
   // es solo para la validación/visualización de cuotas. Pedido explícito
   // del usuario, 2026-09-15.
-  const montoNetoPendiente = detraccionAplica
-    ? totalGeneral - (Number(detraccionMontoNeto) || 0)
-    : totalGeneral;
+  const montoNetoPendiente = totalGeneral - (detraccionAplica ? Number(detraccionMontoNeto) || 0 : 0) - retencionMonto;
 
   const ro = !!resultado?.ok;
 
@@ -389,6 +395,7 @@ export default function EmitirComprobante() {
       if (!detraccionCuentaBancaria.trim()) return "La cuenta del Banco de la Nación es requerida.";
       if (!cuentaDetraccionValida(detraccionCuentaBancaria)) return "La cuenta del Banco de la Nación debe tener 11 dígitos.";
     }
+    if (!esNota && retencionAplica && retencionMonto <= 0) return "El porcentaje de retención debe ser mayor a 0.";
     if (esNota) {
       if (!referencia.id) return "Selecciona el comprobante a modificar.";
       if (!motivoCodigo) return "Selecciona el motivo.";
@@ -481,6 +488,7 @@ export default function EmitirComprobante() {
               cuentaBancaria: detraccionCuentaBancaria.trim(),
             },
           } : {}),
+          ...(retencionAplica ? { retencion: { aplica: true, porcentaje: Number(retencionPorcentaje) } } : {}),
         };
       }
       const res  = await fetchAuth(endpoint, { method: "POST", body: JSON.stringify(body) });
@@ -515,6 +523,7 @@ export default function EmitirComprobante() {
       empresa:            ocOrigen.empresa?._id || ocOrigen.empresa,
       codigoSap:          ocOrigen.codigoSap,
       fechaSalida:        ocOrigen.fechaSalida,
+      ...(retencionAplica ? { retencionPorcentaje: Number(retencionPorcentaje) } : {}),
     };
     if (formaPago === "Credito" && cuotas.length) {
       factPayload.cuotas = cuotas.map((c) => ({ monto: Number(c.monto), fechaVencimiento: c.fechaVencimiento }));
@@ -554,6 +563,8 @@ export default function EmitirComprobante() {
     setDetraccionCodigoBien("");
     setDetraccionPorcentaje("");
     setDetraccionCuentaBancaria("");
+    setRetencionAplica(false);
+    setRetencionPorcentaje("3");
     setNumeroOrdenCompra("");
     setOrdenCompraId("");
     setGuiaRelacionada(null);
@@ -966,6 +977,8 @@ export default function EmitirComprobante() {
                     onChange={(e) => {
                       const marcado = e.target.checked;
                       setDetraccionAplica(marcado);
+                      // Detracción y retención del IGV no van juntas — marcar una desmarca la otra.
+                      if (marcado) setRetencionAplica(false);
                       // 020 (Mantenimiento y reparación de bienes muebles, 12%) es por lejos el
                       // más común en este ERP — se precarga como default para no obligar a
                       // buscarlo cada vez, el usuario puede cambiarlo si el caso es otro. El monto
@@ -1012,6 +1025,37 @@ export default function EmitirComprobante() {
                       <input value={detraccionCuentaBancaria} placeholder="00000000000" maxLength={11}
                         onChange={(e) => setDetraccionCuentaBancaria(normalizarCuentaDetraccion(e.target.value))} disabled={ro} required
                         className={`w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500 ${detraccionCuentaBancaria && !cuentaDetraccionValida(detraccionCuentaBancaria) ? "border-red-300" : ""}`} />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-500 mb-3">
+                  <input type="checkbox" checked={retencionAplica} disabled={ro}
+                    onChange={(e) => {
+                      setRetencionAplica(e.target.checked);
+                      if (e.target.checked) setDetraccionAplica(false);
+                    }} />
+                  Operación sujeta a retención del IGV
+                </label>
+                {retencionAplica && (
+                  <div className="grid grid-cols-4 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Porcentaje (%)<Oblig /></label>
+                      <input type="number" min="0" max="100" step="0.1" value={retencionPorcentaje}
+                        onChange={(e) => setRetencionPorcentaje(e.target.value)} onWheel={(e) => e.target.blur()} disabled={ro} required
+                        className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Monto de retención</label>
+                      <input value={retencionMonto.toFixed(2)} disabled
+                        className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Neto a cobrar (total − retención)</label>
+                      <input value={`${moneda} ${montoNetoPendiente.toFixed(2)}`} disabled
+                        className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
                     </div>
                   </div>
                 )}

@@ -330,6 +330,17 @@ export default function ListaComprobantes() {
               </div>
             )}
 
+            {seleccionado.retencion?.aplica && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-4">
+                <p className="text-xs font-medium text-amber-700 mb-1">Retención del IGV</p>
+                <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-800">
+                  <span>Porcentaje: {seleccionado.retencion.porcentaje}%</span>
+                  <span className="font-semibold">Monto retención: {Number(seleccionado.retencion.monto).toFixed(2)}</span>
+                  <span>Neto a cobrar: {(Number(seleccionado.totales?.totalPagar) - Number(seleccionado.retencion.monto)).toFixed(2)}</span>
+                </div>
+              </div>
+            )}
+
             {seleccionado.formaPago === "Credito" && !!seleccionado.cuotas?.length && (
               <table className="erp-table w-full text-sm mb-4">
                 <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-100">
