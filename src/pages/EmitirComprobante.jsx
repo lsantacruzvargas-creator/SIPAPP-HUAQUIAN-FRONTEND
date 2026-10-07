@@ -257,7 +257,12 @@ export default function EmitirComprobante() {
   const handleCuota = (key, campo, valor) =>
     setCuotas(cuotas.map((c) => (c._key === key ? { ...c, [campo]: valor } : c)));
 
-  const itemsCalc = items.map((i) => ({ ...i, ...calcularLineaComprobante(i) }));
+  // El input de descuento está en % (0-100); calcularLineaComprobante trabaja
+  // en fracción (0-1), igual que el backend y el modelo Comprobante.
+  const itemsCalc = items.map((i) => ({
+    ...i,
+    ...calcularLineaComprobante({ ...i, descuentoPorcentaje: (Number(i.descuentoPorcentaje) || 0) / 100 }),
+  }));
   const totales = itemsCalc.reduce(
     (acc, i) => ({
       base:       acc.base + i.base,
