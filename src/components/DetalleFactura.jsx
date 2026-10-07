@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import { formatearFecha, aInputFecha } from "../utils/fecha";
+import { generarFacturaPdf } from "../utils/facturaPdf";
 import {
   FlujoNegocio, TarjetaRelacion, Chip,
   badgeOT, badgePago, money, BotonAnular, BannerAnulado, bloqueadoPorCadenaCerrada,
@@ -74,6 +75,7 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
     numeroGuiaEmision:  inicial.numeroGuiaEmision  || "",
     numeroGuiaRemision: inicial.numeroGuiaRemision || "",
     codigoSap:          inicial.codigoSap          || "",
+    conformidad:        inicial.conformidad        || "",
     fechaSalida: inicial.fechaSalida
       ? aInputFecha(inicial.fechaSalida) : "",
   });
@@ -87,6 +89,7 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
   const [guardando, setGuardando] = useState(false);
   const [error, setError]         = useState("");
   const [cargandoOC, setCargandoOC] = useState(false);
+  const [imprimiendo, setImprimiendo] = useState(false);
   // "jefatura" agregado acá para calzar con el gate real del backend
   // (routes/facturas.js `puedeEditar`) — se había quedado desactualizado.
   const rolActual = getUsuario()?.rol;
@@ -196,6 +199,7 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
       numeroGuiaEmision:  form.numeroGuiaEmision,
       numeroGuiaRemision: form.numeroGuiaRemision,
       codigoSap:          form.codigoSap,
+      conformidad:        form.conformidad,
       fechaSalida:        form.fechaSalida || null,
       montoPagado:        inicial.montoPagado,
       estadoPago:         inicial.estadoPago,
@@ -213,6 +217,43 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
     if (res.ok) { onGuardada(await res.json()); }
     else { setError("No se pudo guardar los cambios."); }
     setGuardando(false);
+  };
+
+  // El CPE con lo que se llenó en Emitir Comprobante (ítems, cuotas,
+  // detracción…). Las facturas creadas desde "Nueva Factura" no guardan el
+  // enlace `comprobante`, así que se ubica por serie-correlativo.
+  const buscarComprobante = async () => {
+    if (inicial.comprobante) {
+      const data = await fetchAuth(`/cpe/${inicial.comprobante._id || inicial.comprobante}`).then(r => r.json());
+      return data.ok ? data.data : null;
+    }
+    const [serie, correlativo] = (inicial.numeroFactura || "").split("-");
+    if (!serie || !Number(correlativo)) return null;
+    const data = await fetchAuth(`/cpe?tipoDoc=01&serie=${encodeURIComponent(serie)}&correlativo=${Number(correlativo)}`).then(r => r.json());
+    const coinciden = (data.data || []).filter(c => c.serie === serie && c.correlativo === Number(correlativo));
+    return coinciden.find(c => c.estado === "ACEPTADO") || coinciden[0] || null;
+  };
+
+  const imprimirPdf = async () => {
+    setError(""); setImprimiendo(true);
+    try {
+      await generarFacturaPdf({
+        factura: {
+          ...inicial,
+          numeroFactura:      form.numeroFactura,
+          numeroGuiaRemision: form.numeroGuiaRemision,
+          numeroOrdenCompra:  ocVinculada?.numeroOrden || inicial.numeroOrdenCompra,
+          conformidad:        form.conformidad,
+        },
+        comprobante: await buscarComprobante(),
+        // Datos del cliente tal como están guardados en la empresa (la misma
+        // de la OC) — no se consulta SUNAT para imprimir.
+        empresa: empresas.find(e => e._id === form.empresa) || inicial.empresa,
+      });
+    } catch {
+      setError("No se pudo generar el PDF.");
+    }
+    setImprimiendo(false);
   };
 
   const anular = async (motivo) => {
@@ -267,6 +308,10 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
                   <Chip className="mt-0.5 bg-white/20 text-white">{inicial.estadoPago}</Chip>
                 )}
               </div>
+              <button onClick={imprimirPdf} disabled={imprimiendo}
+                className="border border-white/40 text-white text-sm px-4 py-2 rounded-lg hover:bg-white/10 disabled:opacity-60 transition font-semibold shrink-0">
+                {imprimiendo ? "Generando…" : "Imprimir PDF"}
+              </button>
               {!inicial.anulado && !cadenaCerrada && puedeEditar && <BotonAnular onAnular={anular} />}
               {!inicial.anulado && !cadenaCerrada && puedeEditar && (
                 <button onClick={guardar} disabled={guardando}
@@ -395,6 +440,12 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
                 <input name="numeroGuiaRemision" value={form.numeroGuiaRemision} onChange={handleChange}
                   placeholder="—" className={INP} />
               </div>
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Conformidad</label>
+              <input name="conformidad" value={form.conformidad} onChange={handleChange}
+                placeholder="—" className={INP} />
             </div>
 
             <div className="grid grid-cols-2 gap-4">

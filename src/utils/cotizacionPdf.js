@@ -6,7 +6,7 @@ import { numeroALetras } from "./numeroALetras";
 // Se cargan desde /public (no un import de módulo) para que, si el archivo
 // todavía no fue subido, solo falle la carga de esa imagen puntual en vez
 // de romper el build o la exportación completa del PDF.
-function cargarImagen(url) {
+export function cargarImagen(url) {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => resolve(img);
