@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { fetchAuth } from "../utils/fetchAuth";
 import { fechaHoyLima } from "../utils/fecha";
@@ -90,12 +90,17 @@ export default function EmitirComprobante() {
   // (mismo paso 2 que hacía ModalCrearFactura.jsx).
   const [ocOrigen, setOcOrigen] = useState(null);
   const [facturaInterna, setFacturaInterna] = useState(null);
+  // RUC cuya razón social ya está resuelta (precargada desde la OC o el
+  // comprobante de referencia, o ya consultada) — sin esto, cada vez que el
+  // campo pierde el foco se gasta una consulta a apiperu aunque no haya cambiado.
+  const rucResuelto = useRef("");
 
   const esNota = tipoDoc === "07" || tipoDoc === "08";
 
   const aplicarComprobanteReferencia = (c) => {
     setReferencia({ id: c._id, serie: `${c.serie}-${c.correlativo}`, tipoDoc: c.tipoDoc });
     setReceptor({ schemeID: c.receptor.schemeID, numDoc: c.receptor.numDoc, nombre: c.receptor.nombre });
+    rucResuelto.current = c.receptor.numDoc;
     if (c.totales?.moneda) setMoneda(c.totales.moneda);
     setTipoBienServicio(c.items?.[0]?.unidad === "ZZ" ? "servicio" : "bien");
     setItems(c.items.map((i) => ({
@@ -120,6 +125,7 @@ export default function EmitirComprobante() {
     const emp = oc.empresa;
     if (emp) {
       setReceptor({ schemeID: "6", numDoc: emp.ruc || "", nombre: emp.razonSocial || "" });
+      if (emp.razonSocial) rucResuelto.current = emp.ruc || "";
     }
     const esServicio = cotizacion?.tipo === "servicio";
     const unidad = esServicio ? "ZZ" : "NIU";
@@ -200,13 +206,14 @@ export default function EmitirComprobante() {
   const handleReceptor = (e) => setReceptor({ ...receptor, [e.target.name]: e.target.value });
 
   const buscarReceptorRuc = async (numDoc) => {
-    if (receptor.schemeID !== "6" || numDoc.length !== 11) return;
+    if (receptor.schemeID !== "6" || numDoc.length !== 11 || numDoc === rucResuelto.current) return;
     setBuscandoDoc(true);
     try {
       const res = await fetchAuth(`/sunat/ruc/${numDoc}`);
       if (!res.ok) { setError("RUC no encontrado en SUNAT"); return; }
       const data = await res.json();
       setReceptor((r) => ({ ...r, nombre: data.razonSocial || r.nombre }));
+      rucResuelto.current = numDoc;
       setError("");
     } catch {
       setError("Error al consultar SUNAT");
@@ -547,6 +554,7 @@ export default function EmitirComprobante() {
     setGuiaRelacionada(null);
     setOcOrigen(null);
     setFacturaInterna(null);
+    rucResuelto.current = "";
     setResultado(null);
     setError("");
   };
