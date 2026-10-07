@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import { formatearFecha, anioLima, mesLima, aInputFecha, fechaHoyLima } from "../utils/fecha";
 import DetalleDocumento from "../components/DetalleDocumento";
-import ModalCrearFactura  from "../components/ModalCrearFactura";
 import ModalImportarExcel, { COLS_FACTURAS } from "../components/ModalImportarExcel";
 import { DotChip, badgePago, dotPago } from "../components/detalleShared";
 import TablaScroll from "../components/TablaScroll";
@@ -324,7 +323,6 @@ export default function ListaFacturas() {
   const [facturas, setFacturas]       = useState([]);
   const [filtros, setFiltros]         = useState(FILTROS_VACIO);
   const [seleccionada, setSeleccionada] = useState(null);
-  const [crearOpen, setCrearOpen]     = useState(false);
   const [importarOpen, setImportarOpen] = useState(false);
   const [sortBy, setSortBy]           = useState("fecha");
   const [avisoPermiso, setAvisoPermiso] = useState("");
@@ -611,10 +609,6 @@ export default function ListaFacturas() {
             className="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition">
             Exportar Excel
           </button>
-          <button onClick={() => setCrearOpen(true)}
-            className="bg-blue-700 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-800 transition font-medium">
-            + Nueva Factura
-          </button>
         </div>
       </div>
 
@@ -685,12 +679,6 @@ export default function ListaFacturas() {
       />
     </div>
 
-    {crearOpen && (
-      <ModalCrearFactura
-        onClose={() => setCrearOpen(false)}
-        onCreada={(nueva) => { setFacturas(prev => [nueva, ...prev]); setCrearOpen(false); }}
-      />
-    )}
 
     {importarOpen && (
       <ModalImportarExcel
