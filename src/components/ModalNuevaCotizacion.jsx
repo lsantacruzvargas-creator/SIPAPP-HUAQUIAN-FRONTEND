@@ -29,7 +29,7 @@ function calcular(sub, descuentoPct = 0) {
 }
 
 const FORM_VACIO = {
-  empresa: "", tipo: "venta", numeroCotizacion: "", atencion: "",
+  empresa: "", tipo: "servicio", numeroCotizacion: "", atencion: "",
   fecha: fechaHoyLima(), fechaRecibida: "",
   // Estos van con su valor por defecto YA cargado en el estado (no solo
   // mostrado en el input) — antes el input mostraba "2 días hábiles"/etc.

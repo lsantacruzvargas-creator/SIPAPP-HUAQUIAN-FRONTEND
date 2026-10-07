@@ -373,7 +373,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
       numeroDocumento: ot.numeroDocumento,
       titulo: ot.titulo,
       numeroCotizacion: siguiente,
-      tipo: "venta",
+      tipo: "servicio",
       moneda: "PEN",
       planta: ot.planta,
       encargado: ot.encargado,
