@@ -9,6 +9,7 @@ import {
   estadoComprobanteClase,
 } from "../utils/catalogosSunat";
 import { generarComprobantePdf } from "../utils/comprobantePdf";
+import { generarFacturaPdf } from "../utils/facturaPdf";
 
 const FILTROS_VACIO = { tipoDoc: "", estado: "", desde: "", hasta: "", receptorDoc: "" };
 const SELECT = "input-field w-auto";
@@ -59,6 +60,32 @@ export default function ListaComprobantes() {
     setFiltros(FILTROS_VACIO);
     setFiltrosAplicados(FILTROS_VACIO);
     setPagina(1);
+  };
+
+  // Las facturas salen con la plantilla nueva (la misma del detalle de
+  // factura); boletas y notas siguen con el formato anterior, porque la
+  // plantilla es solo de factura. Conformidad y dirección fiscal viven en la
+  // Factura interna y en la Empresa, no en el comprobante.
+  const descargarPdf = async () => {
+    if (seleccionado.tipoDoc !== "01") return generarComprobantePdf(seleccionado);
+    setErrorDescarga("");
+    try {
+      const [facturas, empresas] = await Promise.all([
+        fetchAuth("/facturas").then((r) => (r.ok ? r.json() : [])),
+        fetchAuth("/empresas").then((r) => (r.ok ? r.json() : [])),
+      ]);
+      const numero = `${seleccionado.serie}-${seleccionado.correlativo}`;
+      const factura =
+        facturas.find((f) => f._id === seleccionado.facturaInterna || f.comprobante === seleccionado._id) ||
+        facturas.find((f) => f.numeroFactura === numero && !f.comprobante);
+      await generarFacturaPdf({
+        factura: factura || {},
+        comprobante: seleccionado,
+        empresa: empresas.find((e) => e.ruc === seleccionado.receptor?.numDoc),
+      });
+    } catch {
+      setErrorDescarga("No se pudo generar el PDF.");
+    }
   };
 
   const descargar = async (tipo) => {
@@ -348,7 +375,7 @@ export default function ListaComprobantes() {
               <button onClick={() => descargar("xml")} className="border border-gray-300 text-gray-800 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition">
                 Descargar XML
               </button>
-              <button onClick={() => generarComprobantePdf(seleccionado)} className="border border-gray-300 text-gray-800 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition">
+              <button onClick={descargarPdf} className="border border-gray-300 text-gray-800 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition">
                 Descargar PDF
               </button>
               <button onClick={() => { setSeleccionado(null); setErrorDescarga(""); }} className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-700 transition">

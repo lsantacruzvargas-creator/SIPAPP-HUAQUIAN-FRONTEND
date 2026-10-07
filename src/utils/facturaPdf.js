@@ -93,7 +93,7 @@ export async function generarFacturaPdf({ factura, comprobante, empresa }) {
 
   // ─── Membrete + placa RUC / FACTURA ELECTRÓNICA / número ───
   let y = 12;
-  const membreteW = 80;
+  const membreteW = 120;
   const membreteH = membrete ? membreteW * (membrete.naturalHeight / membrete.naturalWidth) : 24;
   if (membrete) doc.addImage(membrete, "PNG", M + 4, y, membreteW, membreteH);
 
@@ -140,18 +140,24 @@ export async function generarFacturaPdf({ factura, comprobante, empresa }) {
   // ─── Ítems ───
   autoTable(doc, {
     startY: y,
-    head: [["Cant.", "Unid.", "Descripción", "Valor Unitario", "Total"]],
+    head: [[
+      { content: "Cant", styles: { halign: "center" } },
+      { content: "Unid.", styles: { halign: "center" } },
+      "Descripción",
+      { content: "Valor Unit", styles: { halign: "right" } },
+      { content: "Total", styles: { halign: "right" } },
+    ]],
     body: lineas.map((l) => [l.cantidad, UNIDAD[l.unidad] || l.unidad || "", l.descripcion, n2(l.valorUnitario), n2(l.bruto)]),
     theme: "grid",
     margin: { left: M, right: M, top: 14, bottom: 14 },
     // Sin relleno en el cuerpo para que la marca de agua se vea detrás, como en la plantilla.
-    styles: { fontSize: 8, textColor: 0, lineColor: 0, lineWidth: 0.1, fillColor: false, halign: "center", valign: "middle", cellPadding: { top: 0.5, bottom: 0.5, left: 1, right: 1 } },
+    styles: { fontSize: 8, textColor: 0, lineColor: 0, lineWidth: 0.1, fillColor: false, halign: "left", valign: "middle", cellPadding: { top: 0.5, bottom: 0.5, left: 1, right: 1 } },
     headStyles: { fillColor: AZUL, fontStyle: "bold", cellPadding: 1.8 },
     columnStyles: {
-      0: { cellWidth: 18, fontStyle: "bold" },
-      1: { cellWidth: 14 },
-      3: { cellWidth: 27, fontStyle: "bold" },
-      4: { cellWidth: 26 },
+      0: { cellWidth: 10, fontStyle: "bold", halign: "center" },
+      1: { cellWidth: 12, halign: "center" },
+      3: { cellWidth: 18, fontStyle: "bold", halign: "right" },
+      4: { cellWidth: 18, halign: "right" },
     },
     willDrawPage: (data) => { if (data.pageNumber > 1) dibujarMarcaDeAgua(); },
   });
@@ -167,7 +173,7 @@ export async function generarFacturaPdf({ factura, comprobante, empresa }) {
     if (fill) { doc.setFillColor(...fill); doc.rect(x, yy, w, h, "FD"); }
     else doc.rect(x, yy, w, h);
     doc.setFont("helvetica", bold ? "bold" : "normal");
-    const tx = align === "left" ? x + 1.5 : x + w / 2;
+    const tx = align === "left" ? x + 1.5 : align === "right" ? x + w - 1.5 : x + w / 2;
     doc.text(String(texto ?? ""), tx, yy + h / 2, { align, baseline: "middle" });
   };
   doc.setLineWidth(0.1);
@@ -196,7 +202,7 @@ export async function generarFacturaPdf({ factura, comprobante, empresa }) {
   doc.text(sonLineas, M + 1.5, y + 3.3);
   filasTotales.forEach(([etq, valor], i) => {
     celda(totX, y + i * H, totEtqW, H, etq, { fill: GRIS });
-    celda(totX + totEtqW, y + i * H, totW - totEtqW, H, n2(valor));
+    celda(totX + totEtqW, y + i * H, totW - totEtqW, H, n2(valor), { align: "right" });
   });
   y += Math.max(sonH, filasTotales.length * H) + 8;
 
