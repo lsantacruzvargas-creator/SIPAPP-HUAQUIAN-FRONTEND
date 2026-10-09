@@ -351,9 +351,9 @@ export const exportarCotizacionGloriaPdf = async (cotizacion) => {
     ["SUB-TOTAL", `${simboloDoc} ${totales.subtotal.toFixed(2)}`, false],
     [`GASTOS GENERALES (${totales.gastosGeneralesPorcentaje}%)`, `${simboloDoc} ${totales.gastosGenerales.toFixed(2)}`, false],
     [`UTILIDAD (${totales.utilidadPorcentaje}%)`, `${simboloDoc} ${totales.utilidad.toFixed(2)}`, false],
-    ["TOTAL", `${simboloDoc} ${totales.totalPreIgv.toFixed(2)}`, false],
+    ["TOTAL", `${simboloDoc} ${totales.totalPreIgv.toFixed(2)}`, true],
     ["I.G.V. (18%)", `${simboloDoc} ${totales.igv.toFixed(2)}`, false],
-    ["VALOR TOTAL DE LA OFERTA", `${simboloDoc} ${totales.total.toFixed(2)}`, true],
+    ["VALOR TOTAL DE LA OFERTA", `${simboloDoc} ${totales.total.toFixed(2)}`, false],
   ];
   filasTotales.forEach(([label, valor, negrita]) => {
     doc.setFillColor(...(negrita ? [173, 193, 229] : [255, 255, 255]));
