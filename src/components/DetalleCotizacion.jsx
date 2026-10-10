@@ -1450,7 +1450,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
             <div className="bg-gray-50 rounded-lg border border-gray-100 p-3 mb-4 text-sm space-y-1.5">
               <div className="flex justify-between">
                 <span className="text-gray-500">Monto de la cotización</span>
-                <span className="font-medium text-gray-800">{money(cot.subtotal, cot.moneda)}</span>
+                <span className="font-medium text-gray-800">{money(Number(cot.igv) > 0 ? Number(cot.total) - Number(cot.igv) : cot.subtotal, cot.moneda)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">I.G.V.</span>

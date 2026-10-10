@@ -23,9 +23,17 @@ export default function ModalOrdenCompra({ cotizacion, onClose, onCreada }) {
   // `disabled`. Ahora el estado y el input manejan el mismo número (el
   // subtotal), sin conversión de por medio — permite crear una OC con
   // monto menor al de la cotización. Pedido explícito del usuario, 2026-09-23.
-  const [monto, setMonto] = useState(() =>
-    cotizacion.subtotal != null ? Number(cotizacion.subtotal) : (Number(cotizacion.total) || 0) / 1.18
-  );
+  // `cotizacion.subtotal` es el bruto de los ítems (sin descuento global ni
+  // gastos/utilidad de los formatos Gloria/Alicorp) — la base sin IGV real de
+  // la cotización es `total - igv`, válido en los 3 formatos (ver
+  // calcular()/calcularGloria()/calcularAlicorp()). Las cotizaciones sin
+  // `igv` guardado caen al criterio anterior.
+  const [monto, setMonto] = useState(() => {
+    const total = Number(cotizacion.total) || 0;
+    const igv = Number(cotizacion.igv) || 0;
+    if (total > 0 && igv > 0) return Math.round((total - igv) * 100) / 100;
+    return cotizacion.subtotal != null ? Number(cotizacion.subtotal) : total / 1.18;
+  });
   const [numeroOrden, setNumeroOrden] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [error, setError]         = useState("");
