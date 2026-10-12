@@ -35,7 +35,7 @@ const PENALIDAD_PARRAFOS = [
 // (no hay una barra de sección aparte ni un rótulo genérico "DESCRIPCIÓN").
 const COLUMNAS_TABLA = {
   cantidad_precio: {
-    head: (grupo) => [String(grupo.numero), grupo.label.toUpperCase(), "UND", "CANT.", "P. UNIT.", "VALOR TOTAL S/."],
+    head: (grupo) => [String(grupo.numero), grupo.label.toUpperCase(), "UND", "CANT.", "P. UNIT.", "VALOR TOTAL"],
     fila: (item, numero) => [
       numero,
       descripcionConSubItems(item),
