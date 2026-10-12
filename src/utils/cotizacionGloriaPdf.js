@@ -46,7 +46,7 @@ const COLUMNAS_TABLA = {
     ],
   },
   mano_obra: {
-    head: (grupo) => [String(grupo.numero), grupo.label.toUpperCase(), "N° PERSONAS", "N° HORAS", "S/. POR HORA", "VALOR TOTAL S/."],
+    head: (grupo) => [String(grupo.numero), grupo.label.toUpperCase(), "N° PERSONAS", "N° HORAS", "S/. POR HORA", "VALOR TOTAL"],
     fila: (item, numero) => [
       numero,
       descripcionConSubItems(item),
