@@ -37,7 +37,7 @@ export async function generarFacturaPdf({ factura, comprobante, empresa }) {
   const CONTENT_W = PAGE_W - M * 2;
 
   const [membrete, marcaAgua, marcas] = await Promise.all([
-    cargarImagen("/assets/logos/factura_header.png"),
+    cargarImagen("/assets/logos/factura_header.jpeg"),
     cargarImagen("/assets/logos/factura_marca_agua.png"),
     cargarImagen("/assets/logos/factura_marcas.png"),
   ]);
@@ -97,7 +97,7 @@ export async function generarFacturaPdf({ factura, comprobante, empresa }) {
 
   // ─── Membrete + placa RUC / FACTURA ELECTRÓNICA / número ───
   let y = 12;
-  const membreteW = 120;
+  const membreteW = 100;
   const membreteH = membrete ? membreteW * (membrete.naturalHeight / membrete.naturalWidth) : 24;
   if (membrete) doc.addImage(membrete, "PNG", M + 4, y, membreteW, membreteH);
 
@@ -212,22 +212,24 @@ export async function generarFacturaPdf({ factura, comprobante, empresa }) {
 
   // ─── Detracción + información del crédito ───
   const tabW = 117, etqW = 45;
-  asegurarEspacio((8 + (ret ? 1 : 0) + cuotas.length) * H);
-  celda(M, y, tabW, H, "Operación sujeta al sistema de pago de obligaciones tributarias", { fill: AZUL, bold: true });
-  const yDet = y + H;
-  [
-    ["Tipo de operación", det ? "01" : ""],
-    ["Bien o Servicio", det?.codigoBien ? `${det.codigoBien} ${bienDet?.descripcion || ""}` : ""],
-    [det?.porcentaje ? `Detracción (${det.porcentaje}%)` : "Detracción", det ? montoDet : ""],
-    ["Cta. Cte. Banco de la Nación", normalizarCuentaDetraccion(det?.cuentaBancaria)],
-  ].forEach(([etq, valor], i) => {
-    celda(M, yDet + i * H, etqW, H, etq, { fill: GRIS, bold: true });
-    celda(M + etqW, yDet + i * H, tabW - etqW, H, valor);
-  });
-  // Recuadro en blanco de la plantilla (AC45:AN51), a la derecha de ambas tablas.
-  doc.rect(R - 44, yDet, 40, 7 * H);
+  asegurarEspacio(((det ? 6 : 0) + 2 + (ret ? 1 : 0) + cuotas.length) * H);
+  if (det) {
+    celda(M, y, tabW, H, "Operación sujeta al sistema de pago de obligaciones tributarias", { fill: AZUL, bold: true });
+    const yDet = y + H;
+    [
+      ["Tipo de operación", "01"],
+      ["Bien o Servicio", det.codigoBien ? `${det.codigoBien} ${bienDet?.descripcion || ""}` : ""],
+      [det.porcentaje ? `Detracción (${det.porcentaje}%)` : "Detracción", montoDet],
+      ["Cta. Cte. Banco de la Nación", normalizarCuentaDetraccion(det.cuentaBancaria)],
+    ].forEach(([etq, valor], i) => {
+      celda(M, yDet + i * H, etqW, H, etq, { fill: GRIS, bold: true });
+      celda(M + etqW, yDet + i * H, tabW - etqW, H, valor);
+    });
+    // Recuadro en blanco de la plantilla (AC45:AN51), a la derecha de ambas tablas.
+    // doc.rect(R - 44, yDet, 40, 7 * H);
+    y = yDet + 5 * H;
+  }
 
-  y = yDet + 5 * H;
   celda(M, y, tabW, H, "Información del crédito", { fill: AZUL, bold: true });
   const wC = [22, 32, 28, 35];
   const filaCredito = (yy, etq, monto, etq2, valor2) => {
