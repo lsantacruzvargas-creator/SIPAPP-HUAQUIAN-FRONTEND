@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { fetchAuth, uploadAuth, abrirArchivoProtegido, getUsuario } from "../utils/fetchAuth";
 import { formatearFecha, anioLima, mesLima } from "../utils/fecha";
 import DetalleDocumento from "../components/DetalleDocumento";
-import ModalCrearOrdenCompra   from "../components/ModalCrearOrdenCompra";
 import ModalImportarExcel, { COLS_OC, COLS_CADENA } from "../components/ModalImportarExcel";
 import { DotChip, badgeOT, dotOT, badgeInformes, dotInformes } from "../components/detalleShared";
 import TablaScroll from "../components/TablaScroll";
@@ -267,7 +266,6 @@ export default function ListaOrdenesCompra() {
   const [sortBy, setSortBy]         = useState("fecha");
   const [vista, setVista]           = useState("todasLasOC");
   const [ordenSeleccionada, setOrdenSeleccionada] = useState(null);
-  const [crearOpen, setCrearOpen]   = useState(false);
   const [importarOpen, setImportarOpen] = useState(false);
   const [importarCadenaOpen, setImportarCadenaOpen] = useState(false);
   const [busqueda, setBusqueda] = useState("");
@@ -471,10 +469,6 @@ export default function ListaOrdenesCompra() {
             className="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition">
             Importar Excel
           </button>
-          <button onClick={() => setCrearOpen(true)}
-            className="bg-blue-700 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-800 transition font-medium">
-            + Nueva OC
-          </button>
         </div>
       </div>
 
@@ -629,13 +623,6 @@ export default function ListaOrdenesCompra() {
           onGuardadaOC={(actualizada) => {
             setOrdenes((prev) => prev.map((o) => o._id === actualizada._id ? actualizada : o));
           }}
-        />
-      )}
-
-      {crearOpen && (
-        <ModalCrearOrdenCompra
-          onClose={() => setCrearOpen(false)}
-          onCreada={(nueva) => { setOrdenes(prev => [nueva, ...prev]); setCrearOpen(false); }}
         />
       )}
 

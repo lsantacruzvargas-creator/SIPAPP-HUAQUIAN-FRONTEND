@@ -12,14 +12,15 @@ import {
   MOTIVO_ND,
   TIPO_MONEDA,
   DETRACCION_BIENES_SERVICIOS,
-  normalizarCuentaDetraccion,
-  cuentaDetraccionValida,
   itemVacioComprobante,
   precioUnitarioDesdeValor,
   calcularLineaComprobante,
   documentoValido,
   serieValida,
+  formatearGuiaRemision,
+  parsearGuiaRemision,
 } from "../utils/catalogosSunat";
+import { RUC_GLORIA, esFormatoAlicorp } from "../utils/cotizacionItems";
 
 const RECEPTOR_VACIO = { schemeID: "6", numDoc: "", nombre: "" };
 const REFERENCIA_VACIA = { id: "", serie: "", tipoDoc: "" };
@@ -30,6 +31,7 @@ const REFERENCIA_VACIA = { id: "", serie: "", tipoDoc: "" };
 // de Backend/.env.
 const RUC_EMISOR = "20601565235";
 const NOMBRE_EMISOR = "HUAQUIAN";
+const CUENTA_DETRACCION_BN = "00062084456";
 
 // Serie fija por tipo de comprobante — todas terminan en "2" para evitar
 // futuros conflictos de correlativo con series de prueba/históricas.
@@ -63,7 +65,6 @@ export default function EmitirComprobante() {
   const [detraccionAplica, setDetraccionAplica] = useState(false);
   const [detraccionCodigoBien, setDetraccionCodigoBien] = useState("");
   const [detraccionPorcentaje, setDetraccionPorcentaje] = useState("");
-  const [detraccionCuentaBancaria, setDetraccionCuentaBancaria] = useState("");
   const [retencionAplica, setRetencionAplica] = useState(false);
   const [retencionPorcentaje, setRetencionPorcentaje] = useState("3");
   const [numeroOrdenCompra, setNumeroOrdenCompra] = useState("");
@@ -73,10 +74,9 @@ export default function EmitirComprobante() {
   const [buscandoOC, setBuscandoOC] = useState(false);
   const [filtroOC, setFiltroOC] = useState("");
   // GRE relacionada (cac:DespatchDocumentReference en el XML) — Softys exige
-  // este tag al facturar un MATERIAL. Acá no hay autocompletado (eso solo
-  // aplica al crear la factura desde el modal de OC, ver ModalCrearFactura.jsx)
-  // — el usuario la busca a mano, mismo patrón que "Buscar OC".
-  const [guiaRelacionada, setGuiaRelacionada] = useState(null);
+  // este tag al facturar un MATERIAL. Texto libre "SERIE-CORRELATIVO"; "Buscar"
+  // solo lo rellena con una guía emitida desde el ERP.
+  const [guiaRelacionada, setGuiaRelacionada] = useState("");
   const [mostrarBuscadorGuia, setMostrarBuscadorGuia] = useState(false);
   const [guiasDisponibles, setGuiasDisponibles] = useState([]);
   const [buscandoGuia, setBuscandoGuia] = useState(false);
@@ -147,7 +147,23 @@ export default function EmitirComprobante() {
         return { descripcion: i.descripcion, cantidad, valorUnitario };
       })
       .filter((i) => i.cantidad > 0 && i.valorUnitario > 0);
-    if (itemsValidos.length) {
+    // Formatos Gloria y Alicorp/Intradevco/Masterbread: el cliente paga el TOTAL (SIN IGV), que ya
+    // incluye gastos y utilidad — los ítems solo suman el SUB-TOTAL. Se factura en una sola línea
+    // por ese monto (decisión del usuario, 2026-11-03), igual que la OC (`total - igv`).
+    const totalSinIgv = Math.round(((Number(cotizacion?.total) || 0) - (Number(cotizacion?.igv) || 0)) * 100) / 100;
+    const formatoEspecial = emp?.ruc === RUC_GLORIA || esFormatoAlicorp(emp?.ruc);
+    if (formatoEspecial && totalSinIgv > 0) {
+      setItems([{
+        ...itemVacioComprobante(),
+        descripcion: itemsValidos[0]?.descripcion || oc.descripcion || oc.titulo || "",
+        cantidad: 1,
+        unidad,
+        valorUnitario: totalSinIgv,
+        precioUnitario: precioUnitarioDesdeValor(totalSinIgv, "10"),
+        afectacion: "10",
+        descuentoPorcentaje: 0,
+      }]);
+    } else if (itemsValidos.length) {
       setItems(itemsValidos.map((i) => ({
         _key: Date.now() + Math.random(),
         descripcion: i.descripcion,
@@ -359,7 +375,7 @@ export default function EmitirComprobante() {
   };
 
   const elegirGuia = (g) => {
-    setGuiaRelacionada(g);
+    setGuiaRelacionada(formatearGuiaRemision(g));
     setMostrarBuscadorGuia(false);
   };
 
@@ -367,6 +383,9 @@ export default function EmitirComprobante() {
     if (!rucEmisor) return "Selecciona la empresa emisora.";
     if (!serie.trim()) return "La serie es requerida.";
     if (!serieValida(serie)) return "La serie debe tener exactamente 4 caracteres (ej. F001, B001, FC01).";
+    if (!esNota && guiaRelacionada.trim() && !parsearGuiaRemision(guiaRelacionada)) {
+      return "La guía de remisión relacionada debe tener el formato SERIE-NÚMERO (ej. T001-00001234).";
+    }
     if (!receptor.numDoc.trim() || !receptor.nombre.trim()) return "Los datos del receptor son requeridos.";
     if (tipoDoc === "01" && receptor.schemeID !== "6") return "La factura requiere un receptor con RUC.";
     if (!documentoValido(receptor.schemeID, receptor.numDoc)) {
@@ -393,8 +412,6 @@ export default function EmitirComprobante() {
       if (!detraccionCodigoBien) return "Selecciona el bien o servicio sujeto a detracción.";
       if (!detraccionPorcentaje || Number(detraccionPorcentaje) <= 0) return "El porcentaje de detracción debe ser mayor a 0.";
       if (!detraccionMontoNeto || Number(detraccionMontoNeto) <= 0) return "El monto neto a depositar debe ser mayor a 0.";
-      if (!detraccionCuentaBancaria.trim()) return "La cuenta del Banco de la Nación es requerida.";
-      if (!cuentaDetraccionValida(detraccionCuentaBancaria)) return "La cuenta del Banco de la Nación debe tener 11 dígitos.";
     }
     if (retencionAplica && !(Number(retencionPorcentaje) > 0 && Number(retencionPorcentaje) < 100)) {
       return "El porcentaje de retención debe ser mayor a 0 y menor a 100.";
@@ -481,14 +498,14 @@ export default function EmitirComprobante() {
           informacionRelacionada: informacionRelacionada.trim(),
           numeroOrdenCompra: numeroOrdenCompra.trim(),
           ...(ordenCompraId ? { ordenCompra: ordenCompraId } : {}),
-          ...(guiaRelacionada ? { guiaRelacionada: { serie: guiaRelacionada.serie, correlativo: guiaRelacionada.correlativo } } : {}),
+          ...(parsearGuiaRemision(guiaRelacionada) ? { guiaRelacionada: parsearGuiaRemision(guiaRelacionada) } : {}),
           ...(detraccionAplica ? {
             detraccion: {
               aplica: true,
               codigoBien: detraccionCodigoBien,
               porcentaje: Number(detraccionPorcentaje),
               montoNeto: Number(detraccionMontoNeto),
-              cuentaBancaria: detraccionCuentaBancaria.trim(),
+              cuentaBancaria: CUENTA_DETRACCION_BN,
             },
           } : {}),
           ...(retencionAplica ? { retencion: { aplica: true, porcentaje: Number(retencionPorcentaje) } } : {}),
@@ -565,12 +582,11 @@ export default function EmitirComprobante() {
     setDetraccionAplica(false);
     setDetraccionCodigoBien("");
     setDetraccionPorcentaje("");
-    setDetraccionCuentaBancaria("");
     setRetencionAplica(false);
     setRetencionPorcentaje("3");
     setNumeroOrdenCompra("");
     setOrdenCompraId("");
-    setGuiaRelacionada(null);
+    setGuiaRelacionada("");
     setOcOrigen(null);
     setFacturaInterna(null);
     rucResuelto.current = "";
@@ -1024,10 +1040,9 @@ export default function EmitirComprobante() {
                         className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
                     </div>
                     <div className="col-span-4">
-                      <label className="block text-xs font-medium text-gray-500 mb-1">Cuenta Banco de la Nación<Oblig /></label>
-                      <input value={detraccionCuentaBancaria} placeholder="00000000000" maxLength={11}
-                        onChange={(e) => setDetraccionCuentaBancaria(normalizarCuentaDetraccion(e.target.value))} disabled={ro} required
-                        className={`w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500 ${detraccionCuentaBancaria && !cuentaDetraccionValida(detraccionCuentaBancaria) ? "border-red-300" : ""}`} />
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Cuenta Banco de la Nación</label>
+                      <input value={CUENTA_DETRACCION_BN} readOnly disabled
+                        className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
                     </div>
                   </div>
                 )}
@@ -1086,20 +1101,9 @@ export default function EmitirComprobante() {
               <div className="mt-4 pt-4 border-t border-gray-100">
                 <label className="block text-xs font-medium text-gray-500 mb-1">N° Guía de Remisión relacionada (opcional)</label>
                 <div className="flex gap-2">
-                  {guiaRelacionada ? (
-                    <div className="flex-1 flex items-center gap-2 border border-blue-200 bg-blue-50 rounded-lg px-3 py-2">
-                      <span className="font-mono text-xs text-blue-600 flex-1">
-                        {guiaRelacionada.serie}-{String(guiaRelacionada.correlativo).padStart(8, "0")}
-                      </span>
-                      {!ro && (
-                        <button type="button" onClick={() => setGuiaRelacionada(null)}
-                          className="text-gray-300 hover:text-red-400 text-lg leading-none">✕</button>
-                      )}
-                    </div>
-                  ) : (
-                    <input value="" placeholder="Ej. T001-00001234" disabled
-                      className="flex-1 input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
-                  )}
+                  <input value={guiaRelacionada} placeholder="Ej. T001-00001234" maxLength={13} disabled={ro}
+                    onChange={(e) => setGuiaRelacionada(e.target.value.toUpperCase())}
+                    className={`flex-1 input-field w-auto font-mono disabled:bg-gray-50 disabled:text-gray-500 ${guiaRelacionada.trim() && !parsearGuiaRemision(guiaRelacionada) ? "border-red-300" : ""}`} />
                   {!ro && (
                     <button type="button" onClick={abrirBuscadorGuia}
                       className="px-4 py-2 rounded-lg text-sm border border-gray-300 text-gray-500 hover:text-gray-800 transition">

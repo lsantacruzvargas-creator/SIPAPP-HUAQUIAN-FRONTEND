@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { fetchAuth } from "../utils/fetchAuth";
 import { fechaHoyLima } from "../utils/fecha";
+import { formatearGuiaRemision, parsearGuiaRemision } from "../utils/catalogosSunat";
 
 const INP     = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 w-full";
 const INP_DIS = "border border-gray-100 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500 w-full";
@@ -172,7 +173,7 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
   // GRE relacionada (cac:DespatchDocumentReference en el XML) — Softys exige
   // este tag al facturar un MATERIAL. Se autocompleta si la cadena de la OC
   // ya tiene una GRE aceptada; si no, el usuario la busca a mano.
-  const [guiaRelacionada, setGuiaRelacionada] = useState(null);
+  const [guiaRelacionada, setGuiaRelacionada] = useState("");
   const [buscadorGuia, setBuscadorGuia] = useState(false);
   const [buscandoGuiaAuto, setBuscandoGuiaAuto] = useState(false);
 
@@ -181,7 +182,7 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
     (async () => {
       setBuscandoGuiaAuto(true);
       const g = await buscarGuiaDeCadena(ocInicial.numeroDocumento);
-      if (g) setGuiaRelacionada(g);
+      if (g) setGuiaRelacionada(formatearGuiaRemision(g));
       setBuscandoGuiaAuto(false);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -224,9 +225,9 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
   const seleccionarOC = (oc) => {
     setOcVinc(oc);
     setBOC(false);
-    if (oc.numeroDocumento != null && !guiaRelacionada) {
+    if (oc.numeroDocumento != null && !guiaRelacionada.trim()) {
       setBuscandoGuiaAuto(true);
-      buscarGuiaDeCadena(oc.numeroDocumento).then(g => { if (g) setGuiaRelacionada(g); }).finally(() => setBuscandoGuiaAuto(false));
+      buscarGuiaDeCadena(oc.numeroDocumento).then(g => { if (g) setGuiaRelacionada(formatearGuiaRemision(g)); }).finally(() => setBuscandoGuiaAuto(false));
     }
     setForm(prev => {
       const nuevoSub = prev.subtotal || (oc.subtotal > 0 ? String(oc.subtotal) : prev.subtotal);
@@ -276,6 +277,8 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
   const guardar = async () => {
     if (!form.descripcion.trim()) return setError("La descripción es obligatoria.");
     if (!form.subtotal || Number(form.subtotal) <= 0) return setError("El valor unitario debe ser mayor a 0.");
+    if (guiaRelacionada.trim() && !parsearGuiaRemision(guiaRelacionada))
+      return setError("La guía de remisión relacionada debe tener el formato SERIE-NÚMERO (ej. T001-00001234).");
     if (!empresaSeleccionada?.ruc || !/^\d{11}$/.test(empresaSeleccionada.ruc))
       return setError("La empresa seleccionada no tiene un RUC válido — la factura SUNAT requiere un receptor con RUC.");
     if (formaPago === "Credito") {
@@ -321,7 +324,7 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
         moneda: "PEN",
         numeroOrdenCompra: form.numeroOrdenCompra || "",
         ordenCompra: ocId,
-        ...(guiaRelacionada ? { guiaRelacionada: { serie: guiaRelacionada.serie, correlativo: guiaRelacionada.correlativo } } : {}),
+        ...(parsearGuiaRemision(guiaRelacionada) ? { guiaRelacionada: parsearGuiaRemision(guiaRelacionada) } : {}),
       }),
     });
     const dataCpe = await resCpe.json();
@@ -436,24 +439,15 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
                 N° Guía de Remisión relacionada
                 {buscandoGuiaAuto && <span className="text-gray-400 font-normal"> (buscando…)</span>}
               </label>
-              {guiaRelacionada ? (
-                <div className="flex items-center gap-2 border border-blue-200 bg-blue-50 rounded-lg px-3 py-2">
-                  <span className="font-mono text-xs text-blue-600 flex-1">
-                    {guiaRelacionada.serie}-{String(guiaRelacionada.correlativo).padStart(8, "0")}
-                  </span>
-                  <button onClick={() => setGuiaRelacionada(null)}
-                    className="text-gray-300 hover:text-red-400 text-lg leading-none">✕
-                  </button>
-                </div>
-              ) : (
-                <div className="flex gap-2">
-                  <input value="" placeholder="Ej. T001-00001234" disabled className={INP_DIS} />
-                  <button type="button" onClick={() => setBuscadorGuia(true)}
-                    className="shrink-0 text-xs border border-gray-300 px-3 py-2 rounded-lg hover:bg-gray-50 whitespace-nowrap transition">
-                    Buscar GRE
-                  </button>
-                </div>
-              )}
+              <div className="flex gap-2">
+                <input value={guiaRelacionada} placeholder="Ej. T001-00001234" maxLength={13}
+                  onChange={(e) => setGuiaRelacionada(e.target.value.toUpperCase())}
+                  className={`${INP} font-mono ${guiaRelacionada.trim() && !parsearGuiaRemision(guiaRelacionada) ? "border-red-300" : ""}`} />
+                <button type="button" onClick={() => setBuscadorGuia(true)}
+                  className="shrink-0 text-xs border border-gray-300 px-3 py-2 rounded-lg hover:bg-gray-50 whitespace-nowrap transition">
+                  Buscar GRE
+                </button>
+              </div>
             </div>
             <div>
               <label className="text-xs text-gray-500 block mb-1">Fecha emisión</label>
@@ -636,7 +630,7 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
     </div>
 
     {buscadorOC && <BuscadorOrdenCompra onSelect={seleccionarOC} onClose={() => setBOC(false)} />}
-    {buscadorGuia && <BuscadorGuia onSelect={(g) => { setGuiaRelacionada(g); setBuscadorGuia(false); }} onClose={() => setBuscadorGuia(false)} />}
+    {buscadorGuia && <BuscadorGuia onSelect={(g) => { setGuiaRelacionada(formatearGuiaRemision(g)); setBuscadorGuia(false); }} onClose={() => setBuscadorGuia(false)} />}
     </>
   );
 }

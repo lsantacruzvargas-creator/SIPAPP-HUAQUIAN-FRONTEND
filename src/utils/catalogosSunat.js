@@ -197,6 +197,16 @@ export function serieValida(serie) {
   return /^[A-Z0-9]{4}$/.test((serie || "").trim());
 }
 
+// Guía de remisión relacionada (cac:DespatchDocumentReference): se tipea a mano porque puede ser
+// física o emitida fuera del ERP. Formato SERIE-CORRELATIVO (ej. T001-00001234, 0001-1234).
+export function formatearGuiaRemision(g) {
+  return g ? `${g.serie}-${String(g.correlativo).padStart(8, "0")}` : "";
+}
+export function parsearGuiaRemision(texto) {
+  const m = /^([A-Z0-9]{4})-(\d{1,8})$/.exec((texto || "").trim().toUpperCase());
+  return m && Number(m[2]) > 0 ? { serie: m[1], correlativo: Number(m[2]) } : null;
+}
+
 // Ubigeo INEI: exactamente 6 dígitos (2 departamento + 2 provincia + 2 distrito).
 export function ubigeoValido(ubigeo) {
   return /^\d{6}$/.test((ubigeo || "").trim());
