@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { fetchAuth } from "../utils/fetchAuth";
+import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import { formatearFecha } from "../utils/fecha";
 import TablaScroll from "../components/TablaScroll";
 import {
@@ -23,6 +23,73 @@ const TIPO_DOC_CLASE = {
 
 const tipoDocTexto = (v) => TIPO_DOC_CPE.find((t) => t.valor === v)?.label.split(" — ")[1] ?? v;
 
+const leerBase64 = (archivo) => !archivo ? Promise.resolve(undefined) : new Promise((resolve, reject) => {
+  const r = new FileReader();
+  r.onload = () => resolve(String(r.result).split(",")[1]);
+  r.onerror = reject;
+  r.readAsDataURL(archivo);
+});
+
+// SmartPSE no permite recuperar por API el XML firmado de un documento ya emitido: cuando la
+// emisión se cortó y se resolvió con "Reintentar" en su panel, XML y CDR se bajan de ahí.
+function ModalAdjuntarSunat({ comprobante, onClose, onAdjuntado }) {
+  const [archivos, setArchivos] = useState({ xml: null, cdr: null });
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState("");
+  const numero = `${comprobante.serie}-${String(comprobante.correlativo).padStart(8, "0")}`;
+
+  const handleArchivo = (e) => setArchivos({ ...archivos, [e.target.name]: e.target.files[0] || null });
+
+  const guardar = async () => {
+    if (!archivos.xml && !archivos.cdr) return setError("Selecciona el XML firmado, el CDR o ambos.");
+    setGuardando(true);
+    setError("");
+    try {
+      const [xmlBase64, cdrBase64] = await Promise.all([leerBase64(archivos.xml), leerBase64(archivos.cdr)]);
+      const res  = await fetchAuth(`/cpe/${comprobante._id}/adjuntar-sunat`, {
+        method: "POST",
+        body: JSON.stringify({ xmlBase64, cdrBase64 }),
+      });
+      const data = await res.json();
+      if (!data.ok) { setError(data.error || data.mensaje || "No se pudieron adjuntar los archivos."); return; }
+      onAdjuntado(data);
+    } catch {
+      setError("Error de conexión");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+        <h3 className="font-semibold text-gray-800 mb-1">Adjuntar XML/CDR de SmartPSE</h3>
+        <p className="text-sm text-gray-500 mb-4">
+          Descarga del panel de SmartPSE el XML firmado y el CDR de <span className="font-mono">{numero}</span> y súbelos aquí
+          (.xml o .zip). El estado del comprobante se toma del CDR.
+        </p>
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-2 mb-4">{error}</div>
+        )}
+        <label className="block text-xs font-medium text-gray-500 mb-1">XML firmado</label>
+        <input type="file" name="xml" accept=".xml,.zip" onChange={handleArchivo} className="w-full text-sm mb-4" />
+        <label className="block text-xs font-medium text-gray-500 mb-1">CDR (constancia de SUNAT)</label>
+        <input type="file" name="cdr" accept=".xml,.zip" onChange={handleArchivo} className="w-full text-sm mb-5" />
+        <div className="flex justify-end gap-3">
+          <button onClick={onClose} disabled={guardando}
+            className="border border-gray-300 text-gray-800 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition">
+            Cancelar
+          </button>
+          <button onClick={guardar} disabled={guardando}
+            className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-700 transition disabled:opacity-50">
+            {guardando ? "Adjuntando…" : "Adjuntar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ListaComprobantes() {
   const navigate = useNavigate();
   const [comprobantes, setComprobantes] = useState([]);
@@ -34,6 +101,8 @@ export default function ListaComprobantes() {
   const [cargando, setCargando] = useState(false);
   const [errorDescarga, setErrorDescarga] = useState("");
   const [consultando, setConsultando] = useState(false);
+  const [adjuntando, setAdjuntando] = useState(false);
+  const puedeAdjuntar = ["admin", "facturacion", "jefatura"].includes(getUsuario()?.rol);
 
   const cargar = async () => {
     setCargando(true);
@@ -380,6 +449,11 @@ export default function ListaComprobantes() {
                   Emitir Nota de Crédito/Débito
                 </button>
               )}
+              {puedeAdjuntar && (seleccionado.tipoDoc === "01" || seleccionado.tipoDoc === "03") && seleccionado.estado !== "ANULADO" && (
+                <button onClick={() => setAdjuntando(true)} className="border border-gray-300 text-gray-800 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition">
+                  Adjuntar XML/CDR
+                </button>
+              )}
               <button onClick={() => descargar("cdr")} className="border border-gray-300 text-gray-800 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition">
                 Descargar CDR
               </button>
@@ -395,6 +469,19 @@ export default function ListaComprobantes() {
             </div>
           </div>
         </div>
+      )}
+
+      {seleccionado && adjuntando && (
+        <ModalAdjuntarSunat
+          comprobante={seleccionado}
+          onClose={() => setAdjuntando(false)}
+          onAdjuntado={(data) => {
+            setSeleccionado((prev) => ({ ...prev, estado: data.estado, sunat: data.sunat, facturaInterna: data.facturaInterna }));
+            setErrorDescarga("");
+            setAdjuntando(false);
+            cargar();
+          }}
+        />
       )}
     </div>
   );
