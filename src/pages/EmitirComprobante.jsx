@@ -498,6 +498,7 @@ export default function EmitirComprobante() {
           informacionRelacionada: informacionRelacionada.trim(),
           numeroOrdenCompra: numeroOrdenCompra.trim(),
           ...(ordenCompraId ? { ordenCompra: ordenCompraId } : {}),
+          facturaInternaDesdeCliente: !!ocOrigen,
           ...(parsearGuiaRemision(guiaRelacionada) ? { guiaRelacionada: parsearGuiaRemision(guiaRelacionada) } : {}),
           ...(detraccionAplica ? {
             detraccion: {
@@ -604,6 +605,11 @@ export default function EmitirComprobante() {
       {resultado?.estado === "ACEPTADO" && (
         <div className="bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg px-4 py-3 mb-5">
           Comprobante <strong>{resultado.serie}</strong> ACEPTADO por SUNAT.
+        </div>
+      )}
+      {resultado?.aviso && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-700 text-sm rounded-lg px-4 py-3 mb-5">
+          {resultado.aviso}
         </div>
       )}
       {resultado?.estado === "EN_PROCESO" && (
@@ -1147,8 +1153,11 @@ export default function EmitirComprobante() {
             </p>
             {tipoDoc === "07" && (
               <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
-                Esta Nota de Crédito anulará el comprobante <strong>{referencia.serie}</strong> de forma incondicional
-                (pasará a estado ANULADO), sin importar el motivo seleccionado.
+                {["01", "02"].includes(motivoCodigo) ? (
+                  <>Esta Nota de Crédito anulará el comprobante <strong>{referencia.serie}</strong> (pasará a ANULADO) y su factura interna.</>
+                ) : (
+                  <>El comprobante <strong>{referencia.serie}</strong> solo se anulará si esta nota cubre su total; si es parcial, sigue vigente por el saldo.</>
+                )}
               </p>
             )}
             <div className="flex justify-end gap-3">

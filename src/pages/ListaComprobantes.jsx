@@ -30,6 +30,63 @@ const leerBase64 = (archivo) => !archivo ? Promise.resolve(undefined) : new Prom
   r.readAsDataURL(archivo);
 });
 
+// Anulación hecha directamente en SUNAT (NC en SOL o en el panel de SmartPSE, comunicación de baja):
+// el ERP no puede detectarla, así que se registra a mano con el documento que la sustenta.
+function ModalAnulacionExterna({ comprobante, onClose, onRegistrada }) {
+  const [form, setForm] = useState({ documento: "", motivo: "" });
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  const guardar = async () => {
+    if (!form.documento.trim() || !form.motivo.trim()) return setError("Indica el documento de anulación y el motivo.");
+    setGuardando(true);
+    setError("");
+    try {
+      const res  = await fetchAuth(`/cpe/${comprobante._id}/anulacion-externa`, { method: "PATCH", body: JSON.stringify(form) });
+      const data = await res.json();
+      if (!data.ok) { setError(data.error || data.mensaje || "No se pudo registrar la anulación."); return; }
+      onRegistrada(data);
+    } catch {
+      setError("Error de conexión");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+        <h3 className="font-semibold text-gray-800 mb-1">Registrar anulación hecha en SUNAT</h3>
+        <p className="text-sm text-gray-500 mb-4">
+          Úsalo solo si <span className="font-mono">{comprobante.serie}-{String(comprobante.correlativo).padStart(8, "0")}</span> ya
+          figura anulado en SUNAT (consulta de validez de CPE). El comprobante y su factura interna pasarán a ANULADO; no se envía nada a SUNAT.
+        </p>
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-2 mb-4">{error}</div>
+        )}
+        <label className="block text-xs font-medium text-gray-500 mb-1">Documento de anulación</label>
+        <input name="documento" value={form.documento} onChange={handleChange} maxLength={100}
+          placeholder="Ej. NC FC02-00000003 o baja RA-20261103-1" className="w-full input-field w-auto mb-4" />
+        <label className="block text-xs font-medium text-gray-500 mb-1">Motivo</label>
+        <textarea name="motivo" value={form.motivo} onChange={handleChange} maxLength={500} rows={3}
+          className="w-full input-field w-auto mb-5" />
+        <div className="flex justify-end gap-3">
+          <button onClick={onClose} disabled={guardando}
+            className="border border-gray-300 text-gray-800 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition">
+            Cancelar
+          </button>
+          <button onClick={guardar} disabled={guardando}
+            className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-700 transition disabled:opacity-50">
+            {guardando ? "Registrando…" : "Registrar anulación"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // SmartPSE no permite recuperar por API el XML firmado de un documento ya emitido: cuando la
 // emisión se cortó y se resolvió con "Reintentar" en su panel, XML y CDR se bajan de ahí.
 function ModalAdjuntarSunat({ comprobante, onClose, onAdjuntado }) {
@@ -102,6 +159,7 @@ export default function ListaComprobantes() {
   const [errorDescarga, setErrorDescarga] = useState("");
   const [consultando, setConsultando] = useState(false);
   const [adjuntando, setAdjuntando] = useState(false);
+  const [registrandoAnulacion, setRegistrandoAnulacion] = useState(false);
   const puedeAdjuntar = ["admin", "facturacion", "jefatura"].includes(getUsuario()?.rol);
 
   const cargar = async () => {
@@ -188,6 +246,7 @@ export default function ListaComprobantes() {
       const data = await res.json();
       if (!data.ok) { setErrorDescarga(data.error || "No se pudo consultar el estado en SUNAT."); return; }
       setSeleccionado((prev) => ({ ...prev, estado: data.estado, sunat: { ...prev.sunat, mensaje: data.mensaje } }));
+      if (data.aviso) setErrorDescarga(data.aviso);
       await cargar();
     } catch {
       setErrorDescarga("Error de conexión al consultar SUNAT.");
@@ -324,6 +383,20 @@ export default function ListaComprobantes() {
                 {seleccionado.sunat.mensaje}
               </div>
             )}
+            {seleccionado.estado === "ANULADO" && (
+              <div className="bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg px-4 py-3 mb-4">
+                {seleccionado.anulacionExterna?.documento ? (
+                  <>
+                    Anulado en SUNAT con <strong>{seleccionado.anulacionExterna.documento}</strong>: {seleccionado.anulacionExterna.motivo}
+                    <span className="block text-xs text-gray-400 mt-1">
+                      Registrado por {seleccionado.anulacionExterna.usuario} el {formatearFecha(seleccionado.anulacionExterna.fecha)}
+                    </span>
+                  </>
+                ) : (
+                  "Anulado por una Nota de Crédito emitida desde el ERP."
+                )}
+              </div>
+            )}
             {errorDescarga && (
               <div className="bg-amber-50 border border-amber-200 text-amber-700 text-sm rounded-lg px-4 py-2 mb-4">
                 {errorDescarga}
@@ -449,6 +522,11 @@ export default function ListaComprobantes() {
                   Emitir Nota de Crédito/Débito
                 </button>
               )}
+              {puedeAdjuntar && (seleccionado.tipoDoc === "01" || seleccionado.tipoDoc === "03") && seleccionado.estado === "ACEPTADO" && (
+                <button onClick={() => setRegistrandoAnulacion(true)} className="border border-red-300 text-red-700 px-4 py-2 rounded-lg text-sm hover:bg-red-50 transition">
+                  Registrar anulación en SUNAT
+                </button>
+              )}
               {puedeAdjuntar && (seleccionado.tipoDoc === "01" || seleccionado.tipoDoc === "03") && seleccionado.estado !== "ANULADO" && (
                 <button onClick={() => setAdjuntando(true)} className="border border-gray-300 text-gray-800 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition">
                   Adjuntar XML/CDR
@@ -469,6 +547,19 @@ export default function ListaComprobantes() {
             </div>
           </div>
         </div>
+      )}
+
+      {seleccionado && registrandoAnulacion && (
+        <ModalAnulacionExterna
+          comprobante={seleccionado}
+          onClose={() => setRegistrandoAnulacion(false)}
+          onRegistrada={(data) => {
+            setSeleccionado((prev) => ({ ...prev, estado: data.estado, anulacionExterna: data.anulacionExterna }));
+            setErrorDescarga(data.aviso || "");
+            setRegistrandoAnulacion(false);
+            cargar();
+          }}
+        />
       )}
 
       {seleccionado && adjuntando && (

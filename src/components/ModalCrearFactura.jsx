@@ -324,6 +324,7 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
         moneda: "PEN",
         numeroOrdenCompra: form.numeroOrdenCompra || "",
         ordenCompra: ocId,
+        facturaInternaDesdeCliente: true,
         ...(parsearGuiaRemision(guiaRelacionada) ? { guiaRelacionada: parsearGuiaRemision(guiaRelacionada) } : {}),
       }),
     });
