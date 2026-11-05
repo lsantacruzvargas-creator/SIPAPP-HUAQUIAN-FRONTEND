@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { fetchAuth } from "../utils/fetchAuth";
-import { fechaHoyLima } from "../utils/fecha";
+import { fechaHoyLima, formatearFecha } from "../utils/fecha";
 import TablaScroll from "../components/TablaScroll";
 import {
   AFECTACION_IGV,
@@ -65,6 +65,11 @@ export default function EmitirComprobante() {
   const [detraccionAplica, setDetraccionAplica] = useState(false);
   const [detraccionCodigoBien, setDetraccionCodigoBien] = useState("");
   const [detraccionPorcentaje, setDetraccionPorcentaje] = useState("");
+  // { valor, fecha, fuente } — TC venta con el que se pasa a soles la detracción de un comprobante
+  // en moneda extranjera (el Banco de la Nación solo recibe soles).
+  const [tcDetraccion, setTcDetraccion] = useState(null);
+  const [cargandoTc, setCargandoTc] = useState(false);
+  const consultandoTc = useRef(false);
   const [retencionAplica, setRetencionAplica] = useState(false);
   const [retencionPorcentaje, setRetencionPorcentaje] = useState("3");
   const [numeroOrdenCompra, setNumeroOrdenCompra] = useState("");
@@ -301,8 +306,40 @@ export default function EmitirComprobante() {
   // usuario cambia ítems/porcentaje después de haberlo tipeado a mano). El depósito en el Banco
   // de la Nación va en soles enteros, no en céntimos — mismo redondeo (Math.round, .5 sube al
   // entero superior) que ya usa DetalleOrdenCompra.jsx para la detracción de compra.
-  const detraccionMontoNeto = detraccionAplica
-    ? Math.round(totalGeneral * (Number(detraccionPorcentaje) || 0) / 100).toFixed(2)
+  // En USD: la detracción en dólares (con céntimos) es la que se descuenta de las cuotas, y el
+  // depósito es ese monto × TC venta del día, redondeado a soles enteros — va así al XML (PEN).
+  const enSoles = moneda === "PEN";
+  const detraccionBruta = totalGeneral * (Number(detraccionPorcentaje) || 0) / 100;
+  const detraccionMontoMoneda = !detraccionAplica ? 0
+    : enSoles ? Math.round(detraccionBruta) : Math.round(detraccionBruta * 100) / 100;
+  const detraccionMontoNeto = !detraccionAplica ? ""
+    : enSoles ? detraccionMontoMoneda.toFixed(2)
+    : tcDetraccion ? Math.round(Math.round(detraccionBruta * tcDetraccion.valor * 100) / 100).toFixed(2) : "";
+
+  useEffect(() => {
+    // Ref y no el state `cargandoTc`: StrictMode corre el efecto dos veces antes de que el state
+    // cambie, y cada consulta a apiperu gasta cuota.
+    if (!detraccionAplica || moneda === "PEN" || tcDetraccion || consultandoTc.current) return;
+    consultandoTc.current = true;
+    setCargandoTc(true);
+    (async () => {
+      try {
+        const r = await fetchAuth("/sunat/tipo-cambio");
+        const d = r.ok ? await r.json() : null;
+        if (d?.venta > 0) { setTcDetraccion({ valor: d.venta, fecha: d.fecha, fuente: "SUNAT" }); return; }
+        // apiperu caído o sin cuota: el TC vigente de la app, para no bloquear la emisión.
+        const r2 = await fetchAuth("/tipo-cambio");
+        const d2 = r2.ok ? await r2.json() : null;
+        if (d2?.valor > 0) setTcDetraccion({ valor: d2.valor, fecha: d2.fechaActualizacion, fuente: "app" });
+      } catch { /* sin TC: la validación de emitir lo informa */ }
+      finally { consultandoTc.current = false; setCargandoTc(false); }
+    })();
+  }, [detraccionAplica, moneda, tcDetraccion]);
+
+  const fechaTc = tcDetraccion?.fecha
+    ? (/^\d{4}-\d{2}-\d{2}$/.test(tcDetraccion.fecha)
+        ? tcDetraccion.fecha.split("-").reverse().join("/")
+        : formatearFecha(tcDetraccion.fecha))
     : "";
 
   // Retención del IGV: la retiene el cliente (agente de retención) al pagar, sobre el total.
@@ -318,7 +355,7 @@ export default function EmitirComprobante() {
   // total legal del comprobante, el que va al XML/SUNAT) no cambia — esto
   // es solo para la validación/visualización de cuotas. Pedido explícito
   // del usuario, 2026-09-15.
-  const montoNetoPendiente = totalGeneral - (detraccionAplica ? Number(detraccionMontoNeto) || 0 : 0) - retencionMonto;
+  const montoNetoPendiente = totalGeneral - detraccionMontoMoneda - retencionMonto;
 
   const ro = !!resultado?.ok;
 
@@ -411,6 +448,7 @@ export default function EmitirComprobante() {
     if (!esNota && detraccionAplica) {
       if (!detraccionCodigoBien) return "Selecciona el bien o servicio sujeto a detracción.";
       if (!detraccionPorcentaje || Number(detraccionPorcentaje) <= 0) return "El porcentaje de detracción debe ser mayor a 0.";
+      if (!enSoles && !tcDetraccion) return "No se pudo obtener el tipo de cambio del día para pasar la detracción a soles. Actualízalo en Tipo de Cambio y vuelve a intentar.";
       if (!detraccionMontoNeto || Number(detraccionMontoNeto) <= 0) return "El monto neto a depositar debe ser mayor a 0.";
     }
     if (retencionAplica && !(Number(retencionPorcentaje) > 0 && Number(retencionPorcentaje) < 100)) {
@@ -505,7 +543,9 @@ export default function EmitirComprobante() {
               aplica: true,
               codigoBien: detraccionCodigoBien,
               porcentaje: Number(detraccionPorcentaje),
-              montoNeto: Number(detraccionMontoNeto),
+              montoNeto: detraccionMontoMoneda,
+              montoSoles: Number(detraccionMontoNeto),
+              ...(enSoles ? {} : { tipoCambio: tcDetraccion.valor }),
               cuentaBancaria: CUENTA_DETRACCION_BN,
             },
           } : {}),
@@ -583,6 +623,7 @@ export default function EmitirComprobante() {
     setDetraccionAplica(false);
     setDetraccionCodigoBien("");
     setDetraccionPorcentaje("");
+    setTcDetraccion(null);
     setRetencionAplica(false);
     setRetencionPorcentaje("3");
     setNumeroOrdenCompra("");
@@ -1041,9 +1082,17 @@ export default function EmitirComprobante() {
                         className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-1">Monto neto a depositar<Oblig /></label>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Monto neto a depositar (S/)<Oblig /></label>
                       <input type="number" value={detraccionMontoNeto} placeholder="0.00" disabled required
                         className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
+                      {!enSoles && (
+                        <p className={`text-xs mt-1 ${tcDetraccion ? "text-amber-600" : "text-red-500"}`}>
+                          {cargandoTc ? "Consultando TC del día…"
+                            : tcDetraccion
+                              ? `Calculado con TC ${tcDetraccion.fuente === "SUNAT" ? "venta SUNAT" : "de la app"} del ${fechaTc}: ${tcDetraccion.valor} (US$ ${detraccionMontoMoneda.toFixed(2)} × ${tcDetraccion.valor})`
+                              : "Sin tipo de cambio: no se puede calcular en soles."}
+                        </p>
+                      )}
                     </div>
                     <div className="col-span-4">
                       <label className="block text-xs font-medium text-gray-500 mb-1">Cuenta Banco de la Nación</label>

@@ -467,7 +467,10 @@ export default function ListaComprobantes() {
                 <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-800">
                   <span>Bien/servicio: {seleccionado.detraccion.codigoBien}</span>
                   <span>Porcentaje: {seleccionado.detraccion.porcentaje}%</span>
-                  <span className="font-semibold">Monto detracción: {Number(seleccionado.detraccion.montoNeto).toFixed(2)}</span>
+                  <span className="font-semibold">Monto detracción: S/ {Number(seleccionado.detraccion.montoSoles ?? seleccionado.detraccion.montoNeto).toFixed(2)}</span>
+                  {seleccionado.detraccion.tipoCambio && (
+                    <span>US$ {Number(seleccionado.detraccion.montoNeto).toFixed(2)} × TC {seleccionado.detraccion.tipoCambio}</span>
+                  )}
                 </div>
               </div>
             )}

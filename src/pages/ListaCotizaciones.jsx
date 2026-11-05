@@ -15,7 +15,17 @@ const MESES = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
 
-const FILTROS_VACIO = { empresa: "", planta: "", ano: "", mes: "", oc: "", busqueda: "", informeEnviado: false };
+const FILTROS_VACIO = { empresa: "", planta: "", ano: "", mes: "", oc: "", estadoServicio: "", busqueda: "", informeEnviado: false };
+
+// Valores de OrdenTrabajo.estadoGeneral; "sin_ot" = la cotización todavía no tiene OT (columna en "—").
+const ESTADOS_SERVICIO = [
+  { valor: "no asignado", label: "No asignado" },
+  { valor: "pendiente",   label: "Pendiente" },
+  { valor: "en progreso", label: "En progreso" },
+  { valor: "completada",  label: "Completada" },
+  { valor: "entregada",   label: "Entregada" },
+  { valor: "sin_ot",      label: "Sin OT" },
+];
 
 const VISTAS = [
   { valor: "todasLasCotizaciones", label: "Todas las cotizaciones" },
@@ -358,6 +368,7 @@ export default function ListaCotizaciones() {
       (!filtros.mes || mesLima(fecha) === parseInt(filtros.mes)) &&
       (!filtros.oc  || (filtros.oc === "con" ? tieneOC(c) : !tieneOC(c))) &&
       (!filtros.informeEnviado || c.informeEnviado) &&
+      (!filtros.estadoServicio || (otsPorCot.get(c._id)?.[0]?.estadoGeneral ?? "sin_ot") === filtros.estadoServicio) &&
       (!q ||
         c.titulo?.toLowerCase().includes(q) ||
         c.numeroCotizacion?.toLowerCase().includes(q) ||
@@ -507,6 +518,13 @@ export default function ListaCotizaciones() {
 
         <select value={vista} onChange={(e) => setVista(e.target.value)} className={SELECT}>
           {VISTAS.map(({ valor, label }) => (
+            <option key={valor} value={valor}>{label}</option>
+          ))}
+        </select>
+
+        <select name="estadoServicio" value={filtros.estadoServicio} onChange={handleFiltro} className={SELECT}>
+          <option value="">Todo estado de servicio</option>
+          {ESTADOS_SERVICIO.map(({ valor, label }) => (
             <option key={valor} value={valor}>{label}</option>
           ))}
         </select>

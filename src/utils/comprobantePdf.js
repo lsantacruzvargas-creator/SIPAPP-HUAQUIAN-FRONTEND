@@ -182,7 +182,9 @@ export async function generarComprobantePdf(comprobante, { logoUrl = "/assets/lo
     doc.setFont("helvetica", "normal");
     doc.text(`Código: ${comprobante.detraccion.codigoBien || "-"}  ·  Porcentaje: ${comprobante.detraccion.porcentaje ?? "-"}%`, margin, y);
     y += 5;
-    doc.text(`Monto neto a depositar: ${simbolo} ${Number(comprobante.detraccion.montoNeto || 0).toFixed(2)}`, margin, y);
+    const det = comprobante.detraccion;
+    const tcTxt = det.tipoCambio ? `  (US$ ${Number(det.montoNeto || 0).toFixed(2)} × TC ${det.tipoCambio})` : "";
+    doc.text(`Monto neto a depositar: S/ ${Number(det.montoSoles ?? det.montoNeto ?? 0).toFixed(2)}${tcTxt}`, margin, y);
     y += 5;
     doc.text(`Cuenta Banco de la Nación: ${comprobante.detraccion.cuentaBancaria || "-"}`, margin, y);
   }
