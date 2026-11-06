@@ -68,10 +68,17 @@ export async function generarFacturaPdf({ factura, comprobante, empresa }) {
   // En USD montoNeto va con céntimos (es lo que descuentan las cuotas); el depósito al Banco de
   // la Nación es montoSoles = montoNeto × TC del día, redondeado a soles enteros.
   const montoDet = !det ? 0 : c ? Number(det.montoNeto) || 0 : Math.round(Number(det.montoNeto) || 0);
-  const montoDetTxt = !det ? "" : c
-    ? `S/ ${miles(Math.round(Number(det.montoSoles ?? det.montoNeto) || 0))}` +
-      (det.tipoCambio ? `  (US$ ${n2(det.montoNeto)} × TC ${det.tipoCambio})` : "")
+
+  // const montoDetTxt = !det ? "" : c
+  //   ? `S/ ${miles(Math.round(Number(det.montoSoles ?? det.montoNeto) || 0))}` +
+  //     (det.tipoCambio ? `  (US$ ${n2(det.montoNeto)} × TC ${det.tipoCambio})` : "")
+  //   : montoDet;
+ const montoDetTxt = !det ? "" : c
+    ? `S/ ${miles(Math.round(Number(det.montoSoles ?? det.montoNeto) || 0))}`
     : montoDet;
+
+
+
   const ret = c
     ? (c.retencion?.aplica ? c.retencion : null)
     : (factura.retencion > 0 ? { monto: factura.retencion, porcentaje: factura.retencionPorcentaje } : null);
