@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
+import { money, totalSinIgv } from "./detalleShared";
 
 const INP     = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 w-full";
 const INP_DIS = "border border-gray-100 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500 w-full";
@@ -42,7 +43,7 @@ function BuscadorCotizacion({ onSelect, onClose }) {
                 className="w-full text-left px-4 py-3 rounded-xl hover:bg-blue-50 border border-transparent hover:border-blue-100 transition">
                 <div className="flex justify-between">
                   <span className="font-mono text-xs text-blue-600">{c.codigo}</span>
-                  <span className="text-xs text-gray-400">S/ {Number(c.total ?? 0).toFixed(2)}</span>
+                  <span className="text-xs text-gray-400">{money(totalSinIgv(c), c.moneda)}</span>
                 </div>
                 <p className="text-sm text-gray-700 truncate">{c.titulo}</p>
                 {c.empresa && <p className="text-xs text-gray-400">{c.empresa.razonSocial}</p>}
@@ -92,8 +93,9 @@ export default function ModalCrearOrdenCompra({ onClose, onCreada }) {
     setCot(cot);
     setBCot(false);
     setForm(prev => {
-      const nuevoSub = prev.subtotal || (cot.total > 0 ? String(cot.total) : prev.subtotal);
-      if (!prev.subtotal && cot.total > 0) setCalc(calcular(cot.total));
+      const sinIgv = totalSinIgv(cot);
+      const nuevoSub = prev.subtotal || (sinIgv > 0 ? String(sinIgv) : prev.subtotal);
+      if (!prev.subtotal && sinIgv > 0) setCalc(calcular(sinIgv));
       return {
         ...prev,
         titulo:   prev.titulo   || cot.titulo           || "",

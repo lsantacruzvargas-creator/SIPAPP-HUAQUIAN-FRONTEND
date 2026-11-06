@@ -265,7 +265,10 @@ export default function ListaCotizaciones() {
   const [tipoCambio, setTipoCambio] = useState(null);
   // Precios: información sensible, solo Admin/Facturación/Jefatura los ven —
   // esta lista es compartida también con Planner y Asistente (Administración).
-  const puedeVerPrecios = ["admin", "facturacion", "jefatura"].includes(getUsuario()?.rol);
+  // Columnas de precio ocultas "por ahora" a pedido del usuario (2026-11-06),
+  // en la tabla y en el Excel. Para volver a mostrarlas: MOSTRAR_PRECIOS = true.
+  const MOSTRAR_PRECIOS = false;
+  const puedeVerPrecios = MOSTRAR_PRECIOS && ["admin", "facturacion", "jefatura"].includes(getUsuario()?.rol);
 
   const buildOtsMap = (ots) => {
     const m = new Map();

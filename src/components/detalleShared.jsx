@@ -266,6 +266,12 @@ export const bloqueadoPorCadenaCerrada = (estadoCadena, rolActual) =>
 export const money = (v, moneda = "PEN") =>
   (moneda === "USD" ? "US$ " : "S/ ") + Number(v ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2 });
 
+// Base imponible real de una Cotización u OC: en Cotización ya trae el
+// descuento (formato estándar) o gastos + utilidad (Alicorp/Gloria), cosa que
+// `subtotal` (bruto de ítems) no refleja.
+export const totalSinIgv = (doc) =>
+  Math.round(((Number(doc?.total) || 0) - (Number(doc?.igv) || 0)) * 100) / 100;
+
 /* ─── Anulación de documentos ────────────────────────────────────── */
 export function BotonAnular({ onAnular }) {
   const [abierto, setAbierto]   = useState(false);

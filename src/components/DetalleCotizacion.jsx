@@ -21,7 +21,7 @@ import TablaItemsCotizacionGloria from "./TablaItemsCotizacionGloria";
 import TablaItemsCotizacionAlicorp from "./TablaItemsCotizacionAlicorp";
 import {
   FlujoNegocio, TarjetaRelacion, Chip,
-  badgePago, badgeOT, money, BotonAnular, BotonCerrarCadena, BotonDesanular, BannerAnulado, bloqueadoPorCadenaCerrada,
+  badgePago, badgeOT, money, totalSinIgv, BotonAnular, BotonCerrarCadena, BotonDesanular, BannerAnulado, bloqueadoPorCadenaCerrada,
 } from "./detalleShared";
 
 const INP = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 w-full transition";
@@ -642,8 +642,8 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
             <div className="text-right">
               {puedeVerPrecios && (
                 <>
-                  <p className="text-[10px] text-white/60 uppercase tracking-widest leading-none">Total</p>
-                  <p className="text-lg font-bold leading-tight">{money(cot.total, cot.moneda)}</p>
+                  <p className="text-[10px] text-white/60 uppercase tracking-widest leading-none">Total sin IGV</p>
+                  <p className="text-lg font-bold leading-tight">{money(totalSinIgv(cot), cot.moneda)}</p>
                 </>
               )}
               <Chip className="mt-0.5 bg-white/20 text-white">{cot.tipo}</Chip>

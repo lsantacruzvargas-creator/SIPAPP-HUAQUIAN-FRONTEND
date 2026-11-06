@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchAuth } from "../utils/fetchAuth";
+import { money, totalSinIgv } from "./detalleShared";
 import { formatearFecha } from "../utils/fecha";
 
 const INP     = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 w-full";
@@ -44,7 +45,7 @@ function BuscadorCotizacion({ onSelect, onClose }) {
                 className="w-full text-left px-4 py-3 rounded-xl hover:bg-blue-50 border border-transparent hover:border-blue-100 transition">
                 <div className="flex justify-between">
                   <span className="font-mono text-xs text-blue-600">{c.codigo}</span>
-                  <span className="text-xs text-gray-400">S/ {Number(c.total ?? 0).toFixed(2)}</span>
+                  <span className="text-xs text-gray-400">{money(totalSinIgv(c), c.moneda)}</span>
                 </div>
                 <p className="text-sm text-gray-700 truncate">{c.titulo}</p>
                 {c.empresa && <p className="text-xs text-gray-400">{c.empresa.razonSocial}</p>}
