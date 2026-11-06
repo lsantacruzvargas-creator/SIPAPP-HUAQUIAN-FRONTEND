@@ -365,7 +365,7 @@ export default function ListaComprobantes() {
 
       {seleccionado && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-6xl max-h-[90vh] overflow-y-auto p-6">
             <div className="flex justify-between items-start mb-4">
               <div>
                 <h3 className="font-semibold text-gray-800">
@@ -507,7 +507,7 @@ export default function ListaComprobantes() {
               </table>
             )}
 
-            <div className="flex justify-end gap-3 pt-2">
+            <div className="flex flex-wrap justify-end gap-3 pt-2 [&>button]:whitespace-nowrap">
               {(seleccionado.estado === "RECHAZADO" || seleccionado.estado === "ERROR" || seleccionado.estado === "EN_PROCESO") && (
                 <button
                   onClick={consultarEstado}
