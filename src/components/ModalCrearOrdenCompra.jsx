@@ -93,9 +93,8 @@ export default function ModalCrearOrdenCompra({ onClose, onCreada }) {
     setCot(cot);
     setBCot(false);
     setForm(prev => {
-      const sinIgv = totalSinIgv(cot);
-      const nuevoSub = prev.subtotal || (sinIgv > 0 ? String(sinIgv) : prev.subtotal);
-      if (!prev.subtotal && sinIgv > 0) setCalc(calcular(sinIgv));
+      const nuevoSub = prev.subtotal || (cot.total > 0 ? String(cot.total) : prev.subtotal);
+      if (!prev.subtotal && cot.total > 0) setCalc(calcular(cot.total));
       return {
         ...prev,
         titulo:   prev.titulo   || cot.titulo           || "",
