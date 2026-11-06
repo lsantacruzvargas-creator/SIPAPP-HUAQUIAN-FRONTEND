@@ -65,7 +65,13 @@ export async function generarFacturaPdf({ factura, comprobante, empresa }) {
     ? (c.detraccion?.aplica ? c.detraccion : null)
     : (factura.detraccion > 0 ? { montoNeto: factura.detraccion, porcentaje: 12 } : null);
   const bienDet = det?.codigoBien && DETRACCION_BIENES_SERVICIOS.find((b) => b.codigo === det.codigoBien);
-  const montoDet = det ? Math.round(Number(det.montoNeto) || 0) : 0;
+  // En USD montoNeto va con céntimos (es lo que descuentan las cuotas); el depósito al Banco de
+  // la Nación es montoSoles = montoNeto × TC del día, redondeado a soles enteros.
+  const montoDet = !det ? 0 : c ? Number(det.montoNeto) || 0 : Math.round(Number(det.montoNeto) || 0);
+  const montoDetTxt = !det ? "" : c
+    ? `S/ ${miles(Math.round(Number(det.montoSoles ?? det.montoNeto) || 0))}` +
+      (det.tipoCambio ? `  (US$ ${n2(det.montoNeto)} × TC ${det.tipoCambio})` : "")
+    : montoDet;
   const ret = c
     ? (c.retencion?.aplica ? c.retencion : null)
     : (factura.retencion > 0 ? { monto: factura.retencion, porcentaje: factura.retencionPorcentaje } : null);
@@ -219,7 +225,7 @@ export async function generarFacturaPdf({ factura, comprobante, empresa }) {
     [
       ["Tipo de operación", "01"],
       ["Bien o Servicio", det.codigoBien ? `${det.codigoBien} ${bienDet?.descripcion || ""}` : ""],
-      [det.porcentaje ? `Detracción (${det.porcentaje}%)` : "Detracción", montoDet],
+      [det.porcentaje ? `Detracción (${det.porcentaje}%)` : "Detracción", montoDetTxt],
       ["Cta. Cte. Banco de la Nación", normalizarCuentaDetraccion(det.cuentaBancaria)],
     ].forEach(([etq, valor], i) => {
       celda(M, yDet + i * H, etqW, H, etq, { fill: GRIS, bold: true });
