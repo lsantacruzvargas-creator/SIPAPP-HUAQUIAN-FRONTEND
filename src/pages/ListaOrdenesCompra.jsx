@@ -39,13 +39,18 @@ const compararTexto = (na, nb) => {
   return String(nb).localeCompare(String(na));
 };
 
-// El monto de la OC no tiene moneda propia (a diferencia de Cotizacion) —
-// se trata como Soles por convención, igual que el resto de la cadena
-// (OT/Factura), y se convierte a US$ con el Tipo de Cambio compartido.
-const totalesDuales = (monto, tipoCambio) => {
-  const m = Number(monto) || 0;
+// El monto de la OC no tiene moneda propia: hereda la de su Cotización
+// (igual que DetalleOrdenCompra.jsx); sin cotización vinculada es Soles.
+// Antes se trataba siempre como Soles y una OC de cotización en USD
+// mostraba los dólares en la columna S/ (reportado por el usuario, 2026-11-06).
+const r2 = (n) => Math.round(n * 100) / 100;
+const totalesDuales = (monto, moneda, tipoCambio) => {
+  const m = r2(Number(monto) || 0);
   const tc = Number(tipoCambio) || 0;
-  return { pen: m, usd: tc > 0 ? m / tc : null };
+  if (moneda === "USD") {
+    return { pen: tc > 0 ? r2(m * tc) : null, usd: m };
+  }
+  return { pen: m, usd: tc > 0 ? r2(m / tc) : null };
 };
 
 function PillSiNo({ si }) {
@@ -104,7 +109,7 @@ function TablaOC({
               const otPadre = grupoOT?.parent || null;
               const subs = grupoOT?.subs || [];
               const factura = factByOCMap[o._id] || factMap[cotId];
-              const { pen, usd } = totalesDuales(o.monto, tipoCambio);
+              const { pen, usd } = totalesDuales(o.monto, o.cotizacion?.moneda, tipoCambio);
 
               const filaPrincipal = (
                 <tr key={o._id}
@@ -132,7 +137,7 @@ function TablaOC({
                   {mostrarTitulo && <td className="px-4 py-3.5 text-gray-600">{o.titulo}</td>}
                   {puedeVerPrecios && (
                     <td className="px-4 py-3.5 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap">
-                      {pen.toLocaleString("es-PE", { minimumFractionDigits: 2 })}
+                      {pen != null ? pen.toLocaleString("es-PE", { minimumFractionDigits: 2 }) : "—"}
                     </td>
                   )}
                   {puedeVerPrecios && (
@@ -407,7 +412,7 @@ export default function ListaOrdenesCompra() {
     const cotId = o.cotizacion?._id || o.cotizacion;
     const grupoOT = otGroupMap[o.numeroDocumento];
     const factura = factByOCMap[o._id] || factMap[cotId];
-    const { pen, usd } = totalesDuales(o.monto, tipoCambio);
+    const { pen, usd } = totalesDuales(o.monto, o.cotizacion?.moneda, tipoCambio);
     return {
       "Cotización":         o.cotizacion?.numeroCotizacion || "—",
       "N° Orden de Compra": o.numeroOrden || "—",
@@ -418,7 +423,7 @@ export default function ListaOrdenesCompra() {
       "Empresa":            o.empresa?.razonSocial || "—",
       "Título":             o.titulo || "—",
       ...(puedeVerPrecios ? {
-        "Total (S/)":       pen.toFixed(2),
+        "Total (S/)":       pen != null ? pen.toFixed(2) : "—",
         "Total (US$)":      usd != null ? usd.toFixed(2) : "—",
       } : {}),
       "Aprobado":           o.cotizacion?.aprobado ? "Aprobada" : "Pendiente",
