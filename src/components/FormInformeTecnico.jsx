@@ -17,6 +17,31 @@ const TIPOS_SIN_ENCABEZADO = ["adicional", "arrancador", "plc", "diagnostico_ser
 // autocompleta desde ahí.
 const TIPOS_DATOS_EQUIPO_DESDE_OT = ["arrancador", "plc", "diagnostico_servomotor", "panel", "pc", "ups", "diagnostico_equipo", "tarjetas", "variador_reparacion"];
 
+// Fotos de celular de 10-20 MB superaban el tope de multer (15 MB) y la subida
+// fallaba sin aviso. Se reducen en el navegador a 2000 px de lado mayor en JPEG
+// (de sobra para el informe y el Excel); si algo falla, se sube la original.
+const LADO_MAX_FOTO = 2000;
+async function comprimirFoto(file) {
+  if (file.size < 1.5 * 1024 * 1024) return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const escala = Math.min(1, LADO_MAX_FOTO / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * escala);
+    canvas.height = Math.round(bitmap.height * escala);
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
+    if (!blob || blob.size >= file.size) return file;
+    return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg" });
+  } catch {
+    return file;
+  }
+}
+
 function Seccion({ titulo, children }) {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
@@ -223,6 +248,7 @@ function SeccionTabla({ seccion, campos, onCampo, onCampos }) {
 function SeccionEvidencias({ seccion, campos, onCampos }) {
   const grupos = campos[seccion.clave] || [];
   const [subiendo, setSubiendo] = useState(null);
+  const [errorSubida, setErrorSubida] = useState("");
   const set = (nuevos) => onCampos(seccion.clave, nuevos);
 
   // Slots fijos (ej. Servicio de Soporte: A/B/C/D, Diagnóstico de Equipo: 8
@@ -263,14 +289,18 @@ function SeccionEvidencias({ seccion, campos, onCampos }) {
     const archivos = Array.from(files).slice(0, espacio);
     if (!archivos.length) return;
     setSubiendo(key);
+    setErrorSubida("");
     const urls = [];
+    const fallidas = [];
     for (const file of archivos) {
       const fd = new FormData();
-      fd.append("imagen", file);
+      fd.append("imagen", await comprimirFoto(file));
       const res = await uploadAuth("/informes-tecnicos/subir-imagen", fd);
       if (res.ok) urls.push((await res.json()).url);
+      else fallidas.push(`${file.name}: ${(await res.json().catch(() => null))?.mensaje || "no se pudo subir"}`);
     }
     set(grupos.map((g) => (g._key === key ? { ...g, imagenes: [...g.imagenes, ...urls] } : g)));
+    if (fallidas.length) setErrorSubida(`No se subieron ${fallidas.length} foto(s) — ${fallidas.join(" · ")}`);
     setSubiendo(null);
   };
 
@@ -287,6 +317,7 @@ function SeccionEvidencias({ seccion, campos, onCampos }) {
   const tamMiniatura = seccion.miniaturaGrande ? "w-full max-w-[300px] h-[300px]" : "w-16 h-16";
   return (
     <Seccion titulo={seccion.titulo}>
+      {errorSubida && <p className="text-xs text-red-500 mb-2">{errorSubida}</p>}
       <div className={CLASES_COLUMNAS[seccion.columnas] || "space-y-3"}>
         {gruposAMostrar.map((g) => {
           const alcanzoLimite = seccion.maxImagenes && g.imagenes.length >= seccion.maxImagenes;
