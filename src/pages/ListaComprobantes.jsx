@@ -11,7 +11,7 @@ import {
 import { generarComprobantePdf } from "../utils/comprobantePdf";
 import { generarFacturaPdf } from "../utils/facturaPdf";
 
-const FILTROS_VACIO = { tipoDoc: "", estado: "", desde: "", hasta: "", receptorDoc: "" };
+const FILTROS_VACIO = { tipoDoc: "", estado: "", desde: "", hasta: "", q: "" };
 const SELECT = "input-field w-auto";
 
 const TIPO_DOC_CLASE = {
@@ -290,10 +290,11 @@ export default function ListaComprobantes() {
         <input type="date" name="desde" value={filtros.desde} onChange={handleFiltro} className={SELECT} />
         <input type="date" name="hasta" value={filtros.hasta} onChange={handleFiltro} className={SELECT} />
         <input
-          name="receptorDoc"
-          value={filtros.receptorDoc}
+          name="q"
+          value={filtros.q}
           onChange={handleFiltro}
-          placeholder="Doc. del receptor…"
+          onKeyDown={(e) => e.key === "Enter" && buscar()}
+          placeholder="RUC, serie-correlativo, receptor o emisión (dd/mm/aaaa)…"
           className={`${SELECT} flex-1 min-w-40`}
         />
         <button onClick={buscar} className="btn-primary">Buscar</button>
