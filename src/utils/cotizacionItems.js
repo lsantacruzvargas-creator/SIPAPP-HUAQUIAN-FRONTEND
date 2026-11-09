@@ -54,6 +54,7 @@ export const itemDesdeDb = (item) => ({
   precio: item.precio,
   moneda: item.moneda || "PEN",
   otGenerada: item.otGenerada || null,
+  ocGenerada: item.ocGenerada || null,
   // Formato Gloria (ver GRUPOS_GLORIA abajo) — un ítem del flujo genérico no
   // trae `grupo`, así que estos quedan undefined y no afectan nada.
   grupo: item.grupo,
@@ -123,6 +124,19 @@ export function calcularGloria(subtotalItems, gastosPct = 5, utilidadPct = 10) {
     igv,
     total: Math.round((totalPreIgv + igv) * 100) / 100,
   };
+}
+
+// Monto sin IGV de cada ítem con los ajustes de la cotización (descuento
+// global, o gastos generales + utilidad de Gloria/Alicorp) prorrateados según
+// su peso en el subtotal: así la suma de todas las OCs parciales da la base
+// sin IGV de la cotización (`total - igv`, mismo criterio que ModalOrdenCompra).
+export function montoAjustadoItem(cotizacion, item) {
+  const subtotalItems = (cotizacion.items || []).reduce((s, i) => s + calcSubtotalGloria(i), 0);
+  const total = Number(cotizacion.total) || 0;
+  const igv = Number(cotizacion.igv) || 0;
+  const base = total > 0 && igv > 0 ? total - igv : subtotalItems;
+  const factor = subtotalItems > 0 ? base / subtotalItems : 1;
+  return Math.round(calcSubtotalGloria(item) * factor * 100) / 100;
 }
 
 // ── Formato "Alicorp" — compartido por Alicorp, Intradevco y Masterbread ────

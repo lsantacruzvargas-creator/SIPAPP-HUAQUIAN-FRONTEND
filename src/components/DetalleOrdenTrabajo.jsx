@@ -158,7 +158,12 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
         null;
       setCot(cotResuelta);
 
+      // Con OCs parciales por ítems, la OC de esta OT es la que cubre su ítem.
+      const itemDeOT = cotResuelta?.items?.find(i => (i.otGenerada?._id || i.otGenerada) === ot._id);
+      const idOCDelItem = itemDeOT?.ocGenerada && !itemDeOT.ocGenerada.anulado
+        ? (itemDeOT.ocGenerada._id || itemDeOT.ocGenerada) : null;
       const ocResuelta =
+        (idOCDelItem && ocs.find(o => o._id === idOCDelItem)) ||
         (cotResuelta && ocs.find(o => (o.cotizacion?._id || o.cotizacion) === cotResuelta._id)) ||
         (ot.numeroDocumento != null && ocs.find(o => o.numeroDocumento === ot.numeroDocumento)) ||
         null;
@@ -166,7 +171,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
 
       const factResuelta =
         (ocResuelta && facts.find(f => (f.ordenCompra?._id || f.ordenCompra) === ocResuelta._id)) ||
-        (ot.numeroDocumento != null && facts.find(f => f.numeroDocumento === ot.numeroDocumento)) ||
+        (ot.numeroDocumento != null && facts.find(f => f.numeroDocumento === ot.numeroDocumento && !f.ordenCompra)) ||
         null;
       setFactura(factResuelta);
     });

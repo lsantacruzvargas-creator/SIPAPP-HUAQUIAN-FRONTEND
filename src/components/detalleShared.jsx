@@ -397,3 +397,36 @@ export function BannerAnulado({ motivo, por, fecha }) {
     </div>
   );
 }
+
+/* ─── Selección de ítems de cotización para generar OC ─────────────
+   Usado por las 3 tablas de ítems (genérica, Gloria, Alicorp). */
+// Un ítem está cubierto si su OC existe y no fue anulada.
+const itemConOC = (item) => !!item.ocGenerada && !item.ocGenerada.anulado;
+
+export function CeldaOCItem({ item, idx, seleccionados, onToggle, onVerOC, deshabilitado, className = "px-3 py-3" }) {
+  return (
+    <td className={`${className} text-center`}>
+      {itemConOC(item) ? (
+        <button type="button" onClick={() => onVerOC?.(item.ocGenerada)}
+          title="Orden de compra que cubre este ítem"
+          className="text-[11px] font-mono font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 hover:bg-amber-100 transition whitespace-nowrap">
+          {item.ocGenerada.numeroOrden || item.ocGenerada.codigo}
+        </button>
+      ) : (
+        <input type="checkbox" checked={seleccionados.has(idx)}
+          onChange={() => onToggle?.(idx)} disabled={deshabilitado}
+          className="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-400" />
+      )}
+    </td>
+  );
+}
+
+export function BotonGenerarOC({ cantidad, onClick }) {
+  if (!cantidad) return null;
+  return (
+    <button type="button" onClick={onClick}
+      className="bg-amber-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-amber-700 transition font-medium">
+      Generar OC con {cantidad} ítem{cantidad !== 1 ? "s" : ""}
+    </button>
+  );
+}

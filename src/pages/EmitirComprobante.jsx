@@ -142,7 +142,9 @@ export default function EmitirComprobante() {
     // vez de cantidad/precio (ver Cotizacion.js itemSchema) — se traduce a
     // cantidad/valorUnitario equivalentes. Filas puramente informativas o
     // de agrupación (sin cantidad ni precio) se descartan del prellenado.
-    const itemsValidos = (cotizacion?.items || [])
+    // OC parcial (generada desde ítems puntuales): solo se facturan sus ítems.
+    const itemsDeOC = (cotizacion?.items || []).filter((i) => (i.ocGenerada?._id || i.ocGenerada) === oc._id);
+    const itemsValidos = (itemsDeOC.length ? itemsDeOC : cotizacion?.items || [])
       .map((i) => {
         const esManoObra = i.grupo === "mano_obra";
         const cantidad = esManoObra
@@ -178,7 +180,7 @@ export default function EmitirComprobante() {
     const itemsCuadranConOC = !(montoOC > 0) || Math.abs(baseItems - montoOC) <= 0.01 * itemsValidos.length;
     const formatoEspecial = emp?.ruc === RUC_GLORIA || esFormatoAlicorp(emp?.ruc);
     if (formatoEspecial && montoOC > 0) {
-      lineaUnica(itemsValidos[0]?.descripcion || oc.descripcion || oc.titulo || "");
+      lineaUnica((oc.desdeItemsCotizacion && oc.titulo) || itemsValidos[0]?.descripcion || oc.descripcion || oc.titulo || "");
     } else if (itemsValidos.length && itemsCuadranConOC) {
       setItems(itemsValidos.map((i) => ({
         _key: Date.now() + Math.random(),

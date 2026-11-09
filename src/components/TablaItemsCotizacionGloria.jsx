@@ -1,5 +1,6 @@
 import { useState } from "react";
 import TablaScroll from "./TablaScroll";
+import { CeldaOCItem, BotonGenerarOC } from "./detalleShared";
 import SelectorCatalogoServicios from "./SelectorCatalogoServicios";
 import ConfirmacionAccion from "./ConfirmacionAccion";
 import {
@@ -29,6 +30,7 @@ const ACENTOS = {
 export default function TablaItemsCotizacionGloria({
   items, onItemsChange, puedeEditar, disabled, puedeVerPrecios = true,
   seleccionables = false, seleccionados = new Set(), onToggleSeleccion, onGenerarOT, generando = false, onVerOT, onQuitarOT,
+  seleccionablesOC = false, seleccionadosOC = new Set(), onToggleSeleccionOC, onGenerarOC, onVerOC,
 }) {
   const editable = puedeEditar && !disabled;
   // Qué grupo (clave de GRUPOS_GLORIA) recibe lo elegido en el catálogo —
@@ -83,12 +85,15 @@ export default function TablaItemsCotizacionGloria({
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
       <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
         <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Ítems (formato Gloria)</h2>
-        {seleccionables && seleccionados.size > 0 && (
-          <button type="button" onClick={onGenerarOT} disabled={generando}
-            className="bg-emerald-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-emerald-700 disabled:opacity-60 transition font-medium">
-            {generando ? "Generando…" : `Generar OT de ${seleccionados.size} ítem${seleccionados.size !== 1 ? "s" : ""}`}
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {seleccionablesOC && <BotonGenerarOC cantidad={seleccionadosOC.size} onClick={onGenerarOC} />}
+          {seleccionables && seleccionados.size > 0 && (
+            <button type="button" onClick={onGenerarOT} disabled={generando}
+              className="bg-emerald-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-emerald-700 disabled:opacity-60 transition font-medium">
+              {generando ? "Generando…" : `Generar OT de ${seleccionados.size} ítem${seleccionados.size !== 1 ? "s" : ""}`}
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="divide-y divide-gray-100">
@@ -130,6 +135,7 @@ export default function TablaItemsCotizacionGloria({
                   <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
                     <tr>
                       {seleccionables && <th className="px-3 py-2 w-12 text-center">OT</th>}
+                      {seleccionablesOC && <th className="px-3 py-2 w-12 text-center">OC</th>}
                       <th className="px-3 py-2 text-left">Descripción</th>
                       {esManoObra ? (
                         <>
@@ -151,7 +157,7 @@ export default function TablaItemsCotizacionGloria({
                   <tbody className="divide-y divide-gray-100">
                     {itemsGrupo.length === 0 ? (
                       <tr>
-                        <td colSpan={(seleccionables ? 1 : 0) + 3 + (puedeVerPrecios ? 2 : 0) + (editable ? 1 : 0)} className="px-3 py-4 text-center text-gray-400 text-xs">
+                        <td colSpan={(seleccionables ? 1 : 0) + (seleccionablesOC ? 1 : 0) + 3 + (puedeVerPrecios ? 2 : 0) + (editable ? 1 : 0)} className="px-3 py-4 text-center text-gray-400 text-xs">
                           Sin ítems{editable ? " — usa “+ Agregar” para sumar uno." : "."}
                         </td>
                       </tr>
@@ -180,6 +186,10 @@ export default function TablaItemsCotizacionGloria({
                                   className="w-4 h-4 rounded border-gray-300 text-sky-600 focus:ring-sky-400" />
                               )}
                             </td>
+                          )}
+                          {seleccionablesOC && (
+                            <CeldaOCItem item={item} idx={idx} seleccionados={seleccionadosOC} className="px-3 py-2"
+                              onToggle={onToggleSeleccionOC} onVerOC={onVerOC} />
                           )}
                           <td className="px-3 py-2">
                             {editable ? (
@@ -278,7 +288,7 @@ export default function TablaItemsCotizacionGloria({
                   {puedeVerPrecios && (
                     <tfoot className="border-t-2 border-gray-200 bg-gray-50">
                       <tr>
-                        <td colSpan={(seleccionables ? 1 : 0) + 3} className="px-3 py-2 text-right text-xs font-semibold text-gray-600">TOTAL</td>
+                        <td colSpan={(seleccionables ? 1 : 0) + (seleccionablesOC ? 1 : 0) + 3} className="px-3 py-2 text-right text-xs font-semibold text-gray-600">TOTAL</td>
                         <td className="px-3 py-2 text-right font-bold text-gray-900 tabular-nums">{subtotalGrupo.toFixed(2)}</td>
                         {editable && <td />}
                       </tr>

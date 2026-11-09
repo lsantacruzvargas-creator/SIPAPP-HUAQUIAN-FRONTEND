@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
+import { montoAjustadoItem } from "../utils/cotizacionItems";
+import { money } from "./detalleShared";
 
 const INP    = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 w-full";
 const INP_RO = "border border-gray-100 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500 w-full cursor-not-allowed";
@@ -157,6 +159,117 @@ export default function ModalOrdenCompra({ cotizacion, onClose, onCreada }) {
           </button>
           <button onClick={guardar} disabled={guardando}
             className="text-sm bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition font-medium">
+            {guardando ? "Creando…" : "Crear Orden de Compra"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Una OC que agrupa uno o varios ítems de la cotización (OCs parciales).
+export function ModalOrdenCompraItems({ cotizacion, indices, onClose, onCreada }) {
+  const esAsistente = getUsuario()?.rol === "asistente";
+  const elegidos = indices.map((idx) => ({ idx, item: cotizacion.items[idx] })).filter((e) => e.item);
+  const sumaAjustada = Math.round(elegidos.reduce((s, e) => s + montoAjustadoItem(cotizacion, e.item), 0) * 100) / 100;
+  const [form, setForm] = useState(() => ({
+    numeroOrden: "",
+    titulo: elegidos.map((e) => e.item.descripcion).filter(Boolean).join(" / "),
+    monto: sumaAjustada,
+  }));
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState("");
+  const [exito, setExito] = useState(null);
+
+  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  const guardar = async () => {
+    if (!form.numeroOrden.trim()) return setError("El número de orden de compra es obligatorio.");
+    if (!form.titulo.trim()) return setError("El título es obligatorio.");
+    if (!(Number(form.monto) > 0)) return setError("El monto debe ser mayor a 0.");
+    setGuardando(true);
+    setError("");
+    const res = await fetchAuth("/ordenes-compra/desde-items", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        cotizacion: cotizacion._id,
+        indices: elegidos.map((e) => e.idx),
+        numeroOrden: form.numeroOrden.trim(),
+        titulo: form.titulo.trim(),
+        subtotal: Number(form.monto),
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(data.mensaje || "Error al crear la orden de compra.");
+      setGuardando(false);
+      return;
+    }
+    setExito(data.numeroOrden || data.codigo);
+    setTimeout(() => onCreada(data), 1500);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl flex flex-col max-h-[90vh]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+          <h3 className="font-semibold text-gray-800">Nueva Orden de Compra por ítems</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl leading-none">✕</button>
+        </div>
+
+        <div className="p-6 space-y-4 overflow-y-auto">
+          <div className="bg-gray-50 rounded-xl p-4">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+              Ítems de {cotizacion.numeroCotizacion || cotizacion.codigo} ({elegidos.length})
+            </p>
+            <ul className="divide-y divide-gray-200 text-sm">
+              {elegidos.map(({ idx, item }) => (
+                <li key={idx} className="flex items-start justify-between gap-3 py-1.5">
+                  <span className="text-gray-700"><span className="text-gray-400 mr-1.5">{idx + 1}.</span>{item.descripcion}</span>
+                  {!esAsistente && (
+                    <span className="text-gray-600 tabular-nums whitespace-nowrap">{money(montoAjustadoItem(cotizacion, item), cotizacion.moneda)}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Número de orden de compra *</label>
+            <input name="numeroOrden" value={form.numeroOrden} onChange={handleChange} className={INP} placeholder="Ej. 4500012345" />
+          </div>
+
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Título *</label>
+            <textarea name="titulo" value={form.titulo} onChange={handleChange} rows={2} className={INP} />
+          </div>
+
+          {!esAsistente && (
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Monto sin IGV ({cotizacion.moneda === "USD" ? "US$" : "S/"})</label>
+              <input name="monto" type="number" min="0" step="0.01" value={form.monto} onChange={handleChange}
+                onWheel={(e) => e.target.blur()} className={INP} />
+              <p className="text-[11px] text-gray-400 mt-1">
+                Suma de los ítems con el descuento / gastos y utilidad de la cotización: {money(sumaAjustada, cotizacion.moneda)}
+              </p>
+            </div>
+          )}
+
+          {exito && (
+            <div className="bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg px-4 py-3">
+              Orden <strong>{exito}</strong> creada exitosamente.
+            </div>
+          )}
+          {error && <p className="text-xs text-red-500">{error}</p>}
+        </div>
+
+        <div className="px-6 py-4 border-t border-gray-100 flex gap-3 justify-end shrink-0">
+          <button onClick={onClose} className="text-sm border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 transition">
+            Cancelar
+          </button>
+          <button onClick={guardar} disabled={guardando}
+            className="text-sm bg-amber-600 text-white px-5 py-2 rounded-lg hover:bg-amber-700 disabled:opacity-50 transition font-medium">
             {guardando ? "Creando…" : "Crear Orden de Compra"}
           </button>
         </div>

@@ -333,8 +333,10 @@ export default function ListaOrdenesCompra() {
       const factByOCM = {};
       facts.forEach((f) => {
         const cotId = f.cotizacion?._id || f.cotizacion;
-        if (cotId && !factM[cotId]) factM[cotId] = f;
         const ocId = f.ordenCompra?._id || f.ordenCompra;
+        // Respaldo por cotización solo para facturas sin OC: con varias OCs por
+        // cotización, una factura de otra OC no debe aparecer como la de esta.
+        if (cotId && !ocId && !factM[cotId]) factM[cotId] = f;
         if (ocId) {
           // Preferir la factura cuyo numeroDocumento coincide con el de la OC;
           // solo se cae a la primera vista si ninguna coincide.

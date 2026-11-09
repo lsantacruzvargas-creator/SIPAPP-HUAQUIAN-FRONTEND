@@ -2,6 +2,7 @@ import { useState } from "react";
 import SelectorCatalogoServicios from "./SelectorCatalogoServicios";
 import ConfirmacionAccion from "./ConfirmacionAccion";
 import TablaScroll from "./TablaScroll";
+import { CeldaOCItem, BotonGenerarOC } from "./detalleShared";
 import {
   calcSubtotal, itemVacioServicio, UNIDADES,
   descripcionInvalida, cantidadInvalida, precioInvalido, itemInvalido,
@@ -18,6 +19,7 @@ export default function TablaItemsCotizacion({
   items, onItemsChange,
   tipo, puedeEditar, disabled, intentoGuardar, totalesMostrados,
   seleccionables = false, seleccionados = new Set(), onToggleSeleccion, onGenerarOT, generando = false, onVerOT, onQuitarOT,
+  seleccionablesOC = false, seleccionadosOC = new Set(), onToggleSeleccionOC, onGenerarOC, onVerOC,
   puedeVerPrecios = true,
 }) {
   const [catalogoOpen, setCatalogoOpen] = useState(false);
@@ -104,7 +106,7 @@ export default function TablaItemsCotizacion({
 
   const agregarItemManual = () => onItemsChange([...items, itemVacioServicio()]);
 
-  const colsIzquierda = (puedeEditar ? 5 : 4) + (seleccionables ? 1 : 0);
+  const colsIzquierda = (puedeEditar ? 5 : 4) + (seleccionables ? 1 : 0) + (seleccionablesOC ? 1 : 0);
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -116,6 +118,7 @@ export default function TablaItemsCotizacion({
           </h2>
         </div>
         <div className="flex items-center gap-2">
+          {seleccionablesOC && <BotonGenerarOC cantidad={seleccionadosOC.size} onClick={onGenerarOC} />}
           {seleccionables && seleccionados.size > 0 && (
             <button type="button" onClick={onGenerarOT} disabled={generando}
               className="bg-emerald-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-emerald-700 disabled:opacity-60 transition font-medium">
@@ -148,6 +151,7 @@ export default function TablaItemsCotizacion({
           <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
             <tr>
               {seleccionables && <th className="px-3 py-3 w-12 text-center">OT</th>}
+              {seleccionablesOC && <th className="px-3 py-3 w-12 text-center">OC</th>}
               <th className="px-3 py-3 text-center w-12">Item</th>
               <th className="px-3 py-3 text-left">Descripción *</th>
               <th className="px-3 py-3 text-center w-20">Unidad</th>
@@ -160,7 +164,7 @@ export default function TablaItemsCotizacion({
           <tbody className="divide-y divide-gray-100">
             {items.length === 0 ? (
               <tr>
-                <td colSpan={(puedeEditar ? 7 : 6) + (seleccionables ? 1 : 0) - (puedeVerPrecios ? 0 : 2)} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={(puedeEditar ? 7 : 6) + (seleccionables ? 1 : 0) + (seleccionablesOC ? 1 : 0) - (puedeVerPrecios ? 0 : 2)} className="px-4 py-8 text-center text-gray-400">
                   Sin ítems agregados{puedeAgregar
                     ? (tipo === "servicio"
                       ? " — usa “+ Agregar ítem manual” para escribir uno o “+ Agregar ítem de plantilla” para elegir del catálogo de servicios."
@@ -193,6 +197,10 @@ export default function TablaItemsCotizacion({
                           className="w-4 h-4 rounded border-gray-300 text-sky-600 focus:ring-sky-400" />
                       )}
                     </td>
+                  )}
+                  {seleccionablesOC && (
+                    <CeldaOCItem item={item} idx={idx} seleccionados={seleccionadosOC}
+                      onToggle={onToggleSeleccionOC} onVerOC={onVerOC} />
                   )}
                   <td className="px-3 py-3 text-center text-gray-400">{idx + 1}</td>
                   <td className="px-3 py-3">
