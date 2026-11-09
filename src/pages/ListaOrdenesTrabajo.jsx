@@ -14,7 +14,19 @@ const SORTS = [
   { valor: "fecha",             label: "Más reciente" },
   { valor: "numeroOT",          label: "N° OT" },
   { valor: "numeroCotizacion",  label: "N° Cotización" },
+  { valor: "fechaSalidaDesc",   label: "Fecha de salida (más reciente)" },
+  { valor: "fechaSalidaAsc",    label: "Fecha de salida (más antigua)" },
 ];
+
+// Las OTs sin fecha de salida van al final en ambos sentidos.
+const compararFechaSalida = (a, b, asc) => {
+  const ta = a.fechaSalida ? new Date(a.fechaSalida).getTime() : null;
+  const tb = b.fechaSalida ? new Date(b.fechaSalida).getTime() : null;
+  if (ta === null && tb === null) return 0;
+  if (ta === null) return 1;
+  if (tb === null) return -1;
+  return asc ? ta - tb : tb - ta;
+};
 
 const ESTADOS_INFORMES = ["pendiente", "en progreso", "en espera de aprobación", "aprobado"];
 
@@ -73,7 +85,8 @@ const dentroDeRangoFecha = (fecha, desde, hasta) => {
   return true;
 };
 
-function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg }) {
+function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg, sortBy, onSortFechaSalida }) {
+  const ordenSalida = sortBy === "fechaSalidaDesc" ? "↓" : sortBy === "fechaSalidaAsc" ? "↑" : "↕";
   return (
     <div className="mb-6">
       <div className="flex items-center gap-2 mb-3">
@@ -83,7 +96,7 @@ function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg }) {
       </div>
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         <TablaScroll className="overflow-x-auto">
-          <table className="w-full text-sm" style={{ minWidth: "1000px" }}>
+          <table className="w-full text-sm" style={{ minWidth: "1100px" }}>
             <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-200">
               <tr>
                 <th className={`${TH} text-left`}>N° OT</th>
@@ -99,12 +112,24 @@ function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg }) {
                 <th className={`${TH} text-center`}>Estado Informes</th>
                 <th className={`${TH} text-center`}>Días desde recibido</th>
                 <th className={`${TH} text-center`}>Fecha de Ingreso</th>
+                <th className={`${TH} text-center`}>
+                  <button
+                    type="button"
+                    onClick={onSortFechaSalida}
+                    title={sortBy === "fechaSalidaDesc" ? "Ordenado: más reciente primero (click: más antigua)" : "Ordenar por fecha de salida"}
+                    className={`inline-flex items-center gap-1 uppercase tracking-wide hover:text-gray-800 transition ${
+                      sortBy?.startsWith("fechaSalida") ? "text-gray-800" : ""
+                    }`}
+                  >
+                    Fecha de Salida <span className="text-sm leading-none">{ordenSalida}</span>
+                  </button>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {ordenes.length === 0 ? (
                 <tr>
-                  <td colSpan={13} className="px-4 py-8 text-center text-gray-400">{vacioMsg}</td>
+                  <td colSpan={14}className="px-4 py-8 text-center text-gray-400">{vacioMsg}</td>
                 </tr>
               ) : (
                 ordenes.flatMap((o) => [
@@ -152,6 +177,9 @@ function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg }) {
                     </td>
                     <td className="px-4 py-3.5 text-center text-gray-600 whitespace-nowrap">
                       {o.fechaRecibida ? formatearFecha(o.fechaRecibida) : <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="px-4 py-3.5 text-center text-gray-600 whitespace-nowrap">
+                      {o.fechaSalida ? formatearFecha(o.fechaSalida) : <span className="text-gray-300">—</span>}
                     </td>
                   </tr>,
                   ...(o.subOTs || []).map((s) => (
@@ -201,6 +229,9 @@ function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg }) {
                       </td>
                       <td className="px-4 py-3 text-center text-gray-600 whitespace-nowrap">
                         {(s.fechaRecibida ?? o.fechaRecibida) ? formatearFecha(s.fechaRecibida ?? o.fechaRecibida) : <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-4 py-3 text-center text-gray-600 whitespace-nowrap">
+                        {(s.fechaSalida ?? o.fechaSalida) ? formatearFecha(s.fechaSalida ?? o.fechaSalida) : <span className="text-gray-300">—</span>}
                       </td>
                     </tr>
                   )),
@@ -337,6 +368,8 @@ export default function ListaOrdenesTrabajo() {
     // Descendente: más días esperando primero — sin fechaRecibida (null) va
     // al final, igual que un valor "menor" a cualquier día real (>= 0).
     if (sortBy === "diasRecibido") return (diasDesdeRecibido(b.fechaRecibida) ?? -1) - (diasDesdeRecibido(a.fechaRecibida) ?? -1);
+    if (sortBy === "fechaSalidaDesc") return compararFechaSalida(a, b, false);
+    if (sortBy === "fechaSalidaAsc") return compararFechaSalida(a, b, true);
     return new Date(b.createdAt) - new Date(a.createdAt);
   });
 
@@ -470,7 +503,11 @@ export default function ListaOrdenesTrabajo() {
     "Estado Informes":          o.estadoInformes || "—",
     "Días desde recibido":      diasDesdeRecibido(o.fechaRecibida) ?? "—",
     "Fecha de Ingreso":         o.fechaRecibida ? formatearFecha(o.fechaRecibida) : "—",
+    "Fecha de Salida":          o.fechaSalida ? formatearFecha(o.fechaSalida) : "—",
   });
+
+  const alternarSortFechaSalida = () =>
+    setSortBy(sortBy === "fechaSalidaDesc" ? "fechaSalidaAsc" : "fechaSalidaDesc");
 
   const exportarExcel = () => {
     const wb = XLSX.utils.book_new();
@@ -658,6 +695,8 @@ export default function ListaOrdenesTrabajo() {
           acento="bg-red-500"
           ordenes={noAsignadas}
           onSelect={setSeleccionada}
+          sortBy={sortBy}
+          onSortFechaSalida={alternarSortFechaSalida}
           vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes por asignar"}
         />
       )}
@@ -677,6 +716,8 @@ export default function ListaOrdenesTrabajo() {
               acento="bg-indigo-500"
               ordenes={todasOTs}
               onSelect={setSeleccionada}
+              sortBy={sortBy}
+              onSortFechaSalida={alternarSortFechaSalida}
               vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de trabajo"}
             />
           )}
@@ -687,6 +728,8 @@ export default function ListaOrdenesTrabajo() {
               acento="bg-red-500"
               ordenes={noAsignadas}
               onSelect={setSeleccionada}
+              sortBy={sortBy}
+              onSortFechaSalida={alternarSortFechaSalida}
               vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes por asignar"}
             />
           )}
@@ -697,6 +740,8 @@ export default function ListaOrdenesTrabajo() {
               acento="bg-blue-500"
               ordenes={plannerEnProgreso}
               onSelect={setSeleccionada}
+              sortBy={sortBy}
+              onSortFechaSalida={alternarSortFechaSalida}
               vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes en progreso"}
             />
           )}
@@ -707,6 +752,8 @@ export default function ListaOrdenesTrabajo() {
               acento="bg-green-500"
               ordenes={plannerCompletadas}
               onSelect={setSeleccionada}
+              sortBy={sortBy}
+              onSortFechaSalida={alternarSortFechaSalida}
               vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes completadas"}
             />
           )}
@@ -717,6 +764,8 @@ export default function ListaOrdenesTrabajo() {
               acento="bg-teal-500"
               ordenes={plannerEntregadas}
               onSelect={setSeleccionada}
+              sortBy={sortBy}
+              onSortFechaSalida={alternarSortFechaSalida}
               vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes entregadas"}
             />
           )}
@@ -731,6 +780,8 @@ export default function ListaOrdenesTrabajo() {
               acento="bg-amber-500"
               ordenes={pruebaPendientes}
               onSelect={setSeleccionada}
+              sortBy={sortBy}
+              onSortFechaSalida={alternarSortFechaSalida}
               vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de prueba pendientes"}
             />
           )}
@@ -741,6 +792,8 @@ export default function ListaOrdenesTrabajo() {
               acento="bg-blue-500"
               ordenes={pruebaEnProgreso}
               onSelect={setSeleccionada}
+              sortBy={sortBy}
+              onSortFechaSalida={alternarSortFechaSalida}
               vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de prueba en progreso"}
             />
           )}
@@ -751,6 +804,8 @@ export default function ListaOrdenesTrabajo() {
               acento="bg-green-500"
               ordenes={pruebaCompletadas}
               onSelect={setSeleccionada}
+              sortBy={sortBy}
+              onSortFechaSalida={alternarSortFechaSalida}
               vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de prueba completadas"}
             />
           )}
@@ -761,6 +816,8 @@ export default function ListaOrdenesTrabajo() {
               acento="bg-teal-500"
               ordenes={pruebaEntregadas}
               onSelect={setSeleccionada}
+              sortBy={sortBy}
+              onSortFechaSalida={alternarSortFechaSalida}
               vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de prueba entregadas a Intervención"}
             />
           )}
@@ -777,6 +834,8 @@ export default function ListaOrdenesTrabajo() {
               acento="bg-amber-500"
               ordenes={pendientes}
               onSelect={setSeleccionada}
+              sortBy={sortBy}
+              onSortFechaSalida={alternarSortFechaSalida}
               vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de intervención pendientes"}
             />
           )}
@@ -787,6 +846,8 @@ export default function ListaOrdenesTrabajo() {
               acento="bg-blue-500"
               ordenes={enProgreso}
               onSelect={setSeleccionada}
+              sortBy={sortBy}
+              onSortFechaSalida={alternarSortFechaSalida}
               vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de intervención en progreso"}
             />
           )}
@@ -797,6 +858,8 @@ export default function ListaOrdenesTrabajo() {
               acento="bg-green-500"
               ordenes={completadas}
               onSelect={setSeleccionada}
+              sortBy={sortBy}
+              onSortFechaSalida={alternarSortFechaSalida}
               vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de intervención completadas"}
             />
           )}
@@ -807,6 +870,8 @@ export default function ListaOrdenesTrabajo() {
               acento="bg-teal-500"
               ordenes={entregadas}
               onSelect={setSeleccionada}
+              sortBy={sortBy}
+              onSortFechaSalida={alternarSortFechaSalida}
               vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de intervención entregadas"}
             />
           )}
@@ -819,6 +884,8 @@ export default function ListaOrdenesTrabajo() {
           acento="bg-gray-500"
           ordenes={cerradas}
           onSelect={setSeleccionada}
+          sortBy={sortBy}
+          onSortFechaSalida={alternarSortFechaSalida}
           vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes cerradas"}
         />
       )}
