@@ -155,20 +155,31 @@ export default function EmitirComprobante() {
     // Formatos Gloria y Alicorp/Intradevco/Masterbread: el cliente paga el TOTAL (SIN IGV), que ya
     // incluye gastos y utilidad — los ítems solo suman el SUB-TOTAL. Se factura en una sola línea
     // por ese monto (decisión del usuario, 2026-11-03), igual que la OC (`total - igv`).
+    // El monto a facturar es el de la OC (puede ser menor al de la cotización,
+    // ver ModalOrdenCompra.jsx); la cotización solo aporta descripciones.
     const totalSinIgv = Math.round(((Number(cotizacion?.total) || 0) - (Number(cotizacion?.igv) || 0)) * 100) / 100;
+    const montoOC = Number(oc.subtotal) > 0 ? Math.round(Number(oc.subtotal) * 100) / 100 : totalSinIgv;
+    const lineaUnica = (descripcion) => setItems([{
+      ...itemVacioComprobante(),
+      descripcion,
+      cantidad: 1,
+      unidad,
+      valorUnitario: montoOC,
+      precioUnitario: precioUnitarioDesdeValor(montoOC, "10"),
+      afectacion: "10",
+      descuentoPorcentaje: 0,
+    }]);
+    // Descuento global de la cotización (genérica) → mismo % en cada línea, para
+    // que la base de la factura cuadre con la OC (que ya nació descontada).
+    const descPct = Number(cotizacion?.descuentoPorcentaje) || 0;
+    const baseItems = itemsValidos.reduce((s, i) =>
+      s + calcularLineaComprobante({ ...i, afectacion: "10", descuentoPorcentaje: descPct / 100 }).base, 0);
+    // Tolerancia: redondeo del descuento por línea (medio céntimo por ítem).
+    const itemsCuadranConOC = !(montoOC > 0) || Math.abs(baseItems - montoOC) <= 0.01 * itemsValidos.length;
     const formatoEspecial = emp?.ruc === RUC_GLORIA || esFormatoAlicorp(emp?.ruc);
-    if (formatoEspecial && totalSinIgv > 0) {
-      setItems([{
-        ...itemVacioComprobante(),
-        descripcion: itemsValidos[0]?.descripcion || oc.descripcion || oc.titulo || "",
-        cantidad: 1,
-        unidad,
-        valorUnitario: totalSinIgv,
-        precioUnitario: precioUnitarioDesdeValor(totalSinIgv, "10"),
-        afectacion: "10",
-        descuentoPorcentaje: 0,
-      }]);
-    } else if (itemsValidos.length) {
+    if (formatoEspecial && montoOC > 0) {
+      lineaUnica(itemsValidos[0]?.descripcion || oc.descripcion || oc.titulo || "");
+    } else if (itemsValidos.length && itemsCuadranConOC) {
       setItems(itemsValidos.map((i) => ({
         _key: Date.now() + Math.random(),
         descripcion: i.descripcion,
@@ -177,8 +188,10 @@ export default function EmitirComprobante() {
         valorUnitario: i.valorUnitario,
         precioUnitario: precioUnitarioDesdeValor(i.valorUnitario, "10"),
         afectacion: "10",
-        descuentoPorcentaje: 0,
+        descuentoPorcentaje: descPct,
       })));
+    } else if (montoOC > 0) {
+      lineaUnica(oc.descripcion || oc.titulo || itemsValidos[0]?.descripcion || "");
     } else {
       setItems([{ ...itemVacioComprobante(), descripcion: oc.descripcion || oc.titulo || "", unidad }]);
     }
