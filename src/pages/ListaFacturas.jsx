@@ -5,6 +5,8 @@ import DetalleDocumento from "../components/DetalleDocumento";
 import ModalImportarExcel, { COLS_FACTURAS } from "../components/ModalImportarExcel";
 import { DotChip, badgePago, dotPago } from "../components/detalleShared";
 import TablaScroll from "../components/TablaScroll";
+import Paginacion from "../components/Paginacion";
+import { usePaginacion } from "../utils/usePaginacion";
 import ConfirmacionAccion from "../components/ConfirmacionAccion";
 import AvisoAccion from "../components/AvisoAccion";
 import * as XLSX from "xlsx";
@@ -149,6 +151,7 @@ function TablaFacturas({ titulo, acento, facturas, onSelect, handlePagoMonto, ha
     totalAPagar: noAnuladas.reduce((s, f) => s + (Number(f.totalAPagar)           || 0), 0),
     pagado:      noAnuladas.reduce((s, f) => s + (Number(f.montoPagado)           || 0), 0),
   };
+  const pag = usePaginacion(facturas);
 
   return (
     <div className="mb-6">
@@ -158,7 +161,7 @@ function TablaFacturas({ titulo, acento, facturas, onSelect, handlePagoMonto, ha
         <span className="text-xs text-gray-400">({facturas.length})</span>
       </div>
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <TablaScroll className="overflow-x-auto" fija>
+        <TablaScroll className="overflow-x-auto" fija scrollKey={pag.pagina}>
           <table className="w-full text-sm" style={{ minWidth: "1000px" }}>
             <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-200">
               <tr>
@@ -183,7 +186,7 @@ function TablaFacturas({ titulo, acento, facturas, onSelect, handlePagoMonto, ha
                 </tr>
               ) : (
                 <>
-                {facturas.flatMap(f => {
+                {pag.visibles.flatMap(f => {
                   const tieneCuotas = f.cuotas?.length > 0;
                   const filaPrincipal = (
                     <tr key={f._id}
@@ -314,6 +317,7 @@ function TablaFacturas({ titulo, acento, facturas, onSelect, handlePagoMonto, ha
             </tbody>
           </table>
         </TablaScroll>
+        <Paginacion {...pag} />
       </div>
     </div>
   );

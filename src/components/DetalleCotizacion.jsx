@@ -10,8 +10,7 @@ import {
   itemDesdeDb, itemInvalido, RUC_GLORIA, esFormatoAlicorp,
 } from "../utils/cotizacionItems";
 import { estadoComprobanteClase } from "../utils/catalogosSunat";
-import ModalCrearOT from "./ModalCrearOT";
-import ModalOrdenCompra, { ModalOrdenCompraItems } from "./ModalOrdenCompra";
+import { ModalOrdenCompraItems } from "./ModalOrdenCompra";
 import ModalDetalleGuia from "./ModalDetalleGuia";
 import BuscadorOrdenTrabajo from "./BuscadorOrdenTrabajo";
 import SelectorEmpresas from "./SelectorEmpresas";
@@ -124,8 +123,6 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   const [fechaPagoCierre, setFechaPagoCierre] = useState(() => fechaHoyLima());
   const [numeroFacturaCierre, setNumeroFacturaCierre] = useState("");
   const [cerrandoCadena, setCerrandoCadena] = useState(false);
-  const [crearOTOpen, setCrearOTOpen] = useState(false);
-  const [crearOCOpen, setCrearOCOpen] = useState(false);
   const [buscadorOTOpen, setBuscadorOTOpen] = useState(false);
   const [confirmandoReasignarOT, setConfirmandoReasignarOT] = useState(null);
   const [reasignandoOT, setReasignandoOT] = useState(false);
@@ -155,11 +152,15 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   // diferencia de `puedeEditar`, sí se permite con la cotización ya
   // enviada/aprobada (mismo criterio que el backend, ver puedeGenerarOTDesdeItem).
   const puedeGenerarOT = ["admin", "asistente", "facturacion", "jefatura", "planner", "coordinadora"].includes(rolActual);
+  // Quitar el vínculo ítem↔OT: mismos roles y, como generar, también con la
+  // cotización aprobada/enviada/informe enviado (backend: PATCH .../quitar-ot).
+  const puedeQuitarOT = puedeGenerarOT && !cot.anulado && !bloqueadoPorCadenaCerrada(cot.estadoCadena, rolActual);
   // Mismo set de roles que ve el card de GRE en DetalleOrdenTrabajo.jsx.
   // OC por ítems: mismos roles que crean OC (POST /ordenes-compra) y mismo
-  // requisito que la OC de toda la cotización (aprobada y enviada).
+  // Las columnas OT y OC de los ítems están siempre visibles y operativas,
+  // sin depender de aprobada/enviada/informe enviado (pedido 2026-11-12).
   const puedeGenerarOC = ["admin", "asistente", "facturacion", "jefatura", "coordinadora"].includes(rolActual)
-    && !cot.anulado && cot.aprobado && cot.enviado;
+    && !cot.anulado;
   const puedeGenerarGRE = ["admin", "asistente", "facturacion", "almacenero", "jefatura", "planner", "coordinadora"].includes(rolActual);
   // Asistente solo puede enviar cotizaciones ya aprobadas — Admin conserva
   // la potestad de enviar sin esperar la aprobación (ver mismo criterio en
@@ -342,6 +343,15 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
     if (next.has(idx)) next.delete(idx); else next.add(idx);
     return next;
   });
+
+  // La OC por ítems referencia los ítems por índice, igual que generar OT:
+  // ahora que se puede generar con la cotización aún editable, primero se
+  // persisten los cambios pendientes para que los índices coincidan.
+  const abrirNuevaOC = async () => {
+    const guardada = puedeEditar && !cot.enviado && !cadenaCerrada ? await guardarCotizacion() : cot;
+    if (!guardada) return;
+    setIndicesNuevaOC([...seleccionadosOC].sort((a, b) => a - b));
+  };
 
   const toggleSeleccion = (idx) => setSeleccionados(prev => {
     const next = new Set(prev);
@@ -1261,8 +1271,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
             </TarjetaRelacion>
 
             {ots.length === 0 ? (
-              <TarjetaRelacion tipo="ot" vacio
-                onCrear={!cot.anulado && !cot.enviado ? () => setCrearOTOpen(true) : undefined} crearLabel="OT" />
+              <TarjetaRelacion tipo="ot" vacio />
             ) : (
               ots.map(o => (
                 <TarjetaRelacion key={o._id} tipo="ot" codigo={o.codigo} numero={o.numeroOT}
@@ -1271,12 +1280,9 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
                 </TarjetaRelacion>
               ))
             )}
+            {/* OT y OC se crean solo desde las columnas de la tabla de ítems (pedido 2026-11-12). */}
             {!cot.anulado && !cot.enviado && (
               <div className="flex items-center gap-3 -mt-2 px-1">
-                {ots.length > 0 && (
-                  <button type="button" onClick={() => setCrearOTOpen(true)}
-                    className="text-xs text-blue-600 hover:text-blue-800 underline">+ Crear otra OT</button>
-                )}
                 <button type="button" onClick={() => setBuscadorOTOpen(true)}
                   className="text-xs text-blue-600 hover:text-blue-800 underline">+ Vincular OT existente</button>
               </div>
@@ -1324,8 +1330,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
             </TarjetaRelacion>
 
             {ocs.length === 0 ? (
-              <TarjetaRelacion tipo="oc" vacio
-                onCrear={!cot.anulado && cot.aprobado && cot.enviado ? () => setCrearOCOpen(true) : undefined} crearLabel="OC" />
+              <TarjetaRelacion tipo="oc" vacio />
             ) : (
               ocs.map(o => (
                 <TarjetaRelacion key={o._id} tipo="oc" codigo={o.codigo} numero={o.numeroOrden} onClick={() => abrirOC(o)}>
@@ -1404,10 +1409,11 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
               generando={generandoOT}
               onVerOT={(o) => onNavegar?.({ tipo: "ot", data: ots.find(x => x._id === o._id) || o })}
               onQuitarOT={quitarOT}
+              puedeQuitarOT={puedeQuitarOT}
               seleccionablesOC={puedeGenerarOC}
               seleccionadosOC={seleccionadosOC}
               onToggleSeleccionOC={toggleSeleccionOC}
-              onGenerarOC={() => setIndicesNuevaOC([...seleccionadosOC].sort((a, b) => a - b))}
+              onGenerarOC={abrirNuevaOC}
               onVerOC={abrirOC}
             />
           ) : esAlicorp ? (
@@ -1424,10 +1430,11 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
               generando={generandoOT}
               onVerOT={(o) => onNavegar?.({ tipo: "ot", data: ots.find(x => x._id === o._id) || o })}
               onQuitarOT={quitarOT}
+              puedeQuitarOT={puedeQuitarOT}
               seleccionablesOC={puedeGenerarOC}
               seleccionadosOC={seleccionadosOC}
               onToggleSeleccionOC={toggleSeleccionOC}
-              onGenerarOC={() => setIndicesNuevaOC([...seleccionadosOC].sort((a, b) => a - b))}
+              onGenerarOC={abrirNuevaOC}
               onVerOC={abrirOC}
             />
           ) : (
@@ -1439,17 +1446,18 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
               disabled={cot.anulado || cot.enviado}
               intentoGuardar={intentoGuardar}
               totalesMostrados={totalesMostrados}
-              seleccionables={form.tipo === "servicio" && puedeGenerarOT && !cot.anulado}
+              seleccionables={puedeGenerarOT && !cot.anulado}
               seleccionados={seleccionados}
               onToggleSeleccion={toggleSeleccion}
               onGenerarOT={generarOTSeleccionados}
               generando={generandoOT}
               onVerOT={(o) => onNavegar?.({ tipo: "ot", data: ots.find(x => x._id === o._id) || o })}
               onQuitarOT={quitarOT}
+              puedeQuitarOT={puedeQuitarOT}
               seleccionablesOC={puedeGenerarOC}
               seleccionadosOC={seleccionadosOC}
               onToggleSeleccionOC={toggleSeleccionOC}
-              onGenerarOC={() => setIndicesNuevaOC([...seleccionadosOC].sort((a, b) => a - b))}
+              onGenerarOC={abrirNuevaOC}
               onVerOC={abrirOC}
               puedeVerPrecios={puedeVerPrecios}
             />
@@ -1472,14 +1480,6 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
               setBusquedaEmpresa(guardada.alias ? `${guardada.alias} — ${guardada.razonSocial}` : guardada.razonSocial);
             }
           }}
-        />
-      )}
-
-      {crearOTOpen && (
-        <ModalCrearOT
-          cotizacion={cot}
-          onClose={() => setCrearOTOpen(false)}
-          onCreada={() => { setCrearOTOpen(false); cargarRelaciones(); }}
         />
       )}
 
@@ -1518,13 +1518,6 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
         />
       )}
 
-      {crearOCOpen && (
-        <ModalOrdenCompra
-          cotizacion={cot}
-          onClose={() => setCrearOCOpen(false)}
-          onCreada={() => { setCrearOCOpen(false); cargarRelaciones(); }}
-        />
-      )}
 
       {indicesNuevaOC && (
         <ModalOrdenCompraItems

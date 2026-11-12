@@ -29,7 +29,7 @@ const ACENTOS = {
 // coincida con el formato real que exige Gloria.
 export default function TablaItemsCotizacionGloria({
   items, onItemsChange, puedeEditar, disabled, puedeVerPrecios = true,
-  seleccionables = false, seleccionados = new Set(), onToggleSeleccion, onGenerarOT, generando = false, onVerOT, onQuitarOT,
+  seleccionables = false, seleccionados = new Set(), onToggleSeleccion, onGenerarOT, generando = false, onVerOT, onQuitarOT, puedeQuitarOT = false,
   seleccionablesOC = false, seleccionadosOC = new Set(), onToggleSeleccionOC, onGenerarOC, onVerOC,
 }) {
   const editable = puedeEditar && !disabled;
@@ -172,7 +172,7 @@ export default function TablaItemsCotizacionGloria({
                                     className="text-[11px] font-mono font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 hover:bg-emerald-100 transition whitespace-nowrap">
                                     {item.otGenerada.numeroOT || item.otGenerada.codigo}
                                   </button>
-                                  {editable && onQuitarOT && (
+                                  {puedeQuitarOT && onQuitarOT && (
                                     <button type="button" title="Quitar OT (no se anula, queda sin cotización)"
                                       onClick={() => setConfirmandoQuitarOT(idx)}
                                       className="text-gray-300 hover:text-red-500 text-sm leading-none transition">

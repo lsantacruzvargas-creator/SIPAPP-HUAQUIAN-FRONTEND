@@ -8,6 +8,8 @@ import ModalNuevaOT from "../components/ModalNuevaOT";
 import ModalNuevaCotizacion from "../components/ModalNuevaCotizacion";
 import { DotChip, badgeGeneral, dotGeneral, ESTADOS_SERVICIO } from "../components/detalleShared";
 import TablaScroll from "../components/TablaScroll";
+import Paginacion from "../components/Paginacion";
+import { usePaginacion } from "../utils/usePaginacion";
 import * as XLSX from "xlsx";
 import { r2 } from "../utils/redondeo";
 
@@ -89,6 +91,7 @@ const diasDesdeInforme = (c) =>
   c.fechaInformeEnviado ? Math.floor((Date.now() - new Date(c.fechaInformeEnviado).getTime()) / 86400000) : null;
 
 function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, tipoCambio, mostrarDiasInforme, puedeVerPrecios, mostrarEstadoServicio, mostrarTituloOT, otsPorCot, colOtEstrecha }) {
+  const pag = usePaginacion(cotizaciones);
   return (
     <div className="mb-6">
       <div className="flex items-center gap-2 mb-3">
@@ -97,7 +100,7 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
         <span className="text-xs text-gray-400">({cotizaciones.length})</span>
       </div>
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <TablaScroll className="overflow-x-auto" fija>
+        <TablaScroll className="overflow-x-auto" fija scrollKey={pag.pagina}>
         <table className="w-full text-sm" style={{ minWidth: "1000px" }}>
           <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-200">
             <tr>
@@ -124,7 +127,7 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
                 <td colSpan={8 + (puedeVerPrecios ? 2 : 0) + (mostrarDiasInforme ? 1 : 0) + (mostrarEstadoServicio ? 3 : 0) + (mostrarTituloOT ? 1 : 0)} className="px-4 py-8 text-center text-gray-400">{vacioMsg}</td>
               </tr>
             ) : (
-              cotizaciones.map((c) => {
+              pag.visibles.map((c) => {
                 const { pen, usd } = totalesDuales(c, tipoCambio);
                 const otsDeCot = (mostrarEstadoServicio || mostrarTituloOT) ? otsPorCot?.get(c._id) : null;
                 // Solo se usa (y se busca) en la tabla de Pendientes de OC.
@@ -227,6 +230,7 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
           </tbody>
         </table>
         </TablaScroll>
+        <Paginacion {...pag} />
       </div>
     </div>
   );

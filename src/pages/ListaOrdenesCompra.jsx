@@ -5,6 +5,8 @@ import DetalleDocumento from "../components/DetalleDocumento";
 import ModalImportarExcel, { COLS_OC, COLS_CADENA } from "../components/ModalImportarExcel";
 import { DotChip, badgeOT, dotOT, badgeInformes, dotInformes } from "../components/detalleShared";
 import TablaScroll from "../components/TablaScroll";
+import Paginacion from "../components/Paginacion";
+import { usePaginacion } from "../utils/usePaginacion";
 import * as XLSX from "xlsx";
 import { r2 } from "../utils/redondeo";
 
@@ -70,6 +72,7 @@ function TablaOC({
     + (puedeVerPrecios ? 2 : 0)
     + (mostrarFactura ? 1 : 0) + (mostrarTitulo ? 1 : 0)
     + (mostrarHesActa ? 2 : 0) + (mostrarDocumento ? 1 : 0);
+  const pag = usePaginacion(ordenes);
   return (
     <div className="mb-6">
       <div className="flex items-center gap-2 mb-3">
@@ -78,7 +81,7 @@ function TablaOC({
         <span className="text-xs text-gray-400">({ordenes.length})</span>
       </div>
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <TablaScroll className="overflow-x-auto" fija>
+        <TablaScroll className="overflow-x-auto" fija scrollKey={pag.pagina}>
         <table className="w-full text-sm" style={{ minWidth: `${totalColumnas * 85}px` }}>
           <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-200">
             <tr>
@@ -103,7 +106,7 @@ function TablaOC({
           <tbody className="divide-y divide-gray-100">
             {ordenes.length === 0 ? (
               <tr><td colSpan={totalColumnas} className="px-4 py-8 text-center text-gray-400">{vacioMsg}</td></tr>
-            ) : ordenes.flatMap((o) => {
+            ) : pag.visibles.flatMap((o) => {
               const cotId = o.cotizacion?._id || o.cotizacion;
               const grupoOT = otGroupMap[o.numeroDocumento];
               const otPadre = grupoOT?.parent || null;
@@ -253,6 +256,7 @@ function TablaOC({
           </tbody>
         </table>
         </TablaScroll>
+        <Paginacion {...pag} />
       </div>
     </div>
   );

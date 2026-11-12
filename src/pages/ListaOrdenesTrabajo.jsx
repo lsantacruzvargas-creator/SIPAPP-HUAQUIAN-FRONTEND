@@ -5,6 +5,8 @@ import DetalleDocumento from "../components/DetalleDocumento";
 import ModalNuevaOT from "../components/ModalNuevaOT";
 import ModalImportarExcel, { COLS_OT } from "../components/ModalImportarExcel";
 import TablaScroll from "../components/TablaScroll";
+import Paginacion from "../components/Paginacion";
+import { usePaginacion } from "../utils/usePaginacion";
 import { DotChip, badgeOT, dotOT, badgeInformes, dotInformes, badgeGeneral, dotGeneral, ESTADOS_SERVICIO } from "../components/detalleShared";
 import * as XLSX from "xlsx";
 
@@ -96,6 +98,7 @@ const dentroDeRangoFecha = (fecha, desde, hasta) => {
 
 function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg, sortBy, onSortFechaSalida }) {
   const ordenSalida = sortBy === "fechaSalidaDesc" ? "↓" : sortBy === "fechaSalidaAsc" ? "↑" : "↕";
+  const pag = usePaginacion(ordenes);
   return (
     <div className="mb-6">
       <div className="flex items-center gap-2 mb-3">
@@ -104,7 +107,7 @@ function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg, sortBy, onSortF
         <span className="text-xs text-gray-400">({ordenes.length})</span>
       </div>
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <TablaScroll className="overflow-x-auto" fija>
+        <TablaScroll className="overflow-x-auto" fija scrollKey={pag.pagina}>
           <table className="w-full text-sm" style={{ minWidth: "1100px" }}>
             <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-200">
               <tr>
@@ -141,7 +144,7 @@ function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg, sortBy, onSortF
                   <td colSpan={14}className="px-4 py-8 text-center text-gray-400">{vacioMsg}</td>
                 </tr>
               ) : (
-                ordenes.flatMap((o) => [
+                pag.visibles.flatMap((o) => [
                   <tr
                     key={o._id}
                     className={`hover:bg-gray-50 cursor-pointer transition-colors ${o.anulado ? "opacity-50" : ""}`}
@@ -249,6 +252,7 @@ function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg, sortBy, onSortF
             </tbody>
           </table>
         </TablaScroll>
+        <Paginacion {...pag} />
       </div>
     </div>
   );

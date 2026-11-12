@@ -6,7 +6,9 @@ import { useEffect, useRef, useState } from "react";
 // bajar hasta el final. Las dos barras se sincronizan entre sí.
 // `fija` (páginas de lista): alto máximo con scroll propio y cabecera pegada
 // arriba (ver .tabla-fija en index.css).
-export default function TablaScroll({ children, className = "", fija = false }) {
+// `scrollKey` (paginación): al cambiar, la tabla vuelve arriba — si no, al pasar
+// de página desde el botón de abajo se quedaría mostrando el final.
+export default function TablaScroll({ children, className = "", fija = false, scrollKey }) {
   const topRef = useRef(null);
   const bottomRef = useRef(null);
   const sincronizandoRef = useRef(false);
@@ -18,6 +20,10 @@ export default function TablaScroll({ children, className = "", fija = false }) 
     window.addEventListener("resize", medir);
     return () => window.removeEventListener("resize", medir);
   });
+
+  useEffect(() => {
+    if (bottomRef.current) bottomRef.current.scrollTop = 0;
+  }, [scrollKey]);
 
   const sincronizar = (origen, destino) => () => {
     if (sincronizandoRef.current) { sincronizandoRef.current = false; return; }
