@@ -288,45 +288,33 @@ export const DETRACCION_BIENES_SERVICIOS = [
   { codigo: "041", descripcion: "Plomo", porcentaje: 15 },
 ];
 
-export function calcularLineaComprobante(item) {
-  const cantidad  = Number(item.cantidad) || 0;
-  const valorUnit = Number(item.valorUnitario) || 0;
-  const baseAntesDescuento = cantidad * valorUnit;
-  const descuentoPct   = Number(item.descuentoPorcentaje) || 0;
-  const montoDescuento = descuentoPct > 0 ? baseAntesDescuento * descuentoPct : 0;
-  const base = baseAntesDescuento - montoDescuento;
-  const igv  = item.afectacion === "10" ? base * 0.18 : 0;
-  return {
-    // Sin redondear: los totales del comprobante se suman con estos (ver totalesComprobante).
-    baseExacta:      base,
-    igvExacto:       igv,
-    descuentoExacto: montoDescuento,
-    baseAntesDescuento: Math.round(baseAntesDescuento * 100) / 100,
-    montoDescuento:     Math.round(montoDescuento * 100) / 100,
-    base:               Math.round(base * 100) / 100,
-    igv:                Math.round(igv * 100) / 100,
-    total:              Math.round((base + igv) * 100) / 100,
-  };
-}
-
 const r2 = (n) => Math.round(n * 100) / 100;
 
-// Totales del comprobante con el MISMO cálculo que calcularTotales() del
-// backend (comprobante.controller.js), que es el que va al XML: se suman las
-// líneas sin redondear y se redondea una sola vez al final. Sumar las líneas
-// ya redondeadas puede dar un céntimo distinto, y entonces las cuotas que se
-// arman con este total no cuadran con el neto pendiente del XML (SUNAT 3319,
-// SIPAPP-HUAQUIAN 2026-11-12: 3422.58 en pantalla vs 3422.57 en el XML).
+// Copia exacta de Backend/src/utils/montosCpe.js (calcularLineaCpe /
+// calcularTotalesCpe), que es lo que va escrito en el XML: cada valor de
+// línea redondeado a 2 decimales y los totales como suma de esos valores ya
+// redondeados. Si este cálculo se aparta en un céntimo, el "monto neto
+// pendiente" con el que se arman las cuotas no cuadra con el del XML y SUNAT
+// rechaza con 3319 (SIPAPP-HUAQUIAN 2026-11-12: 3422.58 en pantalla vs
+// 3422.57 en el XML). Cambiar uno obliga a cambiar el otro.
+export function calcularLineaComprobante(item) {
+  const baseAntesDescuento = r2((Number(item.cantidad) || 0) * (Number(item.valorUnitario) || 0));
+  const descuentoPct   = Number(item.descuentoPorcentaje) || 0;
+  const montoDescuento = descuentoPct > 0 ? r2(baseAntesDescuento * descuentoPct) : 0;
+  const base = r2(baseAntesDescuento - montoDescuento);
+  const igv  = r2(item.afectacion === "10" ? base * (18 / 100) : 0);
+  return { baseAntesDescuento, montoDescuento, base, igv, total: r2(base + igv) };
+}
+
 export function totalesComprobante(lineas, otrosCargos = 0, montoRedondeo = 0) {
-  const s = lineas.reduce(
-    (acc, l) => ({ base: acc.base + l.baseExacta, igv: acc.igv + l.igvExacto, descuento: acc.descuento + l.descuentoExacto }),
-    { base: 0, igv: 0, descuento: 0 }
-  );
+  const base      = r2(lineas.reduce((s, l) => s + l.base, 0));
+  const descuento = r2(lineas.reduce((s, l) => s + l.montoDescuento, 0));
+  const igv       = r2(lineas.reduce((s, l) => s + l.igv, 0));
+  const taxExclusive = r2(base + (Number(otrosCargos) || 0));
+  const taxInclusive = r2(taxExclusive + igv);
   return {
-    base:       r2(s.base),
-    igv:        r2(s.igv),
-    descuento:  r2(s.descuento),
-    total:      r2(s.base + s.igv),
-    totalPagar: r2(s.base + (Number(otrosCargos) || 0) + s.igv + (Number(montoRedondeo) || 0)),
+    base, igv, descuento,
+    total:      r2(base + igv),
+    totalPagar: r2(taxInclusive + (Number(montoRedondeo) || 0)),
   };
 }
