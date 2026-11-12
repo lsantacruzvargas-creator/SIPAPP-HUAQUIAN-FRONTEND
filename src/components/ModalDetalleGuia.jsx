@@ -14,7 +14,8 @@ const labelModalidad = (v) => MODALIDAD_TRASLADO.find((m) => m.valor === v)?.lab
 // ticket, no un rechazo real de SUNAT (esos van con código del catálogo CDR, siempre 4 dígitos)
 // — ver Backend/src/utils/sunatConsultaResultado.js. En ese caso "Forzar actualización" sigue
 // disponible aunque el estado guardado sea RECHAZADO.
-const esFalloDeConsulta = (mensaje) => /^\[[45]\d{2}\]/.test(mensaje || "");
+// "[HTTP] Bad Gateway" y similares: SUNAT no respondió, tampoco es un rechazo.
+const esFalloDeConsulta = (mensaje) => /^\[(?:[45]\d{2}|HTTP)\]/i.test(mensaje || "");
 
 // Extraído de ListaGuias.jsx (su modal inline) para poder abrir el mismo
 // detalle de GRE desde las tarjetas de relación de Cotización/OT/OC.

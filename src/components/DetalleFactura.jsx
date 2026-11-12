@@ -242,6 +242,14 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
   const imprimirPdf = async () => {
     setError(""); setImprimiendo(true);
     try {
+      const comprobante = await buscarComprobante();
+      // Emitida desde el ERP pero sin XML firmado (ej. SUNAT no respondió y se reintentó en el PSE):
+      // el PDF no sería la representación de un documento con validez. Sin comprobante (factura
+      // registrada a mano) se imprime como siempre.
+      if (comprobante && !comprobante.tieneXml) {
+        setError("Este comprobante no tiene el XML firmado. Súbelo en Facturación Electrónica con “Adjuntar XML/CDR” (descárgalo del panel del PSE) y vuelve a imprimir.");
+        return;
+      }
       await generarFacturaPdf({
         factura: {
           ...inicial,
@@ -250,15 +258,16 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
           numeroOrdenCompra:  ocVinculada?.numeroOrden || inicial.numeroOrdenCompra,
           conformidad:        form.conformidad,
         },
-        comprobante: await buscarComprobante(),
+        comprobante,
         // Datos del cliente tal como están guardados en la empresa (la misma
         // de la OC) — no se consulta SUNAT para imprimir.
         empresa: empresas.find(e => e._id === form.empresa) || inicial.empresa,
       });
     } catch {
       setError("No se pudo generar el PDF.");
+    } finally {
+      setImprimiendo(false);
     }
-    setImprimiendo(false);
   };
 
   const anular = async (motivo) => {

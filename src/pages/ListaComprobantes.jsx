@@ -193,7 +193,14 @@ export default function ListaComprobantes() {
   // factura); boletas y notas siguen con el formato anterior, porque la
   // plantilla es solo de factura. Conformidad y dirección fiscal viven en la
   // Factura interna y en la Empresa, no en el comprobante.
+  // Trae de nuevo el comprobante tras consultar/adjuntar: tieneXml/tieneCdr pueden haber cambiado.
+  const refrescarSeleccionado = async (id) => {
+    const data = await fetchAuth(`/cpe/${id}`).then((r) => r.json()).catch(() => null);
+    if (data?.ok) setSeleccionado((prev) => (prev?._id === id ? { ...prev, ...data.data } : prev));
+  };
+
   const descargarPdf = async () => {
+    if (!seleccionado.tieneXml) return;
     if (seleccionado.tipoDoc !== "01") return generarComprobantePdf(seleccionado);
     setErrorDescarga("");
     try {
@@ -247,7 +254,7 @@ export default function ListaComprobantes() {
       if (!data.ok) { setErrorDescarga(data.error || "No se pudo consultar el estado en SUNAT."); return; }
       setSeleccionado((prev) => ({ ...prev, estado: data.estado, sunat: { ...prev.sunat, mensaje: data.mensaje } }));
       if (data.aviso) setErrorDescarga(data.aviso);
-      await cargar();
+      await Promise.all([cargar(), refrescarSeleccionado(seleccionado._id)]);
     } catch {
       setErrorDescarga("Error de conexión al consultar SUNAT.");
     } finally {
@@ -380,9 +387,20 @@ export default function ListaComprobantes() {
             </div>
 
             {(seleccionado.estado === "RECHAZADO" || seleccionado.estado === "ERROR") && seleccionado.sunat?.mensaje && (
-              <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 mb-4 whitespace-pre-wrap">
-                {seleccionado.sunat.mensaje}
-              </div>
+              /^\[HTTP\]/i.test(seleccionado.sunat.mensaje) ? (
+                <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg px-4 py-3 mb-4">
+                  <p className="font-medium">{seleccionado.sunat.mensaje} — SUNAT no respondió; no es un rechazo.</p>
+                  <p className="mt-1">
+                    No emitas otra factura por lo mismo. Revisa este número en el panel de SmartPSE: si aparece con
+                    “Reintentar”, reinténtalo ahí y luego usa “Adjuntar XML/CDR” con los archivos que descargues.
+                    También puedes probar “Consultar estado en SUNAT”.
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 mb-4 whitespace-pre-wrap">
+                  {seleccionado.sunat.mensaje}
+                </div>
+              )
             )}
             {seleccionado.estado === "ANULADO" && (
               <div className="bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg px-4 py-3 mb-4">
@@ -536,13 +554,19 @@ export default function ListaComprobantes() {
                   Adjuntar XML/CDR
                 </button>
               )}
-              <button onClick={() => descargar("cdr")} className="border border-gray-300 text-gray-800 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition">
+              <button onClick={() => descargar("cdr")} disabled={!seleccionado.tieneCdr}
+                title={seleccionado.tieneCdr ? undefined : "Este comprobante no tiene CDR guardado"}
+                className="border border-gray-300 text-gray-800 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition disabled:opacity-40 disabled:cursor-not-allowed">
                 Descargar CDR
               </button>
-              <button onClick={() => descargar("xml")} className="border border-gray-300 text-gray-800 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition">
+              <button onClick={() => descargar("xml")} disabled={!seleccionado.tieneXml}
+                title={seleccionado.tieneXml ? undefined : "Este comprobante no tiene XML firmado guardado"}
+                className="border border-gray-300 text-gray-800 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition disabled:opacity-40 disabled:cursor-not-allowed">
                 Descargar XML
               </button>
-              <button onClick={descargarPdf} className="border border-gray-300 text-gray-800 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition">
+              <button onClick={descargarPdf} disabled={!seleccionado.tieneXml}
+                title={seleccionado.tieneXml ? undefined : "Sin XML firmado no hay PDF: súbelo con “Adjuntar XML/CDR” (descárgalo del panel del PSE)"}
+                className="border border-gray-300 text-gray-800 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition disabled:opacity-40 disabled:cursor-not-allowed">
                 Descargar PDF
               </button>
               <button onClick={() => { setSeleccionado(null); setErrorDescarga(""); }} className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-700 transition">
@@ -575,6 +599,7 @@ export default function ListaComprobantes() {
             setErrorDescarga("");
             setAdjuntando(false);
             cargar();
+            refrescarSeleccionado(seleccionado._id);
           }}
         />
       )}

@@ -566,7 +566,9 @@ export default function EmitirComprobante() {
       const res  = await fetchAuth(endpoint, { method: "POST", body: JSON.stringify(body) });
       const data = await res.json();
       setResultado(data);
-      if (!data.ok) {
+      if (!data.ok && /^\[HTTP\]/i.test(data.mensaje || "")) {
+        setError(`SUNAT no respondió (${data.mensaje}). El comprobante ${data.serie || ""} quedó en ERROR, no rechazado: no lo vuelvas a emitir — revísalo en Facturación Electrónica (Consultar estado / Adjuntar XML/CDR).`);
+      } else if (!data.ok) {
         setError(data.mensaje || data.error || "El comprobante fue rechazado por SUNAT.");
       } else if (ocOrigen) {
         await crearFacturaInterna(data);
