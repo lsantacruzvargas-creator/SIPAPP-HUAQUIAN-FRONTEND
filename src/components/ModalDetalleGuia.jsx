@@ -5,6 +5,7 @@ import {
   MOTIVO_TRASLADO,
   estadoComprobanteClase,
 } from "../utils/catalogosSunat";
+import { generarGuiaPdf, puedeGenerarPdfGuia } from "../utils/guiaPdf";
 
 const labelMotivo = (v) => MOTIVO_TRASLADO.find((m) => m.valor === v)?.label ?? v;
 const labelModalidad = (v) => MODALIDAD_TRASLADO.find((m) => m.valor === v)?.label ?? v;
@@ -23,10 +24,28 @@ export default function ModalDetalleGuia({ guia, onClose, onActualizada }) {
   const [actual, setActual] = useState(guia);
   const [errorDescarga, setErrorDescarga] = useState("");
   const [consultando, setConsultando] = useState(false);
+  const [generandoPdf, setGenerandoPdf] = useState(false);
 
   useEffect(() => { setActual(guia); setErrorDescarga(""); }, [guia]);
 
   if (!actual) return null;
+
+  const pdfHabilitado = puedeGenerarPdfGuia(actual);
+  const motivoPdfDeshabilitado = actual.estado !== "ACEPTADO"
+    ? "Disponible cuando SUNAT acepte la guía"
+    : "SUNAT no devolvió el link del QR — usa “Forzar actualización” o revisa la guía en SUNAT";
+
+  const descargarPdf = async () => {
+    setGenerandoPdf(true);
+    setErrorDescarga("");
+    try {
+      await generarGuiaPdf(actual);
+    } catch {
+      setErrorDescarga("No se pudo generar el PDF de la guía.");
+    } finally {
+      setGenerandoPdf(false);
+    }
+  };
 
   const descargar = async (tipo) => {
     setErrorDescarga("");
@@ -179,6 +198,11 @@ export default function ModalDetalleGuia({ guia, onClose, onActualizada }) {
               {consultando ? "Consultando SUNAT…" : "↻ Forzar actualización con SUNAT"}
             </button>
           )}
+          <button onClick={descargarPdf} disabled={!pdfHabilitado || generandoPdf}
+            title={pdfHabilitado ? "Representación impresa con QR de SUNAT" : motivoPdfDeshabilitado}
+            className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-700 transition disabled:opacity-40 disabled:cursor-not-allowed">
+            {generandoPdf ? "Generando PDF…" : "Descargar PDF"}
+          </button>
           <button onClick={() => descargar("xml")} className="border border-gray-300 text-gray-800 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition">
             Descargar XML
           </button>
@@ -191,7 +215,7 @@ export default function ModalDetalleGuia({ guia, onClose, onActualizada }) {
               PDF SUNAT ↗
             </a>
           )}
-          <button onClick={onClose} className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-700 transition">
+          <button onClick={onClose} className="border border-gray-300 text-gray-800 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition">
             Cerrar
           </button>
         </div>

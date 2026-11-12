@@ -5,6 +5,7 @@ import { fechaHoyLima } from "../utils/fecha";
 import TablaScroll from "../components/TablaScroll";
 import SelectorDireccionGuardada from "../components/SelectorDireccionGuardada";
 import { HUAQUIAN } from "../utils/cotizacionPdf";
+import { generarGuiaPdf, puedeGenerarPdfGuia } from "../utils/guiaPdf";
 import {
   TIPO_GUIA,
   MODALIDAD_TRASLADO,
@@ -153,6 +154,7 @@ export default function EmitirGuia() {
   const [cargando, setCargando]       = useState(false);
   const [error, setError]             = useState("");
   const [resultado, setResultado]     = useState(null);
+  const [generandoPdf, setGenerandoPdf] = useState(false);
 
   useEffect(() => {
     if (!rucEmisor) { setComprobantes([]); return; }
@@ -456,6 +458,26 @@ export default function EmitirGuia() {
     }
   };
 
+  // El PDF se arma con la guía guardada (no con el estado del form): trae el link del QR
+  // que SUNAT devolvió y es exactamente lo que se emitió.
+  const descargarPdf = async () => {
+    setGenerandoPdf(true);
+    setError("");
+    try {
+      const res = await fetchAuth(`/guias/${resultado.id}`);
+      const guia = res.ok ? (await res.json()).data : null;
+      if (!puedeGenerarPdfGuia(guia)) {
+        setError("SUNAT no devolvió el link del QR de esta guía — revisa su estado desde Guías.");
+        return;
+      }
+      await generarGuiaPdf(guia);
+    } catch {
+      setError("No se pudo generar el PDF de la guía.");
+    } finally {
+      setGenerandoPdf(false);
+    }
+  };
+
   const nuevo = () => {
     setSerie("");
     setModalidadTraslado("02");
@@ -505,9 +527,21 @@ export default function EmitirGuia() {
           Ítems y destinatario prellenados desde la Orden de Trabajo — revisa antes de emitir.
         </div>
       )}
+      {/* `ok` también es true con EN_PROCESO (SUNAT recibió la guía pero falta el ticket): el
+          aviso y el PDF dependen del estado real — el QR solo existe con la guía aceptada. */}
       {resultado?.ok && (
-        <div className="bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg px-4 py-3 mb-5">
-          Guía <strong>{resultado.nombre}</strong> ACEPTADA por SUNAT.
+        <div className={`border text-sm rounded-lg px-4 py-3 mb-5 flex flex-wrap items-center justify-between gap-3 ${
+          resultado.estado === "ACEPTADO" ? "bg-green-50 border-green-200 text-green-700" : "bg-amber-50 border-amber-200 text-amber-700"}`}>
+          <span>
+            {resultado.estado === "ACEPTADO"
+              ? <>Guía <strong>{resultado.nombre}</strong> ACEPTADA por SUNAT.</>
+              : <>Guía <strong>{resultado.nombre}</strong> recibida por SUNAT, EN PROCESO. Consulta su estado desde Guías; el PDF se habilita cuando quede aceptada.</>}
+          </span>
+          <button type="button" onClick={descargarPdf} disabled={resultado.estado !== "ACEPTADO" || generandoPdf}
+            title={resultado.estado === "ACEPTADO" ? "Representación impresa con QR de SUNAT" : "Disponible cuando SUNAT acepte la guía"}
+            className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-700 transition disabled:opacity-40 disabled:cursor-not-allowed">
+            {generandoPdf ? "Generando PDF…" : "Descargar PDF"}
+          </button>
         </div>
       )}
       {error && (
