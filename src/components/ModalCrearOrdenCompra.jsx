@@ -1,18 +1,19 @@
 import { useState, useEffect } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import { money, totalSinIgv } from "./detalleShared";
+import { r2, r0 } from "../utils/redondeo";
 
 const INP     = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 w-full";
 const INP_DIS = "border border-gray-100 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500 w-full";
 
 function calcular(sub) {
-  const s = Math.round(Number(sub) * 100) / 100 || 0;
-  const igv = Math.round(s * 0.18 * 100) / 100;
-  const total = Math.round((s + igv) * 100) / 100;
+  const s = r2(Number(sub)) || 0;
+  const igv = r2(s * 0.18);
+  const total = r2((s + igv));
   // R.S. 178-2005/SUNAT: aplica solo si el total (con IGV) es >= S/ 701, y el
   // depósito se hace en números enteros (sin decimales).
-  const detraccion = total >= 701 ? Math.round(total * 0.12) : 0;
-  return { igv, total, detraccion, totalAPagar: Math.round((total - detraccion) * 100) / 100 };
+  const detraccion = total >= 701 ? r0(total * 0.12) : 0;
+  return { igv, total, detraccion, totalAPagar: r2((total - detraccion)) };
 }
 
 function BuscadorCotizacion({ onSelect, onClose }) {
@@ -92,9 +93,12 @@ export default function ModalCrearOrdenCompra({ onClose, onCreada }) {
   const seleccionarCot = (cot) => {
     setCot(cot);
     setBCot(false);
+    // La OC parte de la base sin IGV real de la cotización (con descuento o
+    // gastos + utilidad), no de `total`, que ya trae el IGV.
+    const base = totalSinIgv(cot);
     setForm(prev => {
-      const nuevoSub = prev.subtotal || (cot.total > 0 ? String(cot.total) : prev.subtotal);
-      if (!prev.subtotal && cot.total > 0) setCalc(calcular(cot.total));
+      const nuevoSub = prev.subtotal || (base > 0 ? String(base) : prev.subtotal);
+      if (!prev.subtotal && base > 0) setCalc(calcular(base));
       return {
         ...prev,
         titulo:   prev.titulo   || cot.titulo           || "",

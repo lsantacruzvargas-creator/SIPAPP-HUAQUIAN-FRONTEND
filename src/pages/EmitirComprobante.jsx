@@ -22,6 +22,7 @@ import {
   parsearGuiaRemision,
 } from "../utils/catalogosSunat";
 import { RUC_GLORIA, esFormatoAlicorp } from "../utils/cotizacionItems";
+import { r2, r0 } from "../utils/redondeo";
 
 const RECEPTOR_VACIO = { schemeID: "6", numDoc: "", nombre: "" };
 const REFERENCIA_VACIA = { id: "", serie: "", tipoDoc: "" };
@@ -160,8 +161,8 @@ export default function EmitirComprobante() {
     // por ese monto (decisión del usuario, 2026-11-03), igual que la OC (`total - igv`).
     // El monto a facturar es el de la OC (puede ser menor al de la cotización,
     // ver ModalOrdenCompra.jsx); la cotización solo aporta descripciones.
-    const totalSinIgv = Math.round(((Number(cotizacion?.total) || 0) - (Number(cotizacion?.igv) || 0)) * 100) / 100;
-    const montoOC = Number(oc.subtotal) > 0 ? Math.round(Number(oc.subtotal) * 100) / 100 : totalSinIgv;
+    const totalSinIgv = r2(((Number(cotizacion?.total) || 0) - (Number(cotizacion?.igv) || 0)));
+    const montoOC = Number(oc.subtotal) > 0 ? r2(Number(oc.subtotal)) : totalSinIgv;
     const lineaUnica = (descripcion) => setItems([{
       ...itemVacioComprobante(),
       descripcion,
@@ -307,7 +308,7 @@ export default function EmitirComprobante() {
   const montoRedondeoNum = Number(montoRedondeo) || 0;
   const totales = totalesComprobante(itemsCalc, otrosCargosNum, montoRedondeoNum);
   const totalGeneral = totales.totalPagar;
-  const sumaCuotas = Math.round(cuotas.reduce((s, c) => s + (Number(c.monto) || 0), 0) * 100) / 100;
+  const sumaCuotas = r2(cuotas.reduce((s, c) => s + (Number(c.monto) || 0), 0));
 
   // Monto neto a depositar = detraccionPorcentaje% del total a pagar — ya no es un input libre,
   // se deriva siempre del total y el porcentaje vigente (evita que quede desincronizado si el
@@ -319,10 +320,10 @@ export default function EmitirComprobante() {
   const enSoles = moneda === "PEN";
   const detraccionBruta = totalGeneral * (Number(detraccionPorcentaje) || 0) / 100;
   const detraccionMontoMoneda = !detraccionAplica ? 0
-    : enSoles ? Math.round(detraccionBruta) : Math.round(detraccionBruta * 100) / 100;
+    : enSoles ? r0(detraccionBruta) : r2(detraccionBruta);
   const detraccionMontoNeto = !detraccionAplica ? ""
     : enSoles ? detraccionMontoMoneda.toFixed(2)
-    : tcDetraccion ? Math.round(Math.round(detraccionBruta * tcDetraccion.valor * 100) / 100).toFixed(2) : "";
+    : tcDetraccion ? r0(r2(detraccionBruta * tcDetraccion.valor)).toFixed(2) : "";
 
   useEffect(() => {
     // Ref y no el state `cargandoTc`: StrictMode corre el efecto dos veces antes de que el state
@@ -353,7 +354,7 @@ export default function EmitirComprobante() {
   // Retención del IGV: la retiene el cliente (agente de retención) al pagar, sobre el total.
   // El backend la recalcula igual; acá es para mostrarla y para el neto de las cuotas.
   const retencionMonto = retencionAplica
-    ? Math.round(totalGeneral * (Number(retencionPorcentaje) || 0)) / 100
+    ? r2(totalGeneral * (Number(retencionPorcentaje) || 0) / 100)
     : 0;
 
   // El comprador deposita la detracción directo al Banco de la Nación —
@@ -363,7 +364,7 @@ export default function EmitirComprobante() {
   // total legal del comprobante, el que va al XML/SUNAT) no cambia — esto
   // es solo para la validación/visualización de cuotas. Pedido explícito
   // del usuario, 2026-09-15.
-  const montoNetoPendiente = Math.round((totalGeneral - detraccionMontoMoneda - retencionMonto) * 100) / 100;
+  const montoNetoPendiente = r2((totalGeneral - detraccionMontoMoneda - retencionMonto));
   // SUNAT exige igualdad exacta al céntimo (3319) — sin tolerancia de ±0.01.
   const cuotasCuadran = Math.abs(sumaCuotas - montoNetoPendiente) < 0.005;
 

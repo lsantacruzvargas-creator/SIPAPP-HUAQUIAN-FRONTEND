@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { fetchAuth } from "../utils/fetchAuth";
 import { fechaHoyLima } from "../utils/fecha";
 import { formatearGuiaRemision, parsearGuiaRemision } from "../utils/catalogosSunat";
+import { r2, r0 } from "../utils/redondeo";
 
 const INP     = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 w-full";
 const INP_DIS = "border border-gray-100 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500 w-full";
@@ -17,15 +18,15 @@ const NOMBRE_EMISOR = "HUAQUIAN";
 const SERIE_FACTURA = "F002";
 
 function calcular(subtotal, descuentoPct) {
-  const sub = Math.round(Number(subtotal) * 100) / 100 || 0;
+  const sub = r2(Number(subtotal)) || 0;
   const desc = Number(descuentoPct) || 0;
-  const base = Math.round(sub * (1 - desc / 100) * 100) / 100;
-  const igv = Math.round(base * 0.18 * 100) / 100;
-  const total = Math.round((base + igv) * 100) / 100;
+  const base = r2(sub * (1 - desc / 100));
+  const igv = r2(base * 0.18);
+  const total = r2((base + igv));
   // R.S. 178-2005/SUNAT: aplica solo si el total (con IGV) es >= S/ 701, y el
   // depósito se hace en números enteros (sin decimales).
-  const detraccion = total >= 701 ? Math.round(total * 0.12) : 0;
-  return { base, igv, total, detraccion, totalAPagar: Math.round((total - detraccion) * 100) / 100 };
+  const detraccion = total >= 701 ? r0(total * 0.12) : 0;
+  return { base, igv, total, detraccion, totalAPagar: r2((total - detraccion)) };
 }
 
 // Busca si la cadena de una OC (mismo numeroDocumento: Cotización/OT/OC) ya
@@ -309,7 +310,7 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
           cantidad: 1,
           unidad: "ZZ",
           valorUnitario: Number(form.subtotal),
-          precioUnitario: Math.round(Number(form.subtotal) * 1.18 * 100) / 100,
+          precioUnitario: r2(Number(form.subtotal) * 1.18),
           afectacion: "10",
           descuentoPorcentaje: (Number(form.descuentoPorcentaje) || 0) / 100,
         }],

@@ -10,6 +10,7 @@ import {
 } from "../utils/cotizacionItems";
 import CeldasNumericas from "./CeldasNumericas";
 import TablaScroll from "./TablaScroll";
+import { r2 } from "../utils/redondeo";
 
 // Módulo-nivel: evita desmontaje/remontaje en cada render (previene pérdida de foco)
 function FilaDescripcionEditable({ item, tipo, onUpdate, onAddSub, onUpdateSub, onDeleteSub }) {
@@ -398,9 +399,9 @@ export default function ModalCotizacion({ cotizacion: inicial, onClose, onSaved 
 
   const eliminarItem = (key) => setItems((prev) => prev.filter((it) => it._key !== key));
 
-  const subtotal = parseFloat(items.reduce((s, it) => s + calcSubtotal(it), 0).toFixed(2));
-  const igv = parseFloat((subtotal * 0.18).toFixed(2));
-  const total = parseFloat((subtotal + igv).toFixed(2));
+  const subtotal = r2(items.reduce((s, it) => s + calcSubtotal(it), 0));
+  const igv = r2((subtotal * 0.18));
+  const total = r2((subtotal + igv));
 
   const guardar = async () => {
     setGuardando(true);

@@ -2,14 +2,15 @@ import { useState } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import { montoAjustadoItem } from "../utils/cotizacionItems";
 import { money } from "./detalleShared";
+import { r2 } from "../utils/redondeo";
 
 const INP    = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 w-full";
 const INP_RO = "border border-gray-100 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500 w-full cursor-not-allowed";
 
 function calcular(sub) {
-  const s = Math.round(Number(sub) * 100) / 100 || 0;
-  const igv = Math.round(s * 0.18 * 100) / 100;
-  return { subtotal: s, igv, total: Math.round((s + igv) * 100) / 100 };
+  const s = r2(Number(sub)) || 0;
+  const igv = r2(s * 0.18);
+  return { subtotal: s, igv, total: r2((s + igv)) };
 }
 
 export default function ModalOrdenCompra({ cotizacion, onClose, onCreada }) {
@@ -33,7 +34,7 @@ export default function ModalOrdenCompra({ cotizacion, onClose, onCreada }) {
   const [monto, setMonto] = useState(() => {
     const total = Number(cotizacion.total) || 0;
     const igv = Number(cotizacion.igv) || 0;
-    if (total > 0 && igv > 0) return Math.round((total - igv) * 100) / 100;
+    if (total > 0 && igv > 0) return r2((total - igv));
     return cotizacion.subtotal != null ? Number(cotizacion.subtotal) : total / 1.18;
   });
   const [numeroOrden, setNumeroOrden] = useState("");
@@ -171,7 +172,7 @@ export default function ModalOrdenCompra({ cotizacion, onClose, onCreada }) {
 export function ModalOrdenCompraItems({ cotizacion, indices, onClose, onCreada }) {
   const esAsistente = getUsuario()?.rol === "asistente";
   const elegidos = indices.map((idx) => ({ idx, item: cotizacion.items[idx] })).filter((e) => e.item);
-  const sumaAjustada = Math.round(elegidos.reduce((s, e) => s + montoAjustadoItem(cotizacion, e.item), 0) * 100) / 100;
+  const sumaAjustada = r2(elegidos.reduce((s, e) => s + montoAjustadoItem(cotizacion, e.item), 0));
   const [form, setForm] = useState(() => ({
     numeroOrden: "",
     titulo: elegidos.map((e) => e.item.descripcion).filter(Boolean).join(" / "),

@@ -1,8 +1,9 @@
 import { aInputFecha } from "./fecha";
+import { r2 } from "./redondeo.js";
 export const UNIDADES = ["und", "kg", "g", "L", "mL", "m", "cm", "m²", "caja", "rollo", "par", "juego", "bolsa", "días", "H/H", "Global"];
 
 export const calcSubtotal = (item) =>
-  parseFloat((item.cantidad * item.precio).toFixed(2));
+  r2((item.cantidad * item.precio));
 
 // Descripción + sub-ítems (viñetas del catálogo, ver TablaItemsCotizacionGloria.jsx/
 // TablaItemsCotizacionAlicorp.jsx "agregarGrupoDesdeCatalogo") como un solo texto
@@ -100,7 +101,7 @@ export const itemVacioGloria = (grupo) => {
 
 export const calcSubtotalGloria = (item) =>
   item.grupo === "mano_obra"
-    ? parseFloat((Number(item.personas || 0) * Number(item.horas || 0) * Number(item.tarifaHora || 0)).toFixed(2))
+    ? r2((Number(item.personas || 0) * Number(item.horas || 0) * Number(item.tarifaHora || 0)))
     : calcSubtotal(item);
 
 // Fórmula de totales de Gloria (confirmada por el usuario) — reemplaza el
@@ -109,11 +110,11 @@ export const calcSubtotalGloria = (item) =>
 // se calcula el IGV. `total` acá es "VALOR TOTAL DE LA OFERTA" — se guarda en
 // el mismo campo `cotizacion.total` que usa el resto de la app.
 export function calcularGloria(subtotalItems, gastosPct = 5, utilidadPct = 10) {
-  const subtotal = Math.round(Number(subtotalItems) * 100) / 100 || 0;
-  const gastosGenerales = Math.round(subtotal * (Number(gastosPct) || 0) / 100 * 100) / 100;
-  const utilidad = Math.round(subtotal * (Number(utilidadPct) || 0) / 100 * 100) / 100;
-  const totalPreIgv = Math.round((subtotal + gastosGenerales + utilidad) * 100) / 100;
-  const igv = Math.round(totalPreIgv * 0.18 * 100) / 100;
+  const subtotal = r2(Number(subtotalItems)) || 0;
+  const gastosGenerales = r2(subtotal * (Number(gastosPct) || 0) / 100);
+  const utilidad = r2(subtotal * (Number(utilidadPct) || 0) / 100);
+  const totalPreIgv = r2((subtotal + gastosGenerales + utilidad));
+  const igv = r2(totalPreIgv * 0.18);
   return {
     subtotal,
     gastosGeneralesPorcentaje: Number(gastosPct) || 0,
@@ -122,7 +123,7 @@ export function calcularGloria(subtotalItems, gastosPct = 5, utilidadPct = 10) {
     utilidad,
     totalPreIgv,
     igv,
-    total: Math.round((totalPreIgv + igv) * 100) / 100,
+    total: r2((totalPreIgv + igv)),
   };
 }
 
@@ -136,7 +137,7 @@ export function montoAjustadoItem(cotizacion, item) {
   const igv = Number(cotizacion.igv) || 0;
   const base = total > 0 && igv > 0 ? total - igv : subtotalItems;
   const factor = subtotalItems > 0 ? base / subtotalItems : 1;
-  return Math.round(calcSubtotalGloria(item) * factor * 100) / 100;
+  return r2(calcSubtotalGloria(item) * factor);
 }
 
 // ── Formato "Alicorp" — compartido por Alicorp, Intradevco y Masterbread ────
@@ -175,11 +176,11 @@ export const itemVacioAlicorp = (grupo) => ({
 // el resto de la cadena (OC/Factura) reciba el monto real a cobrar, igual
 // que el resto de la app. `totalSinIgv` es el que efectivamente se imprime.
 export function calcularAlicorp(subtotalItems, gastosAdminPct = 5, utilidadPct = 10) {
-  const subtotal = Math.round(Number(subtotalItems) * 100) / 100 || 0;
-  const gastosAdmin = Math.round(subtotal * (Number(gastosAdminPct) || 0) / 100 * 100) / 100;
-  const utilidad = Math.round(subtotal * (Number(utilidadPct) || 0) / 100 * 100) / 100;
-  const totalSinIgv = Math.round((subtotal + gastosAdmin + utilidad) * 100) / 100;
-  const igv = Math.round(totalSinIgv * 0.18 * 100) / 100;
+  const subtotal = r2(Number(subtotalItems)) || 0;
+  const gastosAdmin = r2(subtotal * (Number(gastosAdminPct) || 0) / 100);
+  const utilidad = r2(subtotal * (Number(utilidadPct) || 0) / 100);
+  const totalSinIgv = r2((subtotal + gastosAdmin + utilidad));
+  const igv = r2(totalSinIgv * 0.18);
   return {
     subtotal,
     gastosAdminPorcentaje: Number(gastosAdminPct) || 0,
@@ -188,6 +189,6 @@ export function calcularAlicorp(subtotalItems, gastosAdminPct = 5, utilidadPct =
     utilidad,
     totalSinIgv,
     igv,
-    total: Math.round((totalSinIgv + igv) * 100) / 100,
+    total: r2((totalSinIgv + igv)),
   };
 }

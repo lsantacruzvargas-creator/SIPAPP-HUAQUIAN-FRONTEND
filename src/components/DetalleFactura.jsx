@@ -6,21 +6,22 @@ import {
   FlujoNegocio, TarjetaRelacion, Chip,
   badgeOT, badgePago, money, BotonAnular, BannerAnulado, bloqueadoPorCadenaCerrada,
 } from "./detalleShared";
+import { r2, r0 } from "../utils/redondeo";
 
 const INP    = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 w-full transition";
 const INP_RO = "border border-gray-100 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500 w-full cursor-not-allowed";
 
 function calcular(sub, retencionPct = 0) {
-  const s = Math.round(Number(sub) * 100) / 100 || 0;
-  const igv = Math.round(s * 0.18 * 100) / 100;
-  const total = Math.round((s + igv) * 100) / 100;
+  const s = r2(Number(sub)) || 0;
+  const igv = r2(s * 0.18);
+  const total = r2((s + igv));
   // Con retención del IGV no hay detracción — mismo cálculo que routes/facturas.js.
   const pct = Number(retencionPct) || 0;
-  const retencion = pct > 0 ? Math.round(total * pct) / 100 : 0;
+  const retencion = pct > 0 ? r2(total * pct / 100) : 0;
   // R.S. 178-2005/SUNAT: aplica solo si el total (con IGV) es >= S/ 701, y el
   // depósito se hace en números enteros (sin decimales).
-  const detraccion = pct > 0 ? 0 : (total >= 701 ? Math.round(total * 0.12) : 0);
-  return { igv, total, detraccion, retencion, totalAPagar: Math.round((total - detraccion - retencion) * 100) / 100 };
+  const detraccion = pct > 0 ? 0 : (total >= 701 ? r0(total * 0.12) : 0);
+  return { igv, total, detraccion, retencion, totalAPagar: r2((total - detraccion - retencion)) };
 }
 
 function BuscadorOC({ onSelect, onClose }) {

@@ -1,3 +1,4 @@
+import { r2 } from "./redondeo.js";
 // Espejo en frontend de Backend/src/utils/catalogos.js — solo lo necesario para selects.
 // Afectación: SOLO los 4 códigos base. Los subcódigos extendidos (11-17, 21, 31-36) están
 // documentados en la Guía SUNAT pero confirmados RECHAZADOS por SUNAT en demo (error 2040) —
@@ -109,7 +110,7 @@ export function itemVacioComprobante() {
 export function precioUnitarioDesdeValor(valorUnitario, afectacion) {
   const valor = Number(valorUnitario) || 0;
   if (afectacion !== "10") return valor;
-  return Math.round(valor * 1.18 * 100) / 100;
+  return r2(valor * 1.18);
 }
 
 export const TIPO_GUIA = [
@@ -287,8 +288,6 @@ export const DETRACCION_BIENES_SERVICIOS = [
   { codigo: "040", descripcion: "Bien inmueble gravado con IGV", porcentaje: 4 },
   { codigo: "041", descripcion: "Plomo", porcentaje: 15 },
 ];
-
-const r2 = (n) => Math.round(n * 100) / 100;
 
 // Copia exacta de Backend/src/utils/montosCpe.js (calcularLineaCpe /
 // calcularTotalesCpe), que es lo que va escrito en el XML: cada valor de

@@ -9,6 +9,7 @@ import ModalNuevaCotizacion from "../components/ModalNuevaCotizacion";
 import { DotChip, badgeGeneral, dotGeneral, ESTADOS_SERVICIO } from "../components/detalleShared";
 import TablaScroll from "../components/TablaScroll";
 import * as XLSX from "xlsx";
+import { r2 } from "../utils/redondeo";
 
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -71,9 +72,7 @@ const titulosOT = (ots) =>
 // Se usa `total − igv` (exacto) y no `total / 1.18`: este último arrastra
 // decimales que, multiplicados por el TC, descuadraban la conversión en
 // ±0.01 (reportado por el usuario, 2026-11-06). `/1.18` queda solo de
-// respaldo para filas sin `igv` (pseudo-filas de OT).
-const r2 = (n) => Math.round(n * 100) / 100;
-const totalesDuales = (c, tipoCambio) => {
+// respaldo para filas sin `igv` (pseudo-filas de OT).const totalesDuales = (c, tipoCambio) => {
   const total = Number(c.total) || 0;
   const igv = Number(c.igv) || 0;
   const sinIgv = r2(igv > 0 ? total - igv : c.total != null ? total / 1.18 : Number(c.subtotal) || 0);

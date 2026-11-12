@@ -6,6 +6,7 @@ import ModalImportarExcel, { COLS_OC, COLS_CADENA } from "../components/ModalImp
 import { DotChip, badgeOT, dotOT, badgeInformes, dotInformes } from "../components/detalleShared";
 import TablaScroll from "../components/TablaScroll";
 import * as XLSX from "xlsx";
+import { r2 } from "../utils/redondeo";
 
 const ESTADOS_OT = ["", "pendiente", "en progreso", "terminado", "completado"];
 const MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
@@ -43,7 +44,6 @@ const compararTexto = (na, nb) => {
 // (igual que DetalleOrdenCompra.jsx); sin cotización vinculada es Soles.
 // Antes se trataba siempre como Soles y una OC de cotización en USD
 // mostraba los dólares en la columna S/ (reportado por el usuario, 2026-11-06).
-const r2 = (n) => Math.round(n * 100) / 100;
 const totalesDuales = (monto, moneda, tipoCambio) => {
   const m = r2(Number(monto) || 0);
   const tc = Number(tipoCambio) || 0;

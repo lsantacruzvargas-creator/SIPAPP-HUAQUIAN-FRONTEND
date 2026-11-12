@@ -1,6 +1,7 @@
 import { Fragment, useState } from "react";
 import { formatearFechaHora } from "../utils/fecha";
 import ConfirmacionAccion from "./ConfirmacionAccion";
+import { r2 } from "../utils/redondeo";
 
 /* ─── Iconos SVG (stroke, currentColor) ─────────────────────────── */
 const svg = "w-5 h-5";
@@ -266,7 +267,7 @@ export const money = (v, moneda = "PEN") =>
 // descuento (formato estándar) o gastos + utilidad (Alicorp/Gloria), cosa que
 // `subtotal` (bruto de ítems) no refleja.
 export const totalSinIgv = (doc) =>
-  Math.round(((Number(doc?.total) || 0) - (Number(doc?.igv) || 0)) * 100) / 100;
+  r2(((Number(doc?.total) || 0) - (Number(doc?.igv) || 0)));
 
 /* ─── Anulación de documentos ────────────────────────────────────── */
 export function BotonAnular({ onAnular }) {

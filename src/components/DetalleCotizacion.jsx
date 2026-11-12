@@ -23,6 +23,7 @@ import {
   FlujoNegocio, TarjetaRelacion, Chip,
   badgePago, badgeOT, money, totalSinIgv, BotonAnular, BotonCerrarCadena, BotonDesanular, BannerAnulado, bloqueadoPorCadenaCerrada,
 } from "./detalleShared";
+import { r2 } from "../utils/redondeo";
 
 const INP = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 w-full transition";
 const codigoDeGuia = (g) => `${g.serie}-${String(g.correlativo).padStart(4, "0")}`;
@@ -31,18 +32,18 @@ const codigoDeGuia = (g) => `${g.serie}-${String(g.correlativo).padStart(4, "0")
 // items[].descuento) y se aplica antes del IGV — `subtotal` sigue siendo el
 // bruto para mostrarlo tal cual, IGV/total ya salen sobre la base descontada.
 function calcular(sub, descuentoPct = 0) {
-  const s = Math.round(Number(sub) * 100) / 100 || 0;
+  const s = r2(Number(sub)) || 0;
   const pct = Math.min(100, Math.max(0, Number(descuentoPct) || 0));
-  const descuento = Math.round(s * (pct / 100) * 100) / 100;
-  const subtotalConDescuento = Math.round((s - descuento) * 100) / 100;
-  const igv = Math.round(subtotalConDescuento * 0.18 * 100) / 100;
+  const descuento = r2(s * (pct / 100));
+  const subtotalConDescuento = r2((s - descuento));
+  const igv = r2(subtotalConDescuento * 0.18);
   return {
     subtotal: s,
     descuentoPorcentaje: pct,
     descuento,
     subtotalConDescuento,
     igv,
-    total: Math.round((subtotalConDescuento + igv) * 100) / 100,
+    total: r2((subtotalConDescuento + igv)),
   };
 }
 
@@ -174,8 +175,8 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   // bienes muebles" = 12%) — acá es solo para mostrar el desglose antes de
   // confirmar el cierre; el cálculo real que se guarda lo hace el backend.
   const detraccionCierreAplica = Number(cot.total) > 700;
-  const detraccionCierreMonto = detraccionCierreAplica ? Math.round(Number(cot.total) * 0.12 * 100) / 100 : 0;
-  const totalAPagarCierre = Math.round((Number(cot.total) - detraccionCierreMonto) * 100) / 100;
+  const detraccionCierreMonto = detraccionCierreAplica ? r2(Number(cot.total) * 0.12) : 0;
+  const totalAPagarCierre = r2((Number(cot.total) - detraccionCierreMonto));
 
   const cargarRelaciones = () => {
     Promise.all([
@@ -392,7 +393,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   // calcSubtotalGloria degrada a calcSubtotal (cantidad×precio) para
   // cualquier ítem sin `grupo` — sirve igual para el flujo genérico y para
   // los 4 grupos de Gloria que no son "mano_obra".
-  const subtotalItems = parseFloat(items.reduce((acc, i) => acc + calcSubtotalGloria(i), 0).toFixed(2));
+  const subtotalItems = r2(items.reduce((acc, i) => acc + calcSubtotalGloria(i), 0));
   const usarTotalesDeItems = items.length > 0;
   const totalesMostrados = esGloria
     ? calcularGloria(usarTotalesDeItems ? subtotalItems : form.subtotal, form.gastosGeneralesPorcentaje, form.utilidadPorcentaje)

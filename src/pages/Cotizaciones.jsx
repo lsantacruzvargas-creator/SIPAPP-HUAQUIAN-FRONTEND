@@ -11,6 +11,7 @@ import {
 } from "../utils/cotizacionItems";
 import CeldasNumericas from "../components/CeldasNumericas";
 import TablaScroll from "../components/TablaScroll";
+import { r2 } from "../utils/redondeo";
 
 const hoy = () => fechaHoyLima();
 
@@ -98,14 +99,14 @@ export default function Cotizaciones() {
         : i
     ));
 
-  const subtotalGeneral = parseFloat(items.reduce((acc, i) => acc + calcSubtotal(i), 0).toFixed(2));
+  const subtotalGeneral = r2(items.reduce((acc, i) => acc + calcSubtotal(i), 0));
   // Descuento global sobre la suma de subtotales (no por ítem) — se aplica
   // antes del IGV, ver mismo criterio en DetalleCotizacion.jsx.
   const descuentoPorcentaje = Math.min(100, Math.max(0, Number(form.descuentoPorcentaje) || 0));
-  const descuentoGeneral = parseFloat((subtotalGeneral * (descuentoPorcentaje / 100)).toFixed(2));
-  const subtotalConDescuento = parseFloat((subtotalGeneral - descuentoGeneral).toFixed(2));
-  const igv = parseFloat((subtotalConDescuento * 0.18).toFixed(2));
-  const total = parseFloat((subtotalConDescuento + igv).toFixed(2));
+  const descuentoGeneral = r2((subtotalGeneral * (descuentoPorcentaje / 100)));
+  const subtotalConDescuento = r2((subtotalGeneral - descuentoGeneral));
+  const igv = r2((subtotalConDescuento * 0.18));
+  const total = r2((subtotalConDescuento + igv));
 
   const validar = () => {
     if (!form.titulo.trim()) return "El título del trabajo es requerido.";

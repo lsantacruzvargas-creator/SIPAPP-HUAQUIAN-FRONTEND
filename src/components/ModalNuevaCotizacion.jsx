@@ -7,24 +7,25 @@ import TablaItemsCotizacionAlicorp from "./TablaItemsCotizacionAlicorp";
 import SelectorEmpresas from "./SelectorEmpresas";
 import { FlujoNegocio, TarjetaRelacion, money } from "./detalleShared";
 import { fechaHoyLima } from "../utils/fecha";
+import { r2 } from "../utils/redondeo";
 
 const INP = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 w-full transition";
 
 // Descuento global sobre la suma de subtotales (no por ítem) — se aplica
 // antes del IGV, mismo criterio en DetalleCotizacion.jsx/Cotizaciones.jsx.
 function calcular(sub, descuentoPct = 0) {
-  const s = Math.round(Number(sub) * 100) / 100 || 0;
+  const s = r2(Number(sub)) || 0;
   const pct = Math.min(100, Math.max(0, Number(descuentoPct) || 0));
-  const descuento = Math.round(s * (pct / 100) * 100) / 100;
-  const subtotalConDescuento = Math.round((s - descuento) * 100) / 100;
-  const igv = Math.round(subtotalConDescuento * 0.18 * 100) / 100;
+  const descuento = r2(s * (pct / 100));
+  const subtotalConDescuento = r2((s - descuento));
+  const igv = r2(subtotalConDescuento * 0.18);
   return {
     subtotal: s,
     descuentoPorcentaje: pct,
     descuento,
     subtotalConDescuento,
     igv,
-    total: Math.round((subtotalConDescuento + igv) * 100) / 100,
+    total: r2((subtotalConDescuento + igv)),
   };
 }
 
@@ -146,7 +147,7 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
   // calcSubtotalGloria degrada a calcSubtotal (cantidad×precio) para
   // cualquier ítem sin `grupo` — sirve igual para el flujo genérico y para
   // los 4 grupos de Gloria que no son "mano_obra".
-  const subtotalItems = parseFloat(items.reduce((acc, i) => acc + calcSubtotalGloria(i), 0).toFixed(2));
+  const subtotalItems = r2(items.reduce((acc, i) => acc + calcSubtotalGloria(i), 0));
   const usarTotalesDeItems = items.length > 0;
   const totalesMostrados = esGloria
     ? calcularGloria(usarTotalesDeItems ? subtotalItems : form.subtotal, form.gastosGeneralesPorcentaje, form.utilidadPorcentaje)
