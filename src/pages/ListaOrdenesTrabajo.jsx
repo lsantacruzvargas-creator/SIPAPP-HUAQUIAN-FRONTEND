@@ -5,7 +5,7 @@ import DetalleDocumento from "../components/DetalleDocumento";
 import ModalNuevaOT from "../components/ModalNuevaOT";
 import ModalImportarExcel, { COLS_OT } from "../components/ModalImportarExcel";
 import TablaScroll from "../components/TablaScroll";
-import { DotChip, badgeOT, dotOT, badgeInformes, dotInformes, badgeGeneral, dotGeneral } from "../components/detalleShared";
+import { DotChip, badgeOT, dotOT, badgeInformes, dotInformes, badgeGeneral, dotGeneral, ESTADOS_SERVICIO } from "../components/detalleShared";
 import * as XLSX from "xlsx";
 
 const FILTROS_VACIO = { empresa: "", planta: "", busqueda: "", estadoInformes: "", fechaDesde: "", fechaHasta: "" };
@@ -52,6 +52,15 @@ const TH = "px-4 py-3 font-semibold text-gray-500 whitespace-nowrap";
 const pruebaLabel = (o) => (o.encargado?.trim() ? o.estadoPrueba : "No asignado");
 const intervencionLabel = (o) => (o.encargado2?.trim() ? o.estado : "No asignado");
 
+const TITULO_TABLA_SERVICIO = {
+  pendiente: "Órdenes pendientes (sin asignar)",
+  "en progreso": "Órdenes en progreso",
+  terminado: "Órdenes terminadas",
+  entregado: "Órdenes entregadas",
+  completado: "Órdenes completadas",
+  facturado: "Órdenes facturadas",
+};
+
 // Una sub-OT nace con la misma `cotizacion` que su padre, pero /vincular-cotizacion
 // (ver DetalleOrdenTrabajo/DetalleCotizacion) permite "jalarla" luego a otra
 // cotización distinta — eso la saca de la cadena de su padre. Se detecta
@@ -95,7 +104,7 @@ function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg, sortBy, onSortF
         <span className="text-xs text-gray-400">({ordenes.length})</span>
       </div>
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <TablaScroll className="overflow-x-auto">
+        <TablaScroll className="overflow-x-auto" fija>
           <table className="w-full text-sm" style={{ minWidth: "1100px" }}>
             <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-200">
               <tr>
@@ -257,7 +266,7 @@ export default function ListaOrdenesTrabajo() {
   // Filtro de grupo: qué bloque de tablas se muestra — Prueba, Intervención,
   // o ambos. "Cerradas" queda siempre visible, es ortogonal a ambos tracks.
   const [grupo, setGrupo] = useState("todos");
-  // Solo para la vista simplificada (planner/asistente): qué tabla de las 5
+  // Solo para la vista simplificada (planner/asistente): qué tabla de las
   // categorías se muestra — el resto de roles no usa este filtro.
   const [filtroEstadoPlanner, setFiltroEstadoPlanner] = useState("todos");
   // Mismo filtro pero para técnico (tecnico/tecnico_prueba/tecnico_intervencion)
@@ -306,8 +315,8 @@ export default function ListaOrdenesTrabajo() {
   // coincidiendo con su nombre) — ver esTecnicoRestringido más abajo.
   const esTecnicoRol = ["tecnico", "tecnico_prueba", "tecnico_intervencion"].includes(rolActual);
   const esTecnicoRestringido = ["tecnico_prueba", "tecnico_intervencion"].includes(rolActual);
-  // Vista simplificada de 4 grupos (No asignadas/En progreso/Completadas/
-  // Entregadas), sin el split Prueba/Intervención — planner, Administración
+  // Vista simplificada por estado del servicio (Pendiente … Facturado,
+  // ver ESTADOS_SERVICIO), sin el split Prueba/Intervención — planner, Administración
   // ("asistente" es el valor de rol real, ver Sidebar.jsx), Jefatura y
   // Coordinadora (estas dos últimas solo en la vista de OTs, a pedido
   // explícito del usuario — el resto de sus permisos no cambia). El rol
@@ -378,7 +387,7 @@ export default function ListaOrdenesTrabajo() {
   // estado de trabajo se haya quedado. Mientras la cadena sigue abierta, la
   // OT vive en la tabla que corresponde a su `estado` actual (el mismo valor
   // que arma el filtro "Todo estado" de arriba) — así una OT que pasa a
-  // "completado" se mueve sola a la tabla de Completadas sin quedarse
+  // "terminado" se mueve sola a la tabla de Terminadas sin quedarse
   // mezclada con las pendientes.
   const esCerrada = (o) => o.estadoCadena === "cerrado";
   const abiertas = filtradas.filter((o) => !esCerrada(o));
@@ -399,7 +408,7 @@ export default function ListaOrdenesTrabajo() {
   // tenía ella misma un encargado en ese track (bug reportado: la vista de
   // técnico solo miraba el encargado del padre, ignorando sus sub-OTs).
   const agruparPorEstado = (campoEncargado, campoEstado) => {
-    const buckets = { pendiente: [], "en progreso": [], completado: [], entregado: [] };
+    const buckets = { pendiente: [], "en progreso": [], terminado: [], completado: [] };
     abiertas.forEach((o) => {
       const porEstado = {};
       (o.subOTs || []).forEach((s) => {
@@ -429,51 +438,43 @@ export default function ListaOrdenesTrabajo() {
   const bucketsIntervencion = agruparPorEstado("encargado2", "estado");
   const pendientes = bucketsIntervencion.pendiente;
   const enProgreso = bucketsIntervencion["en progreso"];
+  const terminadas = bucketsIntervencion.terminado;
   const completadas = bucketsIntervencion.completado;
-  const entregadas = bucketsIntervencion.entregado;
   // Prueba (campo `estadoPrueba`, propiedad del Encargado Prueba — mismas 4 categorías).
   const bucketsPrueba = agruparPorEstado("encargado", "estadoPrueba");
   const pruebaPendientes = bucketsPrueba.pendiente;
   const pruebaEnProgreso = bucketsPrueba["en progreso"];
+  const pruebaTerminadas = bucketsPrueba.terminado;
   const pruebaCompletadas = bucketsPrueba.completado;
-  const pruebaEntregadas = bucketsPrueba.entregado;
 
-  // "No asignado" (estadoGeneral, ver Backend/src/utils/estadoGeneralOT.js)
-  // — mismo criterio de duplicar por sub-OT: la OT padre puede tener técnico
-  // asignado mientras una sub-OT suya sigue sin nadie (o al revés).
+  // Servicio "pendiente" = sin técnico asignado (estadoGeneral, ver
+  // Backend/src/utils/estadoGeneralOT.js) — mismo criterio de duplicar por
+  // sub-OT: la OT padre puede tener técnico asignado mientras una sub-OT suya
+  // sigue sin nadie (o al revés).
   const noAsignadas = [];
   abiertas.forEach((o) => {
-    const subsSinAsignar = (o.subOTs || []).filter((s) => s.estadoGeneral === "no asignado");
-    if (o.estadoGeneral === "no asignado" || subsSinAsignar.length) {
+    const subsSinAsignar = (o.subOTs || []).filter((s) => s.estadoGeneral === "pendiente");
+    if (o.estadoGeneral === "pendiente" || subsSinAsignar.length) {
       noAsignadas.push({ ...o, subOTs: subsSinAsignar });
     }
   });
 
   const cerradas = filtradas.filter((o) => esCerrada(o));
 
-  // Vista simplificada del planner: un solo set de 4 grupos en vez del split
-  // Prueba/Intervención — agrupa directo por `estadoGeneral` (calculado y
-  // persistido en el backend, ver estadoGeneralOT.js), sin distinguir de qué
-  // track viene. Antes se recalculaba acá con otro criterio (track listo +
-  // informesAprobados) que no coincidía con el valor que el backend guardaba
-  // — una misma OT podía verse "en progreso" en el badge y "completada" en
-  // esta tabla. Un solo cálculo, una sola fuente de verdad.
-  const asignadasPlanner = abiertas.filter((o) => o.encargado?.trim() || o.encargado2?.trim());
-  const plannerEntregadas  = asignadasPlanner.filter((o) => o.estadoGeneral === "entregada");
-  const plannerCompletadas = asignadasPlanner.filter((o) => o.estadoGeneral === "completada");
-  const plannerEnProgreso  = asignadasPlanner.filter((o) => o.estadoGeneral === "pendiente" || o.estadoGeneral === "en progreso");
+  // Vista simplificada del planner: una tabla por estado del servicio en vez
+  // del split Prueba/Intervención — agrupa directo por `estadoGeneral`
+  // (calculado y persistido en el backend, ver estadoGeneralOT.js). Un solo
+  // cálculo, una sola fuente de verdad. "pendiente" usa `noAsignadas` (que
+  // además separa las sub-OTs sin asignar).
+  const tablasPlanner = ESTADOS_SERVICIO.map((e) => ({
+    ...e,
+    ordenes: e.valor === "pendiente" ? noAsignadas : abiertas.filter((o) => o.estadoGeneral === e.valor),
+  }));
 
   // Tabla "Todas las Órdenes de Trabajo": una sola lista global (sin separar
   // por track ni por asignación) sobre la que responde el filtro de Estado —
-  // misma categorización que las 5 tablas de la vista simplificada, para que
-  // "Todo estado" muestre exactamente la unión de esas 5.
-  const categoriaGlobal = (o) => {
-    if (esCerrada(o)) return "cerrada";
-    if (o.estadoGeneral === "no asignado") return "noAsignada";
-    if (o.estadoGeneral === "completada") return "completada";
-    if (o.estadoGeneral === "entregada") return "entregada";
-    return "enProgreso";
-  };
+  // misma categorización que las tablas de la vista simplificada.
+  const categoriaGlobal = (o) => (esCerrada(o) ? "cerrada" : o.estadoGeneral);
   const todasOTs = filtradas.filter(
     (o) => filtroEstadoPlanner === "todos" || categoriaGlobal(o) === filtroEstadoPlanner
   );
@@ -515,12 +516,12 @@ export default function ListaOrdenesTrabajo() {
       ["Sin asignar", noAsignadas],
       ["Prueba - Pendientes", pruebaPendientes],
       ["Prueba - En progreso", pruebaEnProgreso],
+      ["Prueba - Terminadas", pruebaTerminadas],
       ["Prueba - Completadas", pruebaCompletadas],
-      ["Prueba - Entregadas", pruebaEntregadas],
       ["Intervención - Pendientes", pendientes],
       ["Intervención - En progreso", enProgreso],
+      ["Intervención - Terminadas", terminadas],
       ["Intervención - Completadas", completadas],
-      ["Intervención - Entregadas", entregadas],
       ["Cerradas", cerradas],
     ].forEach(([nombre, lista]) => {
       const ws = XLSX.utils.json_to_sheet(lista.map(filaOT));
@@ -564,7 +565,7 @@ export default function ListaOrdenesTrabajo() {
       </div>
 
       {/* Filtros — orden: Ordenar, Estado, Empresa (+ Planta), búsqueda, Estado informes */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-5 flex flex-wrap gap-3 items-center">
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-5 flex flex-wrap gap-3 items-center barra-filtros">
 
         <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className={SELECT}>
           {SORTS.map(({ valor, label }) => (
@@ -575,10 +576,9 @@ export default function ListaOrdenesTrabajo() {
         {esVistaSimplificada && (
           <select value={filtroEstadoPlanner} onChange={(e) => setFiltroEstadoPlanner(e.target.value)} className={SELECT}>
             <option value="todos">Todo estado</option>
-            <option value="noAsignada">No asignada</option>
-            <option value="enProgreso">En progreso</option>
-            <option value="completada">Completada</option>
-            <option value="entregada">Entregada</option>
+            {ESTADOS_SERVICIO.map(({ valor, label }) => (
+              <option key={valor} value={valor}>{label}</option>
+            ))}
             <option value="cerrada">Cerrada</option>
           </select>
         )}
@@ -588,8 +588,8 @@ export default function ListaOrdenesTrabajo() {
             <option value="todos">Todo estado</option>
             <option value="pendiente">Pendiente</option>
             <option value="enProgreso">En progreso</option>
-            <option value="completada">Completada</option>
-            <option value="entregada">Entregada</option>
+            <option value="terminado">Terminado</option>
+            <option value="completado">Completado</option>
             <option value="cerrada">Cerrada</option>
           </select>
         )}
@@ -705,7 +705,7 @@ export default function ListaOrdenesTrabajo() {
         <>
           {/* Vista global: todas las OTs juntas (sin separar por asignación
               ni track), respondiendo al mismo filtro de Estado de arriba —
-              "Todo estado" muestra la unión exacta de las 5 tablas de abajo.
+              "Todo estado" muestra la unión exacta de las tablas de abajo.
               Solo se muestra con "Todo estado": si se elige una categoría
               puntual, esta tabla (que ya no filtra nada) quedaba mostrando
               siempre TODAS las OTs por encima de la tabla ya filtrada de
@@ -722,53 +722,18 @@ export default function ListaOrdenesTrabajo() {
             />
           )}
 
-          {mostrarPlanner("noAsignada") && (
+          {tablasPlanner.filter((t) => mostrarPlanner(t.valor)).map((t) => (
             <TablaOTs
-              titulo="Órdenes no asignadas"
-              acento="bg-red-500"
-              ordenes={noAsignadas}
+              key={t.valor}
+              titulo={TITULO_TABLA_SERVICIO[t.valor]}
+              acento={t.dot}
+              ordenes={t.ordenes}
               onSelect={setSeleccionada}
               sortBy={sortBy}
               onSortFechaSalida={alternarSortFechaSalida}
-              vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes por asignar"}
+              vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : `Sin ${TITULO_TABLA_SERVICIO[t.valor].toLowerCase()}`}
             />
-          )}
-
-          {mostrarPlanner("enProgreso") && (
-            <TablaOTs
-              titulo="Órdenes en progreso"
-              acento="bg-blue-500"
-              ordenes={plannerEnProgreso}
-              onSelect={setSeleccionada}
-              sortBy={sortBy}
-              onSortFechaSalida={alternarSortFechaSalida}
-              vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes en progreso"}
-            />
-          )}
-
-          {mostrarPlanner("completada") && (
-            <TablaOTs
-              titulo="Órdenes completadas"
-              acento="bg-green-500"
-              ordenes={plannerCompletadas}
-              onSelect={setSeleccionada}
-              sortBy={sortBy}
-              onSortFechaSalida={alternarSortFechaSalida}
-              vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes completadas"}
-            />
-          )}
-
-          {mostrarPlanner("entregada") && (
-            <TablaOTs
-              titulo="Órdenes entregadas"
-              acento="bg-teal-500"
-              ordenes={plannerEntregadas}
-              onSelect={setSeleccionada}
-              sortBy={sortBy}
-              onSortFechaSalida={alternarSortFechaSalida}
-              vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes entregadas"}
-            />
-          )}
+          ))}
         </>
       ) : !esTecnicoIntervencion && grupo !== "intervencion" && (
         <>
@@ -798,27 +763,27 @@ export default function ListaOrdenesTrabajo() {
             />
           )}
 
-          {mostrarTecnico("completada") && (
+          {mostrarTecnico("terminado") && (
+            <TablaOTs
+              titulo="Órdenes de prueba terminadas"
+              acento="bg-green-500"
+              ordenes={pruebaTerminadas}
+              onSelect={setSeleccionada}
+              sortBy={sortBy}
+              onSortFechaSalida={alternarSortFechaSalida}
+              vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de prueba terminadas"}
+            />
+          )}
+
+          {mostrarTecnico("completado") && (
             <TablaOTs
               titulo="Órdenes de prueba completadas"
-              acento="bg-green-500"
+              acento="bg-teal-500"
               ordenes={pruebaCompletadas}
               onSelect={setSeleccionada}
               sortBy={sortBy}
               onSortFechaSalida={alternarSortFechaSalida}
               vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de prueba completadas"}
-            />
-          )}
-
-          {mostrarTecnico("entregada") && (
-            <TablaOTs
-              titulo="Órdenes de prueba entregadas a Intervención"
-              acento="bg-teal-500"
-              ordenes={pruebaEntregadas}
-              onSelect={setSeleccionada}
-              sortBy={sortBy}
-              onSortFechaSalida={alternarSortFechaSalida}
-              vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de prueba entregadas a Intervención"}
             />
           )}
         </>
@@ -852,27 +817,27 @@ export default function ListaOrdenesTrabajo() {
             />
           )}
 
-          {mostrarTecnico("completada") && (
+          {mostrarTecnico("terminado") && (
+            <TablaOTs
+              titulo="Órdenes de intervención terminadas"
+              acento="bg-green-500"
+              ordenes={terminadas}
+              onSelect={setSeleccionada}
+              sortBy={sortBy}
+              onSortFechaSalida={alternarSortFechaSalida}
+              vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de intervención terminadas"}
+            />
+          )}
+
+          {mostrarTecnico("completado") && (
             <TablaOTs
               titulo="Órdenes de intervención completadas"
-              acento="bg-green-500"
+              acento="bg-teal-500"
               ordenes={completadas}
               onSelect={setSeleccionada}
               sortBy={sortBy}
               onSortFechaSalida={alternarSortFechaSalida}
               vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de intervención completadas"}
-            />
-          )}
-
-          {mostrarTecnico("entregada") && (
-            <TablaOTs
-              titulo="Órdenes de intervención entregadas"
-              acento="bg-teal-500"
-              ordenes={entregadas}
-              onSelect={setSeleccionada}
-              sortBy={sortBy}
-              onSortFechaSalida={alternarSortFechaSalida}
-              vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de intervención entregadas"}
             />
           )}
         </>
@@ -922,7 +887,7 @@ export default function ListaOrdenesTrabajo() {
           <>1. Descarga la plantilla, rellena tus datos y súbela. La <strong>Empresa</strong> se busca por
           <strong>RUC</strong> (11 dígitos); si no existe, se crea sola con la razón social en blanco (edítala
           después desde Empresas para completarla vía SUNAT). <strong>Estado de la orden</strong>: No asignado, En proceso,
-          Terminado o Entregado — sin un técnico asignado, la OT se sigue viendo como "No asignado" en las tablas
+          Terminado, Completado o Entregado (se carga como Completado) — sin un técnico asignado, el servicio de la OT queda "Pendiente" en las tablas
           hasta que alguien lo asigne a mano.</>
         }
         onClose={() => setImportarOpen(false)}

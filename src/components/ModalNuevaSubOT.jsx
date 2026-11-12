@@ -2,13 +2,13 @@ import { useState, useEffect } from "react";
 import { fetchAuth } from "../utils/fetchAuth";
 import { INP } from "../utils/cotizacionItems";
 
-const ESTADOS = ["pendiente", "en progreso", "completado", "entregado"];
+const ESTADOS = ["pendiente", "en progreso", "terminado", "completado"];
 const CATEGORIAS_SERVICIO = ["SOPORTE", "DEVOLUCION", "DIAGNOSTICO", "GARANTIA", "MANTENIMIENTO", "REPARACION", "PRESTAMO", "SUMINISTRO", "MANTENIMIENTO EN PLANTA"];
 
 const colorEstado = (e, activo) => {
   if (!activo) return "bg-gray-100 text-gray-500 hover:bg-gray-200";
-  if (e === "entregado")  return "bg-teal-600 text-white";
-  if (e === "completado") return "bg-green-600 text-white";
+  if (e === "completado") return "bg-teal-600 text-white";
+  if (e === "terminado")  return "bg-green-600 text-white";
   if (e === "en progreso") return "bg-blue-600 text-white";
   return "bg-amber-500 text-white";
 };

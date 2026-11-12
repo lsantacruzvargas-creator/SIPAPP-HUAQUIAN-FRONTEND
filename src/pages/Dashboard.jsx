@@ -1,20 +1,29 @@
 import { useState, useEffect } from "react";
 import { fetchAuth } from "../utils/fetchAuth";
 import { anioLima, mesLima } from "../utils/fecha";
+import { ESTADOS_SERVICIO } from "../components/detalleShared";
 import {
   PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
 
 // ── Colores ──────────────────────────────────────────────────────────────────
+// Por etiqueta del estado del servicio (es el `name` que recibe la dona).
 const COLOR_OT = {
-  pendiente:    "#f59e0b",
-  "en progreso": "#3b82f6",
-  completado:   "#22c55e",
+  Pendiente:     "#f59e0b",
+  "En progreso": "#3b82f6",
+  Terminado:     "#22c55e",
+  Entregado:     "#14b8a6",
+  Completado:    "#8b5cf6",
+  Facturado:     "#6366f1",
 };
 const COLOR_FACT = {
   "sin pago":    "#ef4444",
   "pago parcial": "#f59e0b",
   pagado:        "#22c55e",
+};
+const COLOR_KPI_SERVICIO = {
+  pendiente: "amber", "en progreso": "blue", terminado: "green",
+  entregado: "teal", completado: "violet", facturado: "indigo",
 };
 
 // ── Tooltip personalizado ────────────────────────────────────────────────────
@@ -37,6 +46,9 @@ function KpiCard({ label, value, sub, color }) {
     amber: "text-amber-700",
     green: "text-green-600",
     red:   "text-red-600",
+    teal:   "text-teal-700",
+    violet: "text-violet-700",
+    indigo: "text-indigo-700",
   };
   return (
     <div className="card flex flex-col gap-1 min-w-0">
@@ -203,9 +215,15 @@ const MESES = [
 
 const SELECT = "input-field w-auto";
 
+// La OT no tiene campo `fecha` (antes se filtraba por él y el filtro de
+// año/mes nunca la alcanzaba): su fecha es la de ingreso, o la de creación.
+const fechaOT = (o) => o.fechaRecibida || o.createdAt;
+
+// `campoFecha`: nombre del campo o función que devuelve la fecha del registro.
 function porFecha(arr, campoFecha, ano, mes) {
   return arr.filter((item) => {
-    const f = item[campoFecha] ? new Date(item[campoFecha]) : null;
+    const valor = typeof campoFecha === "function" ? campoFecha(item) : item[campoFecha];
+    const f = valor ? new Date(valor) : null;
     if (!f) return true;
     if (ano && anioLima(f) !== parseInt(ano)) return false;
     if (mes && mesLima(f) !== parseInt(mes)) return false;
@@ -231,34 +249,31 @@ function DashboardPlanner({ ots, ocs }) {
   // independientes en el conteo. Contar el arreglo plano completo (como
   // antes) duplicaba: una OT con sub-OTs sumaba de más frente al total que
   // muestra esa vista.
-  const otsPadres = ots.filter((o) => !o.ordenPadre);
+  const otsPadres = ots.filter((o) => !o.ordenPadre && !o.anulado);
   const esCerrada = (o) => o.estadoCadena === "cerrado";
   const abiertas = otsPadres.filter((o) => !esCerrada(o));
   const totalOTs = otsPadres.length;
 
-  // "Pendientes"/"En progreso" en el KPI mapean a las mismas 4 categorías
-  // (No asignada/En progreso/Completada/Entregada) que usa el filtro de la
-  // vista simplificada (ver categoriaGlobal en ListaOrdenesTrabajo.jsx) — "en
-  // progreso" agrupa tanto el estado interno "pendiente" (asignada, sin
-  // arrancar) como "en progreso" (arrancada), igual que allá. Las OTs con
-  // cadena cerrada quedan fuera de las 4 (ahí caen en su propia categoría
+  // Un KPI por estado del servicio — mismas categorías que el filtro de la
+  // vista simplificada (ver categoriaGlobal en ListaOrdenesTrabajo.jsx). Las
+  // OTs con cadena cerrada quedan fuera (ahí caen en su propia categoría
   // "cerrada", no se cuentan en esta vista).
-  const pendientes  = abiertas.filter((o) => o.estadoGeneral === "no asignado").length;
-  const enProgreso  = abiertas.filter((o) => o.estadoGeneral === "pendiente" || o.estadoGeneral === "en progreso").length;
-  const completadas = abiertas.filter((o) => o.estadoGeneral === "completada").length;
-  const entregadas  = abiertas.filter((o) => o.estadoGeneral === "entregada").length;
+  const kpisServicio = ESTADOS_SERVICIO.map((e) => ({
+    ...e,
+    total: abiertas.filter((o) => o.estadoGeneral === e.valor).length,
+  }));
 
-  // "Completadas o entregadas" = cualquier OT cuyo track ya llegó al final,
-  // sin importar si el informe quedó aprobado o no — sobre ESE subconjunto
-  // se mide cuántas todavía no tienen informe / no tienen OC vinculada (un
-  // trabajo terminado sin su papeleo es la señal de alerta real; contar
-  // "sin informe" sobre el total mezclaría OTs que ni siquiera empezaron).
-  const completadasOEntregadas = abiertas.filter((o) => o.estadoGeneral === "completada" || o.estadoGeneral === "entregada");
-  const conInforme = completadasOEntregadas.filter((o) => o.estadoInformes !== "pendiente").length;
+  // "Trabajo terminado" = cualquier OT de "terminado" en adelante — sobre ESE
+  // subconjunto se mide cuántas todavía no tienen informe / no tienen OC
+  // vinculada (un trabajo terminado sin su papeleo es la señal de alerta
+  // real; contar "sin informe" sobre el total mezclaría OTs que ni siquiera
+  // empezaron).
+  const conTrabajoTerminado = abiertas.filter((o) => !["pendiente", "en progreso"].includes(o.estadoGeneral));
+  const conInforme = conTrabajoTerminado.filter((o) => o.estadoInformes !== "pendiente").length;
 
   const cotizacionesConOC = new Set(ocs.map((oc) => oc.cotizacion?._id).filter(Boolean));
   const tieneOC = (o) => !!o.cotizacion && cotizacionesConOC.has(o.cotizacion._id || o.cotizacion);
-  const conOC = completadasOEntregadas.filter(tieneOC).length;
+  const conOC = conTrabajoTerminado.filter(tieneOC).length;
 
   return (
     <div className="p-6 space-y-8 max-w-6xl mx-auto">
@@ -267,26 +282,25 @@ function DashboardPlanner({ ots, ocs }) {
         <p className="text-sm text-gray-400 mt-0.5">Indicadores de avance — {totalOTs} OTs en total</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-        <KpiCard label="OTs pendientes"   value={pendientes}  sub={`de ${totalOTs} OTs en total`} color="amber" />
-        <KpiCard label="OTs en progreso"  value={enProgreso}  sub={`de ${totalOTs} OTs en total`} color="blue"  />
-        <KpiCard label="OTs completadas"  value={completadas} sub={`de ${totalOTs} OTs en total`} color="green" />
-        <KpiCard label="OTs entregadas"   value={entregadas}  sub={`de ${totalOTs} OTs en total`} color="green" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        {kpisServicio.map((k) => (
+          <KpiCard key={k.valor} label={`OTs: ${k.label}`} value={k.total} sub={`de ${totalOTs} OTs en total`} color={COLOR_KPI_SERVICIO[k.valor]} />
+        ))}
       </div>
 
       <div className="rounded-2xl border border-gray-100 bg-white shadow-sm p-5 flex flex-col gap-5">
         <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-          Papeleo pendiente en OTs ya completadas o entregadas
+          Papeleo pendiente en OTs con trabajo terminado
         </p>
         <FilaConversion
-          labelOrigen="OTs completadas o entregadas" labelDestino="Informe"
-          totalOrigen={completadasOEntregadas.length} enlazados={conInforme}
+          labelOrigen="OTs con trabajo terminado" labelDestino="Informe"
+          totalOrigen={conTrabajoTerminado.length} enlazados={conInforme}
           colorBarra="bg-sky-500" colorDestino="text-sky-700"
         />
         <div className="border-t border-gray-100" />
         <FilaConversion
-          labelOrigen="OTs completadas o entregadas" labelDestino="OC"
-          totalOrigen={completadasOEntregadas.length} enlazados={conOC}
+          labelOrigen="OTs con trabajo terminado" labelDestino="OC"
+          totalOrigen={conTrabajoTerminado.length} enlazados={conOC}
           colorBarra="bg-violet-500" colorDestino="text-violet-700"
         />
       </div>
@@ -322,11 +336,11 @@ export default function Dashboard() {
     ...facts.map((f) => anioLima(f.fechaEmision)),
     ...cots.map((c) => c.fecha ? anioLima(c.fecha) : null),
     ...ocs.map((o) => o.fecha  ? anioLima(o.fecha)  : null),
-    ...ots.map((o) => o.fecha  ? anioLima(o.fecha)  : null),
+    ...ots.map((o) => fechaOT(o) ? anioLima(fechaOT(o)) : null),
   ].filter(Boolean))].sort((a, b) => b - a);
 
   // ── Arrays filtrados ─────────────────────────────────────────────────────
-  const otsFiltradas   = porFecha(ots,   "fecha",        filtroAno, filtroMes);
+  const otsFiltradas   = porFecha(ots,   fechaOT,        filtroAno, filtroMes);
   const factsFiltradas = porFecha(facts, "fechaEmision", filtroAno, filtroMes);
   const cotsFiltradas  = porFecha(cots,  "fecha",        filtroAno, filtroMes);
   const ocsFiltradas   = porFecha(ocs,   "fecha",        filtroAno, filtroMes);
@@ -341,7 +355,13 @@ export default function Dashboard() {
     return Object.entries(map).map(([name, value]) => ({ name, value }));
   };
 
-  const datosOT   = contarPor(otsFiltradas,   "estado");
+  // Estado del servicio: por OT principal (las sub-OTs ya se reflejan en su
+  // padre) y sin anuladas — mismo criterio que el panel de planner.
+  const otsServicio = otsFiltradas.filter((o) => !o.ordenPadre && !o.anulado);
+  const kpisServicio = ESTADOS_SERVICIO.map((e) => ({
+    ...e, total: otsServicio.filter((o) => o.estadoGeneral === e.valor).length,
+  }));
+  const datosOT   = kpisServicio.filter((k) => k.total > 0).map((k) => ({ name: k.label, value: k.total }));
   const datosFact = contarPor(factsFiltradas, "estadoPago");
 
   // ── KPIs ─────────────────────────────────────────────────────────────────
@@ -427,6 +447,13 @@ export default function Dashboard() {
         <KpiCard label="Facturas sin pago"  value={facturasSinPago}  sub={`${factsFiltradas.length} facturas en total`} color="red" />
       </div>
 
+      {/* KPIs — estado del servicio */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        {kpisServicio.map((k) => (
+          <KpiCard key={k.valor} label={`OTs: ${k.label}`} value={k.total} sub={`de ${otsServicio.length} OTs`} color={COLOR_KPI_SERVICIO[k.valor]} />
+        ))}
+      </div>
+
       {/* KPIs — fila 1b */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <KpiCard label="Detracciones por pagar" value={detraccionesPorPagar} sub={`${factsFiltradas.filter(f => Number(f.detraccion) > 0).length} facturas con detracción`} color="amber" />
@@ -444,7 +471,7 @@ export default function Dashboard() {
       {/* Gráficos */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <GraficoDona
-          titulo="Órdenes de Trabajo por estado"
+          titulo="Órdenes de Trabajo por estado del servicio"
           datos={datosOT}
           colores={COLOR_OT}
         />

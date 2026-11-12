@@ -57,7 +57,7 @@ export default function Empresas() {
 
   return (
     <div className="p-6 m-0">
-      <div className="flex flex-wrap justify-between items-center mb-6">
+      <div className="flex flex-wrap justify-between items-center mb-6 barra-filtros barra-filtros-plana">
         <h2 className="text-xl font-semibold text-gray-800 mb-2">Empresas</h2>
         <div className="flex flex-wrap items-center gap-3">
           <input
@@ -77,7 +77,7 @@ export default function Empresas() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <TablaScroll className="overflow-x-auto">
+        <TablaScroll className="overflow-x-auto" fija>
         <table className="w-full text-sm min-w-[600px]">
           <thead className="bg-gray-500 text-white text-xs uppercase">
             <tr>

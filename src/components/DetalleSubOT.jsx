@@ -6,6 +6,7 @@ import FormInformeTecnico from "./FormInformeTecnico";
 import VistaInformeTecnico from "./VistaInformeTecnico";
 import ModalRequerimiento from "./ModalRequerimiento";
 import TablaServiciosExternos from "./TablaServiciosExternos";
+import TarjetaDatosAdjuntos from "./TarjetaDatosAdjuntos";
 import TablaScroll from "./TablaScroll";
 import { Chip, BotonAnular, BotonCerrarCadena, BotonDesanular, BannerAnulado, bloqueadoPorCadenaCerrada } from "./detalleShared";
 
@@ -13,12 +14,12 @@ const CATEGORIAS_SERVICIO = ["SOPORTE", "DEVOLUCION", "DIAGNOSTICO", "GARANTIA",
 
 const INP = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 w-full transition";
 
-const ESTADOS = ["pendiente", "en progreso", "completado", "entregado"];
+const ESTADOS = ["pendiente", "en progreso", "terminado", "completado"];
 
 const colorEstado = (e, activo) => {
   if (!activo) return "bg-gray-100 text-gray-500 hover:bg-gray-200";
-  if (e === "entregado")  return "bg-teal-600 text-white";
-  if (e === "completado") return "bg-green-600 text-white";
+  if (e === "completado") return "bg-teal-600 text-white";
+  if (e === "terminado")  return "bg-green-600 text-white";
   if (e === "en progreso") return "bg-blue-600 text-white";
   return "bg-amber-500 text-white";
 };
@@ -601,6 +602,9 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
           <TablaServiciosExternos ot={ot} servicios={servicios}
             puedeEditar={puedeEditarCampos} onCambio={cargarRelaciones} />
         )}
+
+        <TarjetaDatosAdjuntos ordenId={ot._id} archivos={ot.archivos || []}
+          soloLectura={ot.anulado || cadenaCerrada} onCambio={setOt} />
       </div>
 
       {crearRequerimientoOpen && (

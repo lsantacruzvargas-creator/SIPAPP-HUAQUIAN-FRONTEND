@@ -35,7 +35,7 @@ function Seccion({ titulo, acento, count, children }) {
         <span className="text-xs text-gray-400">({count})</span>
       </div>
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <TablaScroll className="overflow-x-auto">
+        <TablaScroll className="overflow-x-auto" fija>
           <table className="w-full text-sm">{children}</table>
         </TablaScroll>
       </div>
@@ -179,7 +179,7 @@ export default function Reportes() {
           <p className="text-2xl sm:text-3xl font-bold text-gray-900">{money(data.valorizado.total)}</p>
         </div>
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-          <TablaScroll className="overflow-x-auto">
+          <TablaScroll className="overflow-x-auto" fija>
             <table className="w-full text-sm">
               <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-200">
                 <tr>

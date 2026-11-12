@@ -413,7 +413,7 @@ function SeccionMateriales() {
       </div>
 
       {/* Buscador */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 barra-filtros barra-filtros-plana">
         <input
           value={busqueda} onChange={(e) => setBusqueda(e.target.value)}
           className={`flex-1 ${INP}`} placeholder="Buscar por SKU, título o descripción…" />
@@ -429,7 +429,7 @@ function SeccionMateriales() {
 
       {/* Tabla — ancha al 80vw (se sale del contenedor max-w-6xl de la página) */}
       <div className="relative left-1/2 -ml-[40vw] w-[80vw] max-w-[80vw] bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-        <TablaScroll className="overflow-x-auto">
+        <TablaScroll className="overflow-x-auto" fija>
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
@@ -1510,7 +1510,7 @@ function SeccionMovimientos() {
   return (
     <div className="space-y-5">
       {/* Acciones y filtros */}
-      <div className="flex flex-wrap gap-3 items-center">
+      <div className="flex flex-wrap gap-3 items-center barra-filtros barra-filtros-plana">
         <button onClick={() => setModalIngreso(true)}
           className="text-sm bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition font-medium">
           + Ingreso
@@ -1560,7 +1560,7 @@ function SeccionMovimientos() {
 
       {/* Tabla — ancha al 90vw (se sale del contenedor max-w-6xl de la página) */}
       <div className="relative left-1/2 -ml-[45vw] w-[90vw] max-w-[90vw] bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-        <TablaScroll className="overflow-x-auto">
+        <TablaScroll className="overflow-x-auto" fija>
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>

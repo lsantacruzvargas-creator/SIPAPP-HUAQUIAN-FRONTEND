@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from "react";
 // además de la de abajo (la única que da el navegador sobre el contenedor
 // overflow-x-auto) — en tablas largas la de abajo queda fuera de vista sin
 // bajar hasta el final. Las dos barras se sincronizan entre sí.
-export default function TablaScroll({ children, className = "" }) {
+// `fija` (páginas de lista): alto máximo con scroll propio y cabecera pegada
+// arriba (ver .tabla-fija en index.css).
+export default function TablaScroll({ children, className = "", fija = false }) {
   const topRef = useRef(null);
   const bottomRef = useRef(null);
   const sincronizandoRef = useRef(false);
@@ -28,7 +30,7 @@ export default function TablaScroll({ children, className = "" }) {
       <div ref={topRef} className="overflow-x-auto" style={{ height: 12 }} onScroll={sincronizar(topRef, bottomRef)}>
         <div style={{ width: ancho, height: 1 }} />
       </div>
-      <div ref={bottomRef} className={className} onScroll={sincronizar(bottomRef, topRef)}>
+      <div ref={bottomRef} className={`${className} ${fija ? "tabla-fija" : ""}`} onScroll={sincronizar(bottomRef, topRef)}>
         {children}
       </div>
     </>

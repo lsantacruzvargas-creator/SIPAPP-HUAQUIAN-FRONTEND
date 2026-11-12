@@ -158,7 +158,7 @@ function TablaFacturas({ titulo, acento, facturas, onSelect, handlePagoMonto, ha
         <span className="text-xs text-gray-400">({facturas.length})</span>
       </div>
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <TablaScroll className="overflow-x-auto">
+        <TablaScroll className="overflow-x-auto" fija>
           <table className="w-full text-sm" style={{ minWidth: "1000px" }}>
             <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-200">
               <tr>
@@ -613,7 +613,7 @@ export default function ListaFacturas() {
       </div>
 
       {/* Filtros */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-5 flex flex-wrap gap-3 items-center">
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-5 flex flex-wrap gap-3 items-center barra-filtros">
         <select name="empresa" value={filtros.empresa} onChange={handleEmpresa} className={SELECT}>
           <option value="">Toda empresa</option>
           {empresasLista.map(e => (

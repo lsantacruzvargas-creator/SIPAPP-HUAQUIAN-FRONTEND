@@ -297,10 +297,36 @@ export function calcularLineaComprobante(item) {
   const base = baseAntesDescuento - montoDescuento;
   const igv  = item.afectacion === "10" ? base * 0.18 : 0;
   return {
+    // Sin redondear: los totales del comprobante se suman con estos (ver totalesComprobante).
+    baseExacta:      base,
+    igvExacto:       igv,
+    descuentoExacto: montoDescuento,
     baseAntesDescuento: Math.round(baseAntesDescuento * 100) / 100,
     montoDescuento:     Math.round(montoDescuento * 100) / 100,
     base:               Math.round(base * 100) / 100,
     igv:                Math.round(igv * 100) / 100,
     total:              Math.round((base + igv) * 100) / 100,
+  };
+}
+
+const r2 = (n) => Math.round(n * 100) / 100;
+
+// Totales del comprobante con el MISMO cálculo que calcularTotales() del
+// backend (comprobante.controller.js), que es el que va al XML: se suman las
+// líneas sin redondear y se redondea una sola vez al final. Sumar las líneas
+// ya redondeadas puede dar un céntimo distinto, y entonces las cuotas que se
+// arman con este total no cuadran con el neto pendiente del XML (SUNAT 3319,
+// SIPAPP-HUAQUIAN 2026-11-12: 3422.58 en pantalla vs 3422.57 en el XML).
+export function totalesComprobante(lineas, otrosCargos = 0, montoRedondeo = 0) {
+  const s = lineas.reduce(
+    (acc, l) => ({ base: acc.base + l.baseExacta, igv: acc.igv + l.igvExacto, descuento: acc.descuento + l.descuentoExacto }),
+    { base: 0, igv: 0, descuento: 0 }
+  );
+  return {
+    base:       r2(s.base),
+    igv:        r2(s.igv),
+    descuento:  r2(s.descuento),
+    total:      r2(s.base + s.igv),
+    totalPagar: r2(s.base + (Number(otrosCargos) || 0) + s.igv + (Number(montoRedondeo) || 0)),
   };
 }

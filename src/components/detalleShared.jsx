@@ -204,8 +204,8 @@ export const badgePago = (e) => {
   return "bg-red-100 text-red-700";
 };
 export const badgeOT = (e) => {
-  if (e === "entregado")   return "bg-teal-100 text-teal-700";
-  if (e === "completado")  return "bg-green-100 text-green-700";
+  if (e === "completado")  return "bg-teal-100 text-teal-700";
+  if (e === "terminado")   return "bg-green-100 text-green-700";
   if (e === "en progreso") return "bg-blue-100 text-blue-700";
   if (e === "pendiente")   return "bg-amber-100 text-amber-700";
   return "bg-gray-100 text-gray-500";
@@ -217,8 +217,8 @@ export const dotPago = (e) => {
   return "bg-gray-400";
 };
 export const dotOT = (e) => {
-  if (e === "entregado")   return "bg-teal-500";
-  if (e === "completado")  return "bg-green-500";
+  if (e === "completado")  return "bg-teal-500";
+  if (e === "terminado")   return "bg-green-500";
   if (e === "en progreso") return "bg-blue-500";
   if (e === "pendiente")   return "bg-amber-500";
   return "bg-gray-300";
@@ -240,22 +240,18 @@ export const dotInformes = (e) => {
   return "bg-gray-300"; // pendiente
 };
 
-// Estado general de la OT (ver Backend/src/utils/estadoGeneralOT.js) —
-// combina asignación de técnicos, progreso y aprobación de Informe.
-export const badgeGeneral = (e) => {
-  if (e === "entregada")   return "bg-teal-100 text-teal-700";
-  if (e === "completada")  return "bg-green-100 text-green-700";
-  if (e === "en progreso") return "bg-blue-100 text-blue-700";
-  if (e === "pendiente")   return "bg-amber-100 text-amber-700";
-  return "bg-gray-100 text-gray-500"; // no asignado
-};
-export const dotGeneral = (e) => {
-  if (e === "entregada")   return "bg-teal-500";
-  if (e === "completada")  return "bg-green-500";
-  if (e === "en progreso") return "bg-blue-500";
-  if (e === "pendiente")   return "bg-amber-500";
-  return "bg-gray-300"; // no asignado
-};
+// Estado del servicio de la OT (`estadoGeneral`, ver
+// Backend/src/utils/estadoGeneralOT.js), en orden de avance.
+export const ESTADOS_SERVICIO = [
+  { valor: "pendiente",   label: "Pendiente",   badge: "bg-amber-100 text-amber-700",   dot: "bg-amber-500" },
+  { valor: "en progreso", label: "En progreso", badge: "bg-blue-100 text-blue-700",     dot: "bg-blue-500" },
+  { valor: "terminado",   label: "Terminado",   badge: "bg-green-100 text-green-700",   dot: "bg-green-500" },
+  { valor: "entregado",   label: "Entregado",   badge: "bg-teal-100 text-teal-700",     dot: "bg-teal-500" },
+  { valor: "completado",  label: "Completado",  badge: "bg-violet-100 text-violet-700", dot: "bg-violet-500" },
+  { valor: "facturado",   label: "Facturado",   badge: "bg-indigo-100 text-indigo-700", dot: "bg-indigo-500" },
+];
+export const badgeGeneral = (e) => ESTADOS_SERVICIO.find((s) => s.valor === e)?.badge || "bg-gray-100 text-gray-500";
+export const dotGeneral = (e) => ESTADOS_SERVICIO.find((s) => s.valor === e)?.dot || "bg-gray-300";
 
 // Una vez que la cadena de un documento se cierra (factura pagada), el
 // documento entero queda de solo lectura para todos los roles salvo

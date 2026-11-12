@@ -172,6 +172,52 @@ input[type="number"] {
   appearance: textfield;
 }
 
+/* Listas con cabecera y filtros fijos.
+   .tabla-fija: el contenedor de la tabla (TablaScroll) ya es overflow-x-auto,
+   y eso lo vuelve contenedor de scroll también en vertical — un thead
+   sticky solo puede pegarse dentro de él, no de la página. Por eso cada
+   tabla tiene alto máximo y scroll propio. Se resta el alto aproximado de
+   la barra de filtros fija para que la tabla entera quepa debajo de ella.
+   .barra-filtros: se pega al tope de la página; en móvil, debajo de la barra
+   superior del Sidebar (h-14). */
+.tabla-fija {
+  max-height: calc(100dvh - 12rem);
+  overflow: auto;
+}
+.tabla-fija > table > thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.tabla-fija > table > thead > tr > th {
+  box-shadow: inset 0 -1px 0 rgb(0 0 0 / 0.08);
+}
+.tabla-fija > table > thead:not([class*="bg-"]) {
+  background-color: #fff;
+}
+[data-theme="oscuro"] .tabla-fija > table > thead:not([class*="bg-"]),
+[data-theme="sepia"] .tabla-fija > table > thead:not([class*="bg-"]) {
+  background-color: var(--bg-surface);
+}
+.barra-filtros {
+  position: sticky;
+  top: 3.5rem;
+  z-index: 30;
+}
+@media (min-width: 768px) {
+  .barra-filtros { top: 0; }
+}
+/* Barras sin tarjeta propia: necesitan el fondo de la página para que las
+   filas no se vean a través al hacer scroll. */
+.barra-filtros-plana {
+  background-color: var(--color-gray-100);
+  padding-block: 0.5rem;
+}
+[data-theme="oscuro"] .barra-filtros-plana,
+[data-theme="sepia"] .barra-filtros-plana {
+  background-color: var(--bg-page);
+}
+
 @layer components {
   .btn-primary {
     @apply bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed;

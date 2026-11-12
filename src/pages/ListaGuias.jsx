@@ -69,7 +69,7 @@ export default function ListaGuias() {
       </div>
 
       {/* Filtros */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-5 flex flex-wrap gap-3 items-center">
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-5 flex flex-wrap gap-3 items-center barra-filtros">
         <select name="tipoGuia" value={filtros.tipoGuia} onChange={handleFiltro} className={SELECT}>
           <option value="">Todo tipo</option>
           {TIPO_GUIA.map((t) => (
@@ -94,7 +94,7 @@ export default function ListaGuias() {
 
       {/* Tabla */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <TablaScroll className="overflow-x-auto">
+        <TablaScroll className="overflow-x-auto" fija>
         <table className="erp-table w-full text-sm min-w-[1050px]">
           <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-100">
             <tr>

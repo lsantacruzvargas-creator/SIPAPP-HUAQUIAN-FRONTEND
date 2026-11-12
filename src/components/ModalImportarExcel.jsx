@@ -110,9 +110,9 @@ export const COLS_COTIZACIONES = [
 // y al presionar Enter se consulta SUNAT/Decolecta (ver ModalEmpresa.jsx) y
 // rellena razón social + dirección. "Estado de la orden" mapea directo al
 // enum de estado (Encargado Intervención) — "No asignado" deja la OT sin
-// técnico asignado (queda pendiente); las otras 3 opciones guardan el
-// avance real, aunque sin un técnico asignado la tabla la siga mostrando
-// como "No asignado" hasta que alguien lo asigne a mano.
+// técnico asignado (queda pendiente); las otras opciones guardan el avance
+// real, aunque sin un técnico asignado el servicio siga en "Pendiente"
+// hasta que alguien lo asigne a mano.
 export const COLS_OT = [
   { key: "numeroOT",             label: "OT" },
   { key: "ruc",                  label: "RUC", requerido: true },

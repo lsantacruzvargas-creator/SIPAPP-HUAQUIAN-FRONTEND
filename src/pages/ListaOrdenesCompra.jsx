@@ -7,7 +7,7 @@ import { DotChip, badgeOT, dotOT, badgeInformes, dotInformes } from "../componen
 import TablaScroll from "../components/TablaScroll";
 import * as XLSX from "xlsx";
 
-const ESTADOS_OT = ["", "pendiente", "en progreso", "completado"];
+const ESTADOS_OT = ["", "pendiente", "en progreso", "terminado", "completado"];
 const MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 const TH = "px-4 py-3 font-semibold text-gray-500 whitespace-nowrap";
 
@@ -78,7 +78,7 @@ function TablaOC({
         <span className="text-xs text-gray-400">({ordenes.length})</span>
       </div>
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <TablaScroll className="overflow-x-auto">
+        <TablaScroll className="overflow-x-auto" fija>
         <table className="w-full text-sm" style={{ minWidth: `${totalColumnas * 85}px` }}>
           <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-200">
             <tr>
@@ -480,7 +480,7 @@ export default function ListaOrdenesCompra() {
       </div>
 
       {/* Filtros */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-5 flex gap-3 flex-wrap items-center">
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-5 flex gap-3 flex-wrap items-center barra-filtros">
         <select
           value={anio}
           onChange={(e) => setAnio(e.target.value ? Number(e.target.value) : "")}

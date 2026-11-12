@@ -6,7 +6,7 @@ import DetalleDocumento from "../components/DetalleDocumento";
 import ModalImportarExcel, { COLS_COT_OT, COLS_COTIZACIONES } from "../components/ModalImportarExcel";
 import ModalNuevaOT from "../components/ModalNuevaOT";
 import ModalNuevaCotizacion from "../components/ModalNuevaCotizacion";
-import { DotChip, badgeGeneral, dotGeneral } from "../components/detalleShared";
+import { DotChip, badgeGeneral, dotGeneral, ESTADOS_SERVICIO } from "../components/detalleShared";
 import TablaScroll from "../components/TablaScroll";
 import * as XLSX from "xlsx";
 
@@ -18,14 +18,7 @@ const MESES = [
 const FILTROS_VACIO = { empresa: "", planta: "", ano: "", mes: "", oc: "", estadoServicio: "", busqueda: "", informeEnviado: false };
 
 // Valores de OrdenTrabajo.estadoGeneral; "sin_ot" = la cotización todavía no tiene OT (columna en "—").
-const ESTADOS_SERVICIO = [
-  { valor: "no asignado", label: "No asignado" },
-  { valor: "pendiente",   label: "Pendiente" },
-  { valor: "en progreso", label: "En progreso" },
-  { valor: "completada",  label: "Completada" },
-  { valor: "entregada",   label: "Entregada" },
-  { valor: "sin_ot",      label: "Sin OT" },
-];
+const FILTRO_ESTADOS_SERVICIO = [...ESTADOS_SERVICIO, { valor: "sin_ot", label: "Sin OT" }];
 
 const VISTAS = [
   { valor: "todasLasCotizaciones", label: "Todas las cotizaciones" },
@@ -105,7 +98,7 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
         <span className="text-xs text-gray-400">({cotizaciones.length})</span>
       </div>
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <TablaScroll className="overflow-x-auto">
+        <TablaScroll className="overflow-x-auto" fija>
         <table className="w-full text-sm" style={{ minWidth: "1000px" }}>
           <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-200">
             <tr>
@@ -493,7 +486,7 @@ export default function ListaCotizaciones() {
       </div>
 
       {/* Filtros */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-5 flex flex-wrap gap-3 items-center">
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-5 flex flex-wrap gap-3 items-center barra-filtros">
         <select name="empresa" value={filtros.empresa} onChange={handleEmpresa} className={SELECT}>
           <option value="">Toda empresa</option>
           {empresasLista.map((e) => (
@@ -534,7 +527,7 @@ export default function ListaCotizaciones() {
 
         <select name="estadoServicio" value={filtros.estadoServicio} onChange={handleFiltro} className={SELECT}>
           <option value="">Todo estado de servicio</option>
-          {ESTADOS_SERVICIO.map(({ valor, label }) => (
+          {FILTRO_ESTADOS_SERVICIO.map(({ valor, label }) => (
             <option key={valor} value={valor}>{label}</option>
           ))}
         </select>

@@ -274,7 +274,7 @@ export default function ListaComprobantes() {
       </div>
 
       {/* Filtros */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-5 flex flex-wrap gap-3 items-center">
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-5 flex flex-wrap gap-3 items-center barra-filtros">
         <select name="tipoDoc" value={filtros.tipoDoc} onChange={handleFiltro} className={SELECT}>
           <option value="">Todo tipo</option>
           {TIPO_DOC_CPE.map((t) => (
@@ -303,7 +303,7 @@ export default function ListaComprobantes() {
 
       {/* Tabla */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <TablaScroll className="overflow-x-auto">
+        <TablaScroll className="overflow-x-auto" fija>
         <table className="erp-table w-full text-sm min-w-[700px]">
           <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-100">
             <tr>

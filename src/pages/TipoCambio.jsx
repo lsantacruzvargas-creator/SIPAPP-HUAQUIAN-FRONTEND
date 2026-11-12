@@ -136,7 +136,7 @@ export default function TipoCambio() {
       {tc?.historial?.length > 0 && (
         <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
           <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide mb-3">Historial de cambios</h2>
-          <TablaScroll className="overflow-x-auto">
+          <TablaScroll className="overflow-x-auto" fija>
             <table className="w-full text-sm">
               <thead className="text-xs uppercase tracking-wide text-gray-400 border-b border-gray-100">
                 <tr>

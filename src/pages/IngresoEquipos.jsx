@@ -5,12 +5,12 @@ import ModalOTEquipo from "../components/ModalOTEquipo";
 import TablaScroll from "../components/TablaScroll";
 
 const ESTADOS = ["recibido", "en diagnóstico", "en reparación", "listo", "entregado"];
-const ESTADOS_OT = ["pendiente", "en progreso", "completado", "entregado"];
+const ESTADOS_OT = ["pendiente", "en progreso", "terminado", "completado"];
 const MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 
 const badgeOT = (e) => {
-  if (e === "entregado")   return "bg-teal-50 text-teal-700";
-  if (e === "completado")  return "bg-green-50 text-green-700";
+  if (e === "completado")  return "bg-teal-50 text-teal-700";
+  if (e === "terminado")   return "bg-green-50 text-green-700";
   if (e === "en progreso") return "bg-blue-50 text-blue-700";
   if (e === "pendiente")   return "bg-amber-50 text-amber-700";
   return "bg-gray-100 text-gray-400";
@@ -178,7 +178,7 @@ export default function IngresoEquipos() {
       </div>
 
       {/* Filtros */}
-      <div className="flex gap-3 mb-4 flex-wrap">
+      <div className="flex gap-3 mb-4 flex-wrap barra-filtros barra-filtros-plana">
         <select
           value={empresaFiltro}
           onChange={(e) => { setEmpresaFiltro(e.target.value); setPlantaFiltro(""); }}
@@ -256,7 +256,7 @@ export default function IngresoEquipos() {
       </div>
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <TablaScroll className="overflow-x-auto">
+        <TablaScroll className="overflow-x-auto" fija>
         <table className="w-full text-sm min-w-[600px]">
           <thead className="bg-gray-500 text-white text-xs uppercase">
             <tr>

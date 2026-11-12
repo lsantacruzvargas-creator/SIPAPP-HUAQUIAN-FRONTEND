@@ -68,12 +68,14 @@ export default function Inventario() {
         <p className="text-sm text-gray-400 mt-0.5">Consulta de stock disponible por material</p>
       </div>
 
-      <input
-        value={busqueda} onChange={(e) => setBusqueda(e.target.value)}
-        className={`w-full ${INP}`} placeholder="Buscar por SKU, título o descripción…" />
+      <div className="barra-filtros barra-filtros-plana">
+        <input
+          value={busqueda} onChange={(e) => setBusqueda(e.target.value)}
+          className={`w-full ${INP}`} placeholder="Buscar por SKU, título o descripción…" />
+      </div>
 
       {/* Tabla — ancha al 90vw (se sale del contenedor max-w-5xl de la página), columnas con ancho fijo para evitar desborde */}
-      <div className="relative left-1/2 -ml-[45vw] w-[90vw] max-w-[90vw] bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+      <div className="relative left-1/2 -ml-[45vw] w-[90vw] max-w-[90vw] bg-white border border-gray-100 rounded-2xl shadow-sm tabla-fija">
         <table className="w-full text-sm table-fixed">
           <colgroup>
             <col className="w-[5%]" />

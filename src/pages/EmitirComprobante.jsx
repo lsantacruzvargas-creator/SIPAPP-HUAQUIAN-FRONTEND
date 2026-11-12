@@ -15,6 +15,7 @@ import {
   itemVacioComprobante,
   precioUnitarioDesdeValor,
   calcularLineaComprobante,
+  totalesComprobante,
   documentoValido,
   serieValida,
   formatearGuiaRemision,
@@ -302,19 +303,11 @@ export default function EmitirComprobante() {
     ...i,
     ...calcularLineaComprobante({ ...i, descuentoPorcentaje: (Number(i.descuentoPorcentaje) || 0) / 100 }),
   }));
-  const totales = itemsCalc.reduce(
-    (acc, i) => ({
-      base:       acc.base + i.base,
-      igv:        acc.igv + i.igv,
-      descuento:  acc.descuento + i.montoDescuento,
-      total:      acc.total + i.total,
-    }),
-    { base: 0, igv: 0, descuento: 0, total: 0 }
-  );
   const otrosCargosNum   = Number(otrosCargos) || 0;
   const montoRedondeoNum = Number(montoRedondeo) || 0;
-  const totalGeneral = totales.total + otrosCargosNum + montoRedondeoNum;
-  const sumaCuotas = cuotas.reduce((s, c) => s + (Number(c.monto) || 0), 0);
+  const totales = totalesComprobante(itemsCalc, otrosCargosNum, montoRedondeoNum);
+  const totalGeneral = totales.totalPagar;
+  const sumaCuotas = Math.round(cuotas.reduce((s, c) => s + (Number(c.monto) || 0), 0) * 100) / 100;
 
   // Monto neto a depositar = detraccionPorcentaje% del total a pagar — ya no es un input libre,
   // se deriva siempre del total y el porcentaje vigente (evita que quede desincronizado si el
@@ -370,7 +363,9 @@ export default function EmitirComprobante() {
   // total legal del comprobante, el que va al XML/SUNAT) no cambia — esto
   // es solo para la validación/visualización de cuotas. Pedido explícito
   // del usuario, 2026-09-15.
-  const montoNetoPendiente = totalGeneral - detraccionMontoMoneda - retencionMonto;
+  const montoNetoPendiente = Math.round((totalGeneral - detraccionMontoMoneda - retencionMonto) * 100) / 100;
+  // SUNAT exige igualdad exacta al céntimo (3319) — sin tolerancia de ±0.01.
+  const cuotasCuadran = Math.abs(sumaCuotas - montoNetoPendiente) < 0.005;
 
   const ro = !!resultado?.ok;
 
@@ -453,7 +448,7 @@ export default function EmitirComprobante() {
         if (!c.monto || Number(c.monto) <= 0) return "Cada cuota debe tener un monto mayor a 0.";
         if (!c.fechaVencimiento) return "Cada cuota debe tener una fecha de vencimiento.";
       }
-      if (Math.abs(sumaCuotas - montoNetoPendiente) > 0.01) {
+      if (!cuotasCuadran) {
         return `La suma de las cuotas (${moneda} ${sumaCuotas.toFixed(2)}) debe ser igual al monto neto pendiente (${moneda} ${montoNetoPendiente.toFixed(2)}).`;
       }
     }
@@ -809,7 +804,7 @@ export default function EmitirComprobante() {
                             className="text-sm text-gray-500 hover:text-gray-800 transition">
                             + Agregar cuota
                           </button>
-                          <span className={`text-xs font-medium ${Math.abs(sumaCuotas - montoNetoPendiente) < 0.01 ? "text-green-600" : "text-red-500"}`}>
+                          <span className={`text-xs font-medium ${cuotasCuadran ? "text-green-600" : "text-red-500"}`}>
                             Suma de cuotas: {moneda} {sumaCuotas.toFixed(2)}
                           </span>
                         </div>

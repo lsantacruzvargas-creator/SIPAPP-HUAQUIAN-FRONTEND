@@ -11,6 +11,7 @@ import VistaInformeTecnico from "./VistaInformeTecnico";
 import ModalNuevaSubOT from "./ModalNuevaSubOT";
 import ModalRequerimiento from "./ModalRequerimiento";
 import TablaServiciosExternos from "./TablaServiciosExternos";
+import TarjetaDatosAdjuntos from "./TarjetaDatosAdjuntos";
 import TablaScroll from "./TablaScroll";
 import ModalGenerarGRE from "./ModalGenerarGRE";
 import ModalDetalleGuia from "./ModalDetalleGuia";
@@ -24,15 +25,15 @@ import {
 const INP = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 w-full transition";
 const RO = "bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 text-sm text-gray-600 w-full";
 
-const ESTADOS = ["pendiente", "en progreso", "completado", "entregado"];
+const ESTADOS = ["pendiente", "en progreso", "terminado", "completado"];
 const CATEGORIAS_SERVICIO = ["SOPORTE", "DEVOLUCION", "DIAGNOSTICO", "GARANTIA", "MANTENIMIENTO", "REPARACION", "PRESTAMO", "SUMINISTRO", "MANTENIMIENTO EN PLANTA"];
 
 const codigoDeGuia = (g) => `${g.serie}-${String(g.correlativo).padStart(4, "0")}`;
 
 const colorEstado = (e, activo) => {
   if (!activo) return "bg-gray-100 text-gray-500 hover:bg-gray-200";
-  if (e === "entregado") return "bg-teal-600 text-white";
-  if (e === "completado") return "bg-green-600 text-white";
+  if (e === "completado") return "bg-teal-600 text-white";
+  if (e === "terminado") return "bg-green-600 text-white";
   if (e === "en progreso") return "bg-blue-600 text-white";
   return "bg-amber-500 text-white";
 };
@@ -80,6 +81,8 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
   // puede anularla. Igual que técnico, supervisor no ve el resto de la
   // cadena (Cotización/OC/Factura).
   const puedeEditarCampos = ["admin", "jefatura", "supervisor", "planner", "coordinadora"].includes(rolActual);
+  // Mismos roles que crean una OT (puedeCrear en el backend).
+  const puedeDuplicar = ["admin", "asistente", "supervisor", "planner", "jefatura", "coordinadora"].includes(rolActual);
   // Anular un documento queda reservado a Admin y Jefatura — Facturación ya
   // no puede. Desanular y cerrar/abrir la cadena a mano son exclusivos de admin.
   const puedeAnular = ["admin", "jefatura"].includes(rolActual);
@@ -368,6 +371,25 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
   // el detalle de la cotización, vía ítems) era trabajo duplicado.
   const [confirmandoCrearCotizacion, setConfirmandoCrearCotizacion] = useState(false);
   const [creandoCotizacion, setCreandoCotizacion] = useState(false);
+  const [confirmandoDuplicar, setConfirmandoDuplicar] = useState(false);
+  const [duplicando, setDuplicando] = useState(false);
+
+  // Copia fiel (con sus sub-OTs) con N° nuevo y sin relaciones — ver POST /ordenes-trabajo/:id/duplicar.
+  const duplicar = async () => {
+    setDuplicando(true);
+    setError("");
+    try {
+      const res = await fetchAuth(`/ordenes-trabajo/${ot._id}/duplicar`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) onNavegar?.({ tipo: "ot", data });
+      else setError(data.mensaje || "Error al duplicar la orden de trabajo.");
+    } catch {
+      setError("Error de conexión con el servidor");
+    } finally {
+      setDuplicando(false);
+      setConfirmandoDuplicar(false);
+    }
+  };
 
   const crearCotizacion = async () => {
     setCreandoCotizacion(true);
@@ -527,6 +549,12 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
                 <Chip className="mt-1 bg-teal-400/30 text-white block">Informes aprobados</Chip>
               )}
             </div>
+            {puedeDuplicar && (
+              <button onClick={() => setConfirmandoDuplicar(true)} disabled={duplicando}
+                className="bg-white/15 text-white text-sm px-4 py-2 rounded-lg hover:bg-white/25 disabled:opacity-50 transition font-medium shrink-0">
+                Duplicar
+              </button>
+            )}
             {!ot.anulado && !cadenaCerrada && puedeAnular && <BotonAnular onAnular={anular} />}
             {esAdmin && ot.anulado && <BotonDesanular onDesanular={desanular} />}
             {esAdmin && <BotonCerrarCadena cerrado={cadenaCerrada} onToggle={toggleCerrarCadena} />}
@@ -1103,6 +1131,9 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
           <TablaServiciosExternos ot={ot} subOTs={subOTs} servicios={servicios}
             puedeEditar={puedeEditarCampos} onCambio={cargarRelaciones} />
         )}
+
+        <TarjetaDatosAdjuntos ordenId={ot._id} archivos={ot.archivos || []}
+          soloLectura={ot.anulado || cadenaCerrada} onCambio={setOt} />
       </div>
 
       {crearRequerimientoOpen && (
@@ -1131,6 +1162,16 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
 
       {guiaDetalle && (
         <ModalDetalleGuia guia={guiaDetalle} onClose={() => setGuiaDetalle(null)} />
+      )}
+
+      {confirmandoDuplicar && (
+        <ConfirmacionAccion
+          mensaje={`¿Crear una copia de la OT ${ot.numeroOT || ot.codigo}${subOTs.length ? ` con sus ${subOTs.length} sub-OT(s)` : ""}? La copia tendrá numeración nueva, avance en cero y ninguna cotización, guía, factura ni adjunto vinculado.`}
+          onCancelar={() => setConfirmandoDuplicar(false)}
+          onConfirmar={duplicar}
+          procesando={duplicando}
+          textoConfirmar="Duplicar"
+        />
       )}
 
       {confirmandoCrearCotizacion && (

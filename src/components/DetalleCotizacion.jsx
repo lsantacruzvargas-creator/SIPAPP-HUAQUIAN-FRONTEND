@@ -132,6 +132,8 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   const [generandoOT, setGenerandoOT] = useState(false);
   const [seleccionadosOC, setSeleccionadosOC] = useState(() => new Set());
   const [indicesNuevaOC, setIndicesNuevaOC] = useState(null);
+  const [confirmandoDuplicar, setConfirmandoDuplicar] = useState(false);
+  const [duplicando, setDuplicando] = useState(false);
   const rolActual = getUsuario()?.rol;
   const puedeEditar = ["admin", "asistente", "facturacion", "jefatura", "coordinadora", "planner"].includes(rolActual);
   // Anular un documento queda reservado a Admin y Jefatura — Facturación ya
@@ -266,6 +268,23 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
     setBusquedaEmpresa(e.target.value);
     setListaEmpresaAbierta(true);
     if (form.empresa) setForm(f => ({ ...f, empresa: "", planta: "", personaContacto: "" }));
+  };
+
+  // Copia fiel con N° nuevo y sin relaciones — ver POST /cotizaciones/:id/duplicar.
+  const duplicar = async () => {
+    setDuplicando(true);
+    setError("");
+    try {
+      const res = await fetchAuth(`/cotizaciones/${cot._id}/duplicar`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) onNavegar?.({ tipo: "cotizacion", data });
+      else setError(data.mensaje || "Error al duplicar la cotización.");
+    } catch {
+      setError("Error de conexión con el servidor");
+    } finally {
+      setDuplicando(false);
+      setConfirmandoDuplicar(false);
+    }
   };
 
   // Vincula una OT elegida desde BuscadorOrdenTrabajo a esta cotización — si
@@ -681,6 +700,12 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
               <button onClick={() => (esGloria ? exportarCotizacionGloriaPdf : esAlicorp ? exportarCotizacionAlicorpPdf : exportarCotizacionPdf)(datosParaPdf())}
                 className="bg-white/15 text-white text-sm px-4 py-2 rounded-lg hover:bg-white/25 transition font-medium shrink-0">
                 Exportar PDF
+              </button>
+            )}
+            {puedeEditar && (
+              <button onClick={() => setConfirmandoDuplicar(true)} disabled={duplicando}
+                className="bg-white/15 text-white text-sm px-4 py-2 rounded-lg hover:bg-white/25 disabled:opacity-50 transition font-medium shrink-0">
+                Duplicar
               </button>
             )}
             {!cot.anulado && !cadenaCerrada && puedeAnular && <BotonAnular onAnular={anular} />}
@@ -1469,6 +1494,16 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
               vincularOT(orden);
             }
           }}
+        />
+      )}
+
+      {confirmandoDuplicar && (
+        <ConfirmacionAccion
+          mensaje={`¿Crear una copia de la cotización ${cot.numeroCotizacion || cot.codigo} con todos sus ítems? La copia tendrá numeración nueva y ninguna OT, OC ni factura vinculada.`}
+          onCancelar={() => setConfirmandoDuplicar(false)}
+          onConfirmar={duplicar}
+          procesando={duplicando}
+          textoConfirmar="Duplicar"
         />
       )}
 

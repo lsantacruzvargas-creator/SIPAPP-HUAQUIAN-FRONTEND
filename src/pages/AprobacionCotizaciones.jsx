@@ -19,7 +19,7 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, otGroupMap, mostrarOT
         <span className="text-xs text-gray-400">({cotizaciones.length})</span>
       </div>
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <TablaScroll className="overflow-x-auto">
+        <TablaScroll className="overflow-x-auto" fija>
           <table className="w-full text-sm" style={{ minWidth: "900px" }}>
             <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-200">
               <tr>
@@ -180,7 +180,7 @@ export default function AprobacionCotizaciones() {
 
   return (
     <div className="p-6">
-      <div className="flex justify-between items-center mb-6 gap-4 flex-wrap">
+      <div className="flex justify-between items-center mb-6 gap-4 flex-wrap barra-filtros barra-filtros-plana">
         <div>
           <h2 className="text-xl font-semibold text-gray-800">Aprobación de Cotizaciones</h2>
           <span className="text-sm text-gray-400">{cotizaciones.length} cotización{cotizaciones.length !== 1 ? "es" : ""}</span>
