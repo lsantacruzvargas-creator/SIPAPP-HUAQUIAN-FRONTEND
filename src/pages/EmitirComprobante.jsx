@@ -1099,12 +1099,15 @@ export default function EmitirComprobante() {
                       <input type="number" value={detraccionMontoNeto} placeholder="0.00" disabled required
                         className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
                       {!enSoles && (
-                        <p className={`text-xs mt-1 ${tcDetraccion ? "text-amber-600" : "text-red-500"}`}>
-                          {cargandoTc ? "Consultando TC del día…"
-                            : tcDetraccion
-                              ? `Calculado con TC ${tcDetraccion.fuente === "SUNAT" ? "venta SUNAT" : "de la app"} del ${fechaTc}: ${tcDetraccion.valor} (US$ ${detraccionMontoMoneda.toFixed(2)} × ${tcDetraccion.valor})`
-                              : "Sin tipo de cambio: no se puede calcular en soles."}
-                        </p>
+                        cargandoTc ? <p className="text-xs mt-1 text-gray-500">Consultando TC del día…</p>
+                        : tcDetraccion ? (
+                          <div className="mt-1 inline-flex flex-col gap-0.5 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs text-amber-800">
+                            <span className="font-semibold">Va al XML: S/ {detraccionMontoNeto}</span>
+                            <span>US$ {detraccionMontoMoneda.toFixed(2)} × TC {tcDetraccion.valor}</span>
+                            <span className="text-amber-600">TC {tcDetraccion.fuente === "SUNAT" ? "venta SUNAT" : "de la app"} del {fechaTc}</span>
+                          </div>
+                        )
+                        : <p className="text-xs mt-1 text-red-500">Sin tipo de cambio: no se puede calcular en soles.</p>
                       )}
                     </div>
                     <div className="col-span-4">
