@@ -22,6 +22,8 @@ const TIPO_DOC_CLASE = {
 };
 
 const tipoDocTexto = (v) => TIPO_DOC_CPE.find((t) => t.valor === v)?.label.split(" — ")[1] ?? v;
+const simboloMoneda = (m) => (m === "USD" ? "US$" : !m || m === "PEN" ? "S/" : m);
+const nombreMoneda = (m) => (m === "USD" ? "Dólares (USD)" : !m || m === "PEN" ? "Soles (PEN)" : m);
 
 const leerBase64 = (archivo) => !archivo ? Promise.resolve(undefined) : new Promise((resolve, reject) => {
   const r = new FileReader();
@@ -378,6 +380,9 @@ export default function ListaComprobantes() {
               <div>
                 <h3 className="font-semibold text-gray-800">
                   {tipoDocTexto(seleccionado.tipoDoc)} {seleccionado.serie}-{String(seleccionado.correlativo).padStart(4, "0")}
+                  <span className={`ml-2 align-middle px-2 py-0.5 rounded-full text-xs font-medium ${seleccionado.moneda === "USD" ? "bg-blue-50 text-blue-700 border border-blue-200" : "bg-gray-100 text-gray-700 border border-gray-200"}`}>
+                    {nombreMoneda(seleccionado.moneda)}
+                  </span>
                 </h3>
                 <span className="font-mono text-xs text-gray-400">{seleccionado.nombreArchivo}</span>
               </div>
@@ -450,8 +455,8 @@ export default function ListaComprobantes() {
                 <tr>
                   <th className="px-3 py-2 text-left">Descripción</th>
                   <th className="px-3 py-2 text-right">Cant.</th>
-                  <th className="px-3 py-2 text-right">P. Unit.</th>
-                  <th className="px-3 py-2 text-right">Total</th>
+                  <th className="px-3 py-2 text-right">P. Unit. ({simboloMoneda(seleccionado.moneda)})</th>
+                  <th className="px-3 py-2 text-right">Total ({simboloMoneda(seleccionado.moneda)})</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -467,15 +472,15 @@ export default function ListaComprobantes() {
               <tfoot className="border-t-2 border-gray-100 bg-gray-50">
                 <tr>
                   <td colSpan={3} className="px-3 py-2 text-right text-xs text-gray-500">Base imponible</td>
-                  <td className="px-3 py-2 text-right font-medium">{seleccionado.totales?.baseImponible?.toFixed(2)}</td>
+                  <td className="px-3 py-2 text-right font-medium">{simboloMoneda(seleccionado.moneda)} {seleccionado.totales?.baseImponible?.toFixed(2)}</td>
                 </tr>
                 <tr>
                   <td colSpan={3} className="px-3 py-2 text-right text-xs text-gray-500">IGV</td>
-                  <td className="px-3 py-2 text-right font-medium">{seleccionado.totales?.totalIGV?.toFixed(2)}</td>
+                  <td className="px-3 py-2 text-right font-medium">{simboloMoneda(seleccionado.moneda)} {seleccionado.totales?.totalIGV?.toFixed(2)}</td>
                 </tr>
                 <tr>
                   <td colSpan={3} className="px-3 py-2 text-right text-sm font-semibold text-gray-800">Total</td>
-                  <td className="px-3 py-2 text-right font-bold text-gray-800">{seleccionado.totales?.totalPagar?.toFixed(2)}</td>
+                  <td className="px-3 py-2 text-right font-bold text-gray-800">{simboloMoneda(seleccionado.moneda)} {seleccionado.totales?.totalPagar?.toFixed(2)}</td>
                 </tr>
               </tfoot>
             </table>
@@ -488,7 +493,7 @@ export default function ListaComprobantes() {
                   <span>Porcentaje: {seleccionado.detraccion.porcentaje}%</span>
                   <span className="font-semibold">Monto detracción: S/ {Number(seleccionado.detraccion.montoSoles ?? seleccionado.detraccion.montoNeto).toFixed(2)}</span>
                   {seleccionado.detraccion.tipoCambio && (
-                    <span>US$ {Number(seleccionado.detraccion.montoNeto).toFixed(2)} × TC {seleccionado.detraccion.tipoCambio}</span>
+                    <span>{simboloMoneda(seleccionado.moneda)} {Number(seleccionado.detraccion.montoNeto).toFixed(2)} × TC {seleccionado.detraccion.tipoCambio}</span>
                   )}
                 </div>
               </div>
@@ -499,8 +504,8 @@ export default function ListaComprobantes() {
                 <p className="text-xs font-medium text-amber-700 mb-1">Retención del IGV</p>
                 <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-800">
                   <span>Porcentaje: {seleccionado.retencion.porcentaje}%</span>
-                  <span className="font-semibold">Monto retención: {Number(seleccionado.retencion.monto).toFixed(2)}</span>
-                  <span>Neto a cobrar: {(Number(seleccionado.totales?.totalPagar) - Number(seleccionado.retencion.monto)).toFixed(2)}</span>
+                  <span className="font-semibold">Monto retención: {simboloMoneda(seleccionado.moneda)} {Number(seleccionado.retencion.monto).toFixed(2)}</span>
+                  <span>Neto a cobrar: {simboloMoneda(seleccionado.moneda)} {(Number(seleccionado.totales?.totalPagar) - Number(seleccionado.retencion.monto)).toFixed(2)}</span>
                 </div>
               </div>
             )}
@@ -518,7 +523,7 @@ export default function ListaComprobantes() {
                   {seleccionado.cuotas.map((c, idx) => (
                     <tr key={idx}>
                       <td className="px-3 py-2">Cuota {String(c.numero ?? idx + 1).padStart(3, "0")}</td>
-                      <td className="px-3 py-2 text-right font-medium">{Number(c.monto).toFixed(2)}</td>
+                      <td className="px-3 py-2 text-right font-medium">{simboloMoneda(seleccionado.moneda)} {Number(c.monto).toFixed(2)}</td>
                       <td className="px-3 py-2 text-right text-gray-500">{formatearFecha(c.fechaVencimiento)}</td>
                     </tr>
                   ))}
