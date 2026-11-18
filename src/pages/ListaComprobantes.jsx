@@ -319,16 +319,17 @@ export default function ListaComprobantes() {
               <th className="px-4 py-3 text-left">Serie-Correlativo</th>
               <th className="px-4 py-3 text-center">Tipo</th>
               <th className="px-4 py-3 text-left">Receptor</th>
-              <th className="px-4 py-3 text-right">Total</th>
+              <th className="px-4 py-3 text-right">Total S/</th>
+              <th className="px-4 py-3 text-right">Total US$</th>
               <th className="px-4 py-3 text-center">Emisión</th>
               <th className="px-4 py-3 text-center">Estado</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {cargando ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">Cargando…</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">Cargando…</td></tr>
             ) : comprobantes.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">Sin comprobantes para los filtros aplicados</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">Sin comprobantes para los filtros aplicados</td></tr>
             ) : (
               comprobantes.map((c) => (
                 <tr key={c._id} className="hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => setSeleccionado(c)}>
@@ -339,7 +340,12 @@ export default function ListaComprobantes() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-gray-800">{c.receptor?.nombre || "—"}</td>
-                  <td className="px-4 py-3 text-right font-medium">{c.totales?.totalPagar?.toFixed(2) ?? "—"}</td>
+                  <td className="px-4 py-3 text-right font-medium">
+                    {c.moneda !== "USD" ? (c.totales?.totalPagar?.toFixed(2) ?? "—") : <span className="text-gray-300">—</span>}
+                  </td>
+                  <td className="px-4 py-3 text-right font-medium text-blue-700">
+                    {c.moneda === "USD" ? (c.totales?.totalPagar?.toFixed(2) ?? "—") : <span className="text-gray-300">—</span>}
+                  </td>
                   <td className="px-4 py-3 text-center text-gray-500">{formatearFecha(c.fechaEmision)}</td>
                   <td className="px-4 py-3 text-center">
                     <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${estadoComprobanteClase(c.estado)}`}>
