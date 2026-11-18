@@ -83,6 +83,7 @@ export async function generarFacturaPdf({ factura, comprobante, empresa }) {
     ? (c.retencion?.aplica ? c.retencion : null)
     : (factura.retencion > 0 ? { monto: factura.retencion, porcentaje: factura.retencionPorcentaje } : null);
   const montoRet = ret ? Number(ret.monto) || 0 : 0;
+  const retSoles = moneda !== "PEN" && ret?.montoSoles > 0 ? ret : null;
   const cuotas = c ? (c.cuotas || []) : (factura.cuotas || []);
 
   const formaPago = c
@@ -225,7 +226,7 @@ export async function generarFacturaPdf({ factura, comprobante, empresa }) {
 
   // ─── Detracción + información del crédito ───
   const tabW = 117, etqW = 45;
-  asegurarEspacio(((det ? 6 : 0) + 2 + (ret ? 1 : 0) + cuotas.length) * H);
+  asegurarEspacio(((det ? 6 : 0) + 2 + (ret ? 1 : 0) + (retSoles ? 1 : 0) + cuotas.length) * H);
   if (det) {
     celda(M, y, tabW, H, "Operación sujeta al sistema de pago de obligaciones tributarias", { fill: AZUL, bold: true });
     const yDet = y + H;
@@ -245,13 +246,13 @@ export async function generarFacturaPdf({ factura, comprobante, empresa }) {
 
   celda(M, y, tabW, H, "Información del crédito", { fill: AZUL, bold: true });
   const wC = [22, 32, 28, 35];
-  const filaCredito = (yy, etq, monto, etq2, valor2) => {
+  const filaCredito = (yy, etq, monto, etq2, valor2, simboloFila = simbolo) => {
     let x = M;
     celda(x, yy, wC[0], H, etq, { fill: GRIS, bold: true, align: "left" });
     x += wC[0];
     doc.rect(x, yy, wC[1], H);
     doc.setFont("helvetica", "normal");
-    doc.text(simbolo, x + 1.5, yy + H / 2, { baseline: "middle" });
+    doc.text(simboloFila, x + 1.5, yy + H / 2, { baseline: "middle" });
     doc.text(miles(monto), x + wC[1] - 1.5, yy + H / 2, { align: "right", baseline: "middle" });
     x += wC[1];
     celda(x, yy, wC[2], H, etq2, { fill: GRIS, bold: true });
@@ -261,6 +262,12 @@ export async function generarFacturaPdf({ factura, comprobante, empresa }) {
   if (ret) {
     y += H;
     filaCredito(y, "Retención IGV", montoRet, "Tasa", `${ret.porcentaje}%`);
+  }
+  // En USD la retención del XML va en dólares; la fila en soles es referencial, al TC vigente
+  // de la emisión — el cliente la convierte con el TC de la fecha de pago.
+  if (retSoles) {
+    y += H;
+    filaCredito(y, "Retención S/", retSoles.montoSoles, "TC referencial", retSoles.tipoCambio, "S/");
   }
   filaCredito(y + H, "Neto a Pagar", total - montoDet - montoRet, "Total de cuotas", cuotas.length || "");
   cuotas.forEach((q, i) =>

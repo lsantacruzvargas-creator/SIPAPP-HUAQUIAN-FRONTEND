@@ -74,6 +74,7 @@ export default function EmitirComprobante() {
   const consultandoTc = useRef(false);
   const [retencionAplica, setRetencionAplica] = useState(false);
   const [retencionPorcentaje, setRetencionPorcentaje] = useState("3");
+  const [tcRetencion, setTcRetencion] = useState(null);
   const [numeroOrdenCompra, setNumeroOrdenCompra] = useState("");
   const [ordenCompraId, setOrdenCompraId] = useState("");
   const [mostrarBuscadorOC, setMostrarBuscadorOC] = useState(false);
@@ -356,6 +357,18 @@ export default function EmitirComprobante() {
   const retencionMonto = retencionAplica
     ? r2(totalGeneral * (Number(retencionPorcentaje) || 0) / 100)
     : 0;
+  const retencionSoles = tcRetencion ? r2(retencionMonto * tcRetencion.valor) : 0;
+
+  useEffect(() => {
+    if (!retencionAplica || moneda === "PEN" || tcRetencion) return;
+    (async () => {
+      try {
+        const r = await fetchAuth("/tipo-cambio");
+        const d = r.ok ? await r.json() : null;
+        if (d?.valor > 0) setTcRetencion({ valor: d.valor, fecha: d.fechaActualizacion });
+      } catch { /* sin TC: el helper lo indica; la retención es referencial y no bloquea */ }
+    })();
+  }, [retencionAplica, moneda, tcRetencion]);
 
   // El comprador deposita la detracción directo al Banco de la Nación —
   // eso NO se le paga al vendedor, así que lo que realmente queda
@@ -560,7 +573,13 @@ export default function EmitirComprobante() {
               cuentaBancaria: CUENTA_DETRACCION_BN,
             },
           } : {}),
-          ...(retencionAplica ? { retencion: { aplica: true, porcentaje: Number(retencionPorcentaje) } } : {}),
+          ...(retencionAplica ? {
+            retencion: {
+              aplica: true,
+              porcentaje: Number(retencionPorcentaje),
+              ...(!enSoles && tcRetencion ? { tipoCambio: tcRetencion.valor } : {}),
+            },
+          } : {}),
         };
       }
       const res  = await fetchAuth(endpoint, { method: "POST", body: JSON.stringify(body) });
@@ -639,6 +658,7 @@ export default function EmitirComprobante() {
     setTcDetraccion(null);
     setRetencionAplica(false);
     setRetencionPorcentaje("3");
+    setTcRetencion(null);
     setNumeroOrdenCompra("");
     setOrdenCompraId("");
     setGuiaRelacionada("");
@@ -1142,6 +1162,16 @@ export default function EmitirComprobante() {
                       <label className="block text-xs font-medium text-gray-500 mb-1">Monto de retención</label>
                       <input value={retencionMonto.toFixed(2)} disabled
                         className="w-full input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
+                      {!enSoles && (
+                        tcRetencion ? (
+                          <div className="mt-1 inline-flex flex-col gap-0.5 rounded-md border border-sky-300 bg-sky-50 px-2 py-1 text-xs text-sky-800">
+                            <span className="font-semibold">Referencial: S/ {retencionSoles.toFixed(2)}</span>
+                            <span>US$ {retencionMonto.toFixed(2)} × TC vigente {tcRetencion.valor}</span>
+                            <span className="text-sky-600">El XML va en US$; el cliente la pasa a soles con el TC del día del pago.</span>
+                          </div>
+                        )
+                        : <p className="text-xs mt-1 text-gray-500">Sin tipo de cambio vigente para mostrarla en soles.</p>
+                      )}
                     </div>
                     <div className="col-span-2">
                       <label className="block text-xs font-medium text-gray-500 mb-1">Neto a cobrar (total − retención)</label>
