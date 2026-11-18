@@ -1167,7 +1167,6 @@ export default function EmitirComprobante() {
                           <div className="mt-1 inline-flex flex-col gap-0.5 rounded-md border border-sky-300 bg-sky-50 px-2 py-1 text-xs text-sky-800">
                             <span className="font-semibold">Referencial: S/ {retencionSoles.toFixed(2)}</span>
                             <span>US$ {retencionMonto.toFixed(2)} × TC vigente {tcRetencion.valor}</span>
-                            <span className="text-sky-600">El XML va en US$; el cliente la pasa a soles con el TC del día del pago.</span>
                           </div>
                         )
                         : <p className="text-xs mt-1 text-gray-500">Sin tipo de cambio vigente para mostrarla en soles.</p>

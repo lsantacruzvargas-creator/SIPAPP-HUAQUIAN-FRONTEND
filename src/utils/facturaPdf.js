@@ -226,7 +226,7 @@ export async function generarFacturaPdf({ factura, comprobante, empresa }) {
 
   // ─── Detracción + información del crédito ───
   const tabW = 117, etqW = 45;
-  asegurarEspacio(((det ? 6 : 0) + 2 + (ret ? 1 : 0) + (retSoles ? 1 : 0) + cuotas.length) * H);
+  asegurarEspacio(((det ? 6 : 0) + 2 + (ret ? 1 : 0) + cuotas.length) * H);
   if (det) {
     celda(M, y, tabW, H, "Operación sujeta al sistema de pago de obligaciones tributarias", { fill: AZUL, bold: true });
     const yDet = y + H;
@@ -261,13 +261,9 @@ export async function generarFacturaPdf({ factura, comprobante, empresa }) {
   // La fila de retención no está en la plantilla: solo aparece cuando el comprobante la lleva.
   if (ret) {
     y += H;
-    filaCredito(y, "Retención IGV", montoRet, "Tasa", `${ret.porcentaje}%`);
-  }
-  // En USD la retención del XML va en dólares; la fila en soles es referencial, al TC vigente
-  // de la emisión — el cliente la convierte con el TC de la fecha de pago.
-  if (retSoles) {
-    y += H;
-    filaCredito(y, "Retención S/", retSoles.montoSoles, "TC referencial", retSoles.tipoCambio, "S/");
+    // En USD se imprime en soles (TC vigente de la emisión), aunque el XML la lleve en dólares.
+    if (retSoles) filaCredito(y, "Retención IGV", retSoles.montoSoles, "Tasa", `${ret.porcentaje}%`, "S/");
+    else filaCredito(y, "Retención IGV", montoRet, "Tasa", `${ret.porcentaje}%`);
   }
   filaCredito(y + H, "Neto a Pagar", total - montoDet - montoRet, "Total de cuotas", cuotas.length || "");
   cuotas.forEach((q, i) =>
