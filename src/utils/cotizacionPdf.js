@@ -64,7 +64,7 @@ const POLIZA_TEXTO = "- Responsabilidad / Seguro complementario de trabajo de ri
 const REPUESTOS_TEXTO = "* La presente cotización no incluye el suministro ni el reemplazo de repuestos. Cualquier componente que requiera sustitución será informado al cliente y su cambio se realizará únicamente previa aprobación y coordinación correspondiente.";
 
 export const exportarCotizacionPdf = async (cotizacion) => {
-  const doc = new jsPDF();
+  const doc = new jsPDF({ compress: true });
   const empresa = cotizacion.empresa;
   const M = 12; // margen
   const PAGE_W = doc.internal.pageSize.getWidth();

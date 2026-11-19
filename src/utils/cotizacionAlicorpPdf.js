@@ -42,7 +42,7 @@ const COLUMNAS_TABLA = {
 // (razón social + dirección de la planta elegida, o la dirección fiscal si
 // no hay planta) en vez de estar hardcodeados a Alicorp.
 export const exportarCotizacionAlicorpPdf = async (cotizacion) => {
-  const doc = new jsPDF();
+  const doc = new jsPDF({ compress: true });
   const M = 12;
   const PAGE_W = doc.internal.pageSize.getWidth();
   const PAGE_H = doc.internal.pageSize.getHeight();

@@ -30,7 +30,7 @@ function cargarImagen(url) {
 // necesita la imagen ya cargada (un <img>/data URI), no una ruta de texto — por eso
 // esta función ahora es async. Pedido explícito del usuario, 2026-09-18.
 export async function generarComprobantePdf(comprobante, { logoUrl = "/assets/logos/huaquian_icon.png" } = {}) {
-  const doc = new jsPDF();
+  const doc = new jsPDF({ compress: true });
   const margin = 14;
   let y = 18;
 

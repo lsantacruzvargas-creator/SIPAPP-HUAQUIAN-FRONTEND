@@ -30,7 +30,7 @@ const miles = (v) => (Number(v) || 0).toLocaleString("en-US", { minimumFractionD
 // que guarda la propia Factura. `empresa` sale de la BD (heredada de la OC),
 // nunca de una consulta a SUNAT.
 export async function generarFacturaPdf({ factura, comprobante, empresa }) {
-  const doc = new jsPDF();
+  const doc = new jsPDF({ compress: true });
   const PAGE_W = doc.internal.pageSize.getWidth();
   const PAGE_H = doc.internal.pageSize.getHeight();
   const R = PAGE_W - M;

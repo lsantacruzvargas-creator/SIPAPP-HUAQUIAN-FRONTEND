@@ -32,7 +32,7 @@ export const puedeGenerarPdfGuia = (g) => g?.estado === "ACEPTADO" && !!g?.sunat
 export async function generarGuiaPdf(guia) {
   if (!puedeGenerarPdfGuia(guia)) throw new Error("La guía no está aceptada por SUNAT o no tiene el link del QR.");
   const g = guia;
-  const doc = new jsPDF();
+  const doc = new jsPDF({ compress: true });
   const PAGE_W = doc.internal.pageSize.getWidth();
   const PAGE_H = doc.internal.pageSize.getHeight();
   const R = PAGE_W - M;

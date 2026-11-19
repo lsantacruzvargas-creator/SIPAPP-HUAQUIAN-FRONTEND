@@ -65,7 +65,7 @@ const COLUMNAS_TABLA = {
 // una plantilla con ~100 celdas combinadas (ver informeTecnicoExcel.js, que
 // documenta corrupción real de archivos con esa técnica en este proyecto).
 export const exportarCotizacionGloriaPdf = async (cotizacion) => {
-  const doc = new jsPDF();
+  const doc = new jsPDF({ compress: true });
   const M = 12;
   const PAGE_W = doc.internal.pageSize.getWidth();
   const PAGE_H = doc.internal.pageSize.getHeight();
