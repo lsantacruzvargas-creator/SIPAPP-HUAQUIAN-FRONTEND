@@ -3,14 +3,13 @@ import { fetchAuth, uploadAuth, abrirArchivoProtegido, getUsuario } from "../uti
 import { formatearFecha, anioLima, mesLima } from "../utils/fecha";
 import DetalleDocumento from "../components/DetalleDocumento";
 import ModalImportarExcel, { COLS_OC, COLS_CADENA } from "../components/ModalImportarExcel";
-import { DotChip, badgeOT, dotOT, badgeInformes, dotInformes } from "../components/detalleShared";
+import { DotChip, badgeGeneral, dotGeneral, badgeInformes, dotInformes, ESTADOS_SERVICIO } from "../components/detalleShared";
 import TablaScroll from "../components/TablaScroll";
 import Paginacion from "../components/Paginacion";
 import { usePaginacion } from "../utils/usePaginacion";
 import * as XLSX from "xlsx";
 import { r2 } from "../utils/redondeo";
 
-const ESTADOS_OT = ["", "pendiente", "en progreso", "terminado", "completado"];
 const MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 const TH = "px-4 py-3 font-semibold text-gray-500 whitespace-nowrap";
 
@@ -64,7 +63,7 @@ function PillSiNo({ si }) {
 }
 
 function TablaOC({
-  titulo, acento, ordenes, otGroupMap, factMap, factByOCMap, greMap, tipoCambio, onSelect, subirDocumento,
+  titulo, acento, ordenes, otGroupMap, greMap, tipoCambio, onSelect, subirDocumento,
   mostrarFactura = true, mostrarTitulo = true, mostrarDocumento = true, mostrarHesActa = false,
   puedeVerPrecios = true, vacioMsg,
 }) {
@@ -95,7 +94,7 @@ function TablaOC({
               {puedeVerPrecios && <th className={`${TH} text-right`}>Total (S/)</th>}
               {puedeVerPrecios && <th className={`${TH} text-right`}>Total (US$)</th>}
               <th className={`${TH} text-center`}>Estado Cotización</th>
-              <th className={`${TH} text-center`}>Estado OT</th>
+              <th className={`${TH} text-center`}>Estado de servicio</th>
               <th className={`${TH} text-center`}>Estado Informes</th>
               <th className={`${TH} text-center`}>GRE</th>
               {mostrarHesActa && <th className={`${TH} text-center`}>HES</th>}
@@ -107,11 +106,9 @@ function TablaOC({
             {ordenes.length === 0 ? (
               <tr><td colSpan={totalColumnas} className="px-4 py-8 text-center text-gray-400">{vacioMsg}</td></tr>
             ) : pag.visibles.flatMap((o) => {
-              const cotId = o.cotizacion?._id || o.cotizacion;
               const grupoOT = otGroupMap[o.numeroDocumento];
               const otPadre = grupoOT?.parent || null;
               const subs = grupoOT?.subs || [];
-              const factura = factByOCMap[o._id] || factMap[cotId];
               const { pen, usd } = totalesDuales(o.monto, o.cotizacion?.moneda, tipoCambio);
 
               const filaPrincipal = (
@@ -134,7 +131,7 @@ function TablaOC({
                     {o.createdAt ? formatearFecha(o.createdAt) : <span className="text-gray-300">—</span>}
                   </td>
                   {mostrarFactura && (
-                    <td className="px-4 py-3.5 text-gray-600 whitespace-nowrap">{o.numeroFactura || factura?.numeroFactura || <span className="text-gray-300">—</span>}</td>
+                    <td className="px-4 py-3.5 text-gray-600 whitespace-nowrap">{o.numeroFactura?.trim() || <span className="text-gray-300">—</span>}</td>
                   )}
                   <td className="px-4 py-3.5 text-gray-700">{o.empresa?.razonSocial || "—"}</td>
                   {mostrarTitulo && <td className="px-4 py-3.5 text-gray-600">{o.titulo}</td>}
@@ -163,7 +160,7 @@ function TablaOC({
                   </td>
                   <td className="px-4 py-3.5 text-center">
                     {otPadre ? (
-                      <DotChip chip={badgeOT(otPadre.estado)} dot={dotOT(otPadre.estado)}>{otPadre.estado}</DotChip>
+                      <DotChip chip={badgeGeneral(otPadre.estadoGeneral)} dot={dotGeneral(otPadre.estadoGeneral)}>{otPadre.estadoGeneral}</DotChip>
                     ) : (
                       <span className="text-gray-300 text-xs">Sin OT</span>
                     )}
@@ -231,7 +228,7 @@ function TablaOC({
                   {puedeVerPrecios && <td className="px-4 py-3" />}
                   <td className="px-4 py-3" />
                   <td className="px-4 py-3 text-center">
-                    <DotChip chip={badgeOT(s.estado)} dot={dotOT(s.estado)}>{s.estado}</DotChip>
+                    <DotChip chip={badgeGeneral(s.estadoGeneral)} dot={dotGeneral(s.estadoGeneral)}>{s.estadoGeneral}</DotChip>
                   </td>
                   <td className="px-4 py-3 text-center">
                     <DotChip chip={badgeInformes(s.estadoInformes)} dot={dotInformes(s.estadoInformes)}>{s.estadoInformes}</DotChip>
@@ -388,7 +385,7 @@ export default function ListaOrdenesCompra() {
       || o.cotizacion?.numeroCotizacion?.toLowerCase().includes(txt)
       || o.empresa?.razonSocial?.toLowerCase().includes(txt)
       || o.empresa?.ruc?.includes(txt);
-    const estadoActual = grupoOT?.parent?.estado;
+    const estadoActual = grupoOT?.parent?.estadoGeneral;
     const matchEstado = !estadoOT || estadoActual === estadoOT;
     const matchEmpresa = !empresa || o.empresa?._id === empresa;
     const matchPlanta = !planta || o.planta === planta;
@@ -407,7 +404,9 @@ export default function ListaOrdenesCompra() {
   // ListaCotizaciones.jsx.
   const vistaEfectiva = busqueda ? "todasLasOC" : vista;
 
-  const tieneFactura = (o) => !!(factByOCMap[o._id] || factMap[o.cotizacion?._id || o.cotizacion]);
+  // Solo cuenta el campo "N° de factura" de la OC, no si se generó una
+  // Factura desde el detalle (pedido del usuario, 2026-11-18).
+  const tieneFactura = (o) => !!o.numeroFactura?.trim();
   const cerradas   = filtradas.filter((o) => o.estadoCadena === "cerrado");
   const abiertas   = filtradas.filter((o) => o.estadoCadena !== "cerrado");
   const sinFactura = abiertas.filter((o) => !tieneFactura(o));
@@ -415,9 +414,7 @@ export default function ListaOrdenesCompra() {
 
   // Mismas columnas que TablaOC (sin "Documento", no aplica a una hoja de cálculo).
   const filaOC = (o) => {
-    const cotId = o.cotizacion?._id || o.cotizacion;
     const grupoOT = otGroupMap[o.numeroDocumento];
-    const factura = factByOCMap[o._id] || factMap[cotId];
     const { pen, usd } = totalesDuales(o.monto, o.cotizacion?.moneda, tipoCambio);
     return {
       "Cotización":         o.cotizacion?.numeroCotizacion || "—",
@@ -425,7 +422,7 @@ export default function ListaOrdenesCompra() {
       "Fecha de creación":  o.createdAt ? formatearFecha(o.createdAt) : "—",
       "N° OT":              grupoOT?.parent?.numeroOT || "—",
       "Sub-OTs":            grupoOT?.subs?.map((s) => s.numeroOT).join(", ") || "—",
-      "N° Factura":         o.numeroFactura || factura?.numeroFactura || "—",
+      "N° Factura":         o.numeroFactura?.trim() || "—",
       "Empresa":            o.empresa?.razonSocial || "—",
       "Título":             o.titulo || "—",
       ...(puedeVerPrecios ? {
@@ -435,7 +432,7 @@ export default function ListaOrdenesCompra() {
       "Aprobado":           o.cotizacion?.aprobado ? "Aprobada" : "Pendiente",
       "Enviado":            o.cotizacion?.enviado ? "Enviada" : "No enviada",
       "Informe enviado":    o.cotizacion?.informeEnviado ? "Enviado" : "No enviado",
-      "Estado":             grupoOT?.parent?.estado || "Sin OT",
+      "Estado de servicio": grupoOT?.parent?.estadoGeneral || "Sin OT",
       "Estado Informes":    grupoOT?.parent?.estadoInformes || "—",
       "GRE":                (grupoOT?.parent && greMap[grupoOT.parent._id]) || "Sin GRE",
     };
@@ -538,8 +535,9 @@ export default function ListaOrdenesCompra() {
           onChange={(e) => setEstadoOT(e.target.value)}
           className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
         >
-          {ESTADOS_OT.map((e) => (
-            <option key={e} value={e}>{e ? e.charAt(0).toUpperCase() + e.slice(1) : "Todo estado OT"}</option>
+          <option value="">Todo estado de servicio</option>
+          {ESTADOS_SERVICIO.map(({ valor, label }) => (
+            <option key={valor} value={valor}>{label}</option>
           ))}
         </select>
         <select
@@ -575,7 +573,7 @@ export default function ListaOrdenesCompra() {
           titulo="Todas las Órdenes de Compra"
           acento="bg-blue-500"
           ordenes={filtradas}
-          otGroupMap={otGroupMap} factMap={factMap} factByOCMap={factByOCMap} greMap={greMap} tipoCambio={tipoCambio} puedeVerPrecios={puedeVerPrecios}
+          otGroupMap={otGroupMap} greMap={greMap} tipoCambio={tipoCambio} puedeVerPrecios={puedeVerPrecios}
           onSelect={setOrdenSeleccionada}
           subirDocumento={subirDocumento}
           vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de compra registradas"}
@@ -587,7 +585,7 @@ export default function ListaOrdenesCompra() {
           titulo="Órdenes de Compra sin factura"
           acento="bg-amber-500"
           ordenes={sinFactura}
-          otGroupMap={otGroupMap} factMap={factMap} factByOCMap={factByOCMap} greMap={greMap} tipoCambio={tipoCambio} puedeVerPrecios={puedeVerPrecios}
+          otGroupMap={otGroupMap} greMap={greMap} tipoCambio={tipoCambio} puedeVerPrecios={puedeVerPrecios}
           onSelect={setOrdenSeleccionada}
           subirDocumento={subirDocumento}
           mostrarFactura={false}
@@ -603,7 +601,7 @@ export default function ListaOrdenesCompra() {
           titulo="Órdenes de Compra con factura"
           acento="bg-emerald-500"
           ordenes={conFactura}
-          otGroupMap={otGroupMap} factMap={factMap} factByOCMap={factByOCMap} greMap={greMap} tipoCambio={tipoCambio} puedeVerPrecios={puedeVerPrecios}
+          otGroupMap={otGroupMap} greMap={greMap} tipoCambio={tipoCambio} puedeVerPrecios={puedeVerPrecios}
           onSelect={setOrdenSeleccionada}
           subirDocumento={subirDocumento}
           vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de compra con factura"}
@@ -615,7 +613,7 @@ export default function ListaOrdenesCompra() {
           titulo="Órdenes de Compra cerradas"
           acento="bg-gray-500"
           ordenes={cerradas}
-          otGroupMap={otGroupMap} factMap={factMap} factByOCMap={factByOCMap} greMap={greMap} tipoCambio={tipoCambio} puedeVerPrecios={puedeVerPrecios}
+          otGroupMap={otGroupMap} greMap={greMap} tipoCambio={tipoCambio} puedeVerPrecios={puedeVerPrecios}
           onSelect={setOrdenSeleccionada}
           subirDocumento={subirDocumento}
           vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de compra cerradas"}

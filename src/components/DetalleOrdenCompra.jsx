@@ -6,7 +6,7 @@ import { estadoComprobanteClase } from "../utils/catalogosSunat";
 import ModalDetalleGuia from "./ModalDetalleGuia";
 import {
   FlujoNegocio, TarjetaRelacion, Chip,
-  badgePago, badgeOT, money, totalSinIgv, BotonAnular, BotonCerrarCadena, BotonDesanular, BannerAnulado, bloqueadoPorCadenaCerrada,
+  badgePago, badgeGeneral, money, totalSinIgv, BotonAnular, BotonCerrarCadena, BotonDesanular, BannerAnulado, bloqueadoPorCadenaCerrada,
 } from "./detalleShared";
 import { r2, r0 } from "../utils/redondeo";
 
@@ -500,7 +500,7 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
 
             <TarjetaRelacion tipo="ot" codigo={ot?.codigo} numero={ot?.numeroOT} vacio={!ot}
               onClick={ot ? () => onNavegar?.({ tipo: "ot", data: ot }) : undefined}>
-              {ot?.estado && <Chip className={badgeOT(ot.estado)}>{ot.estado}</Chip>}
+              {ot?.estadoGeneral && <Chip className={badgeGeneral(ot.estadoGeneral)}>{ot.estadoGeneral}</Chip>}
               {ot?.personalEncargado?.nombre && (
                 <p className="text-xs text-gray-500">Técnico: {ot.personalEncargado.nombre}</p>
               )}

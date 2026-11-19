@@ -3,7 +3,7 @@ import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import { formatearFecha } from "../utils/fecha";
 import DetalleDocumento from "../components/DetalleDocumento";
 import TablaScroll from "../components/TablaScroll";
-import { DotChip, badgeOT, dotOT } from "../components/detalleShared";
+import { DotChip, badgeGeneral, dotGeneral } from "../components/detalleShared";
 
 const TH = "px-4 py-3 font-semibold text-gray-500 whitespace-nowrap";
 
@@ -96,7 +96,7 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, otGroupMap, mostrarOT
                       <td className="px-4 py-3 text-gray-600" colSpan={2}>
                         <div className="flex items-center gap-2">
                           <span>{s.titulo}</span>
-                          <DotChip chip={badgeOT(s.estado)} dot={dotOT(s.estado)}>{s.estado}</DotChip>
+                          <DotChip chip={badgeGeneral(s.estadoGeneral)} dot={dotGeneral(s.estadoGeneral)}>{s.estadoGeneral}</DotChip>
                         </div>
                       </td>
                       <td className="px-4 py-3" />

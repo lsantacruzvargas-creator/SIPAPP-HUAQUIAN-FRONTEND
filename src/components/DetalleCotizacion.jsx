@@ -20,7 +20,7 @@ import TablaItemsCotizacionGloria from "./TablaItemsCotizacionGloria";
 import TablaItemsCotizacionAlicorp from "./TablaItemsCotizacionAlicorp";
 import {
   FlujoNegocio, TarjetaRelacion, Chip,
-  badgePago, badgeOT, money, totalSinIgv, BotonAnular, BotonCerrarCadena, BotonDesanular, BannerAnulado, bloqueadoPorCadenaCerrada,
+  badgePago, badgeGeneral, money, totalSinIgv, BotonAnular, BotonCerrarCadena, BotonDesanular, BannerAnulado, bloqueadoPorCadenaCerrada,
 } from "./detalleShared";
 import { r2 } from "../utils/redondeo";
 
@@ -1276,7 +1276,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
               ots.map(o => (
                 <TarjetaRelacion key={o._id} tipo="ot" codigo={o.codigo} numero={o.numeroOT}
                   onClick={() => onNavegar?.({ tipo: "ot", data: o })}>
-                  {o.estado && <Chip className={badgeOT(o.estado)}>{o.estado}</Chip>}
+                  {o.estadoGeneral && <Chip className={badgeGeneral(o.estadoGeneral)}>{o.estadoGeneral}</Chip>}
                 </TarjetaRelacion>
               ))
             )}

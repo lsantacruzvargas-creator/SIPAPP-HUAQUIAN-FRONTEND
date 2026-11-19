@@ -19,7 +19,7 @@ import ConfirmacionAccion from "./ConfirmacionAccion";
 import { exportarInformeTecnicoExcel, exportarInformesTecnicosExcelCombinado } from "../utils/informeTecnicoExcel";
 import {
   FlujoNegocio, TarjetaRelacion, Chip,
-  badgePago, badgeOT, badgeGeneral, money, BotonAnular, BotonCerrarCadena, BotonDesanular, BannerAnulado, bloqueadoPorCadenaCerrada,
+  badgePago, badgeGeneral, money, BotonAnular, BotonCerrarCadena, BotonDesanular, BannerAnulado, bloqueadoPorCadenaCerrada,
 } from "./detalleShared";
 
 const INP = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 w-full transition";
@@ -849,7 +849,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
             )}
 
             <TarjetaRelacion tipo="ot" codigo={ot.codigo} numero={ot.numeroOT} actual>
-              {ot.estado && <Chip className={badgeOT(ot.estado)}>{ot.estado}</Chip>}
+              {ot.estadoGeneral && <Chip className={badgeGeneral(ot.estadoGeneral)}>{ot.estadoGeneral}</Chip>}
               {!!greMap[ot._id]?.length && (
                 <Chip className="bg-purple-100 text-purple-700">GRE {greMap[ot._id].map(codigoDeGuia).join(", ")}</Chip>
               )}
@@ -879,7 +879,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
                       <TarjetaRelacion key={s._id} tipo="ot" codigo={s.codigo} numero={s.numeroOT}
                         onClick={() => onNavegar?.({ tipo: "ot", data: s })}>
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          {s.estado && <Chip className={badgeOT(s.estado)}>{s.estado}</Chip>}
+                          {s.estadoGeneral && <Chip className={badgeGeneral(s.estadoGeneral)}>{s.estadoGeneral}</Chip>}
                           {s.irreparable && <Chip className="bg-red-100 text-red-700">Irreparable</Chip>}
                           {totalInf === 0 ? (
                             <Chip className="bg-red-100 text-red-700">Sin informe</Chip>

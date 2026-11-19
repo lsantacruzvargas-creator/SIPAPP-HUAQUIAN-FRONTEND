@@ -3,18 +3,10 @@ import { fetchAuth } from "../utils/fetchAuth";
 import { formatearFecha, fechaHoyLima, anioLima, mesLima } from "../utils/fecha";
 import ModalOTEquipo from "../components/ModalOTEquipo";
 import TablaScroll from "../components/TablaScroll";
+import { badgeGeneral, ESTADOS_SERVICIO } from "../components/detalleShared";
 
 const ESTADOS = ["recibido", "en diagnóstico", "en reparación", "listo", "entregado"];
-const ESTADOS_OT = ["pendiente", "en progreso", "terminado", "completado"];
 const MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
-
-const badgeOT = (e) => {
-  if (e === "completado")  return "bg-teal-50 text-teal-700";
-  if (e === "terminado")   return "bg-green-50 text-green-700";
-  if (e === "en progreso") return "bg-blue-50 text-blue-700";
-  if (e === "pendiente")   return "bg-amber-50 text-amber-700";
-  return "bg-gray-100 text-gray-400";
-};
 
 const hoyISO = () => fechaHoyLima();
 
@@ -152,7 +144,7 @@ export default function IngresoEquipos() {
       || i.empresa?.ruc?.includes(txt)
       || ot?.codigo?.toLowerCase().includes(txt)
       || i.numeroGuiaEmision?.toLowerCase().includes(txt);
-    const matchEstado  = !estadoFiltro  || ot?.estado === estadoFiltro;
+    const matchEstado  = !estadoFiltro  || ot?.estadoGeneral === estadoFiltro;
     const matchAnio    = !anioFiltro    || anioLima(fecha) === parseInt(anioFiltro);
     const matchMes     = !mesFiltro     || mesLima(fecha) === parseInt(mesFiltro);
     const matchEmpresa = !empresaFiltro || i.empresa?._id === empresaFiltro;
@@ -211,8 +203,8 @@ export default function IngresoEquipos() {
           className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
         >
           <option value="">Todo estado OT</option>
-          {ESTADOS_OT.map((e) => (
-            <option key={e} value={e}>{e.charAt(0).toUpperCase() + e.slice(1)}</option>
+          {ESTADOS_SERVICIO.map(({ valor, label }) => (
+            <option key={valor} value={valor}>{label}</option>
           ))}
         </select>
 
@@ -311,8 +303,8 @@ export default function IngresoEquipos() {
                   </td>
                   <td className="px-4 py-3 text-center">
                     {ot ? (
-                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${badgeOT(ot.estado)}`}>
-                        {ot.estado}
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${badgeGeneral(ot.estadoGeneral)}`}>
+                        {ot.estadoGeneral}
                       </span>
                     ) : (
                       <span className="text-gray-300 text-xs">Sin OT</span>

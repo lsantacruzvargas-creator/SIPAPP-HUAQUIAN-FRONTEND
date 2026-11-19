@@ -426,6 +426,7 @@ export default function ListaCotizaciones() {
       "Enviado":                c._esOT ? "—" : (c.enviado ? "Enviada" : "No enviada"),
       "Informe enviado":        c._esOT ? "—" : (c.informeEnviado ? "Enviado" : "No enviado"),
       "Días desde informe enviado": c._esOT ? "—" : (diasDesdeInforme(c) ?? "—"),
+      "Estado de servicio":     otsPorCot.get(c._id)?.[0]?.estadoGeneral || "—",
       ...(puedeVerPrecios ? {
         "Total sin IGV (S/)":   pen != null ? pen.toFixed(2) : "—",
         "Total sin IGV (US$)":  usd != null ? usd.toFixed(2) : "—",

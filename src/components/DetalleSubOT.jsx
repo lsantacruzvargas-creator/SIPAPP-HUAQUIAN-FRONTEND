@@ -8,7 +8,7 @@ import ModalRequerimiento from "./ModalRequerimiento";
 import TablaServiciosExternos from "./TablaServiciosExternos";
 import TarjetaDatosAdjuntos from "./TarjetaDatosAdjuntos";
 import TablaScroll from "./TablaScroll";
-import { Chip, BotonAnular, BotonCerrarCadena, BotonDesanular, BannerAnulado, bloqueadoPorCadenaCerrada } from "./detalleShared";
+import { Chip, badgeGeneral, BotonAnular, BotonCerrarCadena, BotonDesanular, BannerAnulado, bloqueadoPorCadenaCerrada } from "./detalleShared";
 
 const CATEGORIAS_SERVICIO = ["SOPORTE", "DEVOLUCION", "DIAGNOSTICO", "GARANTIA", "MANTENIMIENTO", "REPARACION", "PRESTAMO", "SUMINISTRO", "MANTENIMIENTO EN PLANTA"];
 
@@ -280,7 +280,9 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
           </div>
           <div className="flex items-center gap-4">
             <div className="text-right">
-              <p className="text-[10px] text-white/60 uppercase tracking-widest leading-none">Estado</p>
+              <p className="text-[10px] text-white/60 uppercase tracking-widest leading-none">OT</p>
+              <Chip className={`mt-0.5 ${badgeGeneral(ot.estadoGeneral)}`}>{ot.estadoGeneral}</Chip>
+              <p className="text-[10px] text-white/60 uppercase tracking-widest leading-none mt-1.5">Estado</p>
               <Chip className="mt-0.5 bg-white/20 text-white">{ot.estado}</Chip>
               {ot.informesAprobados && (
                 <Chip className="mt-1 bg-teal-400/30 text-white block">Informes aprobados</Chip>
