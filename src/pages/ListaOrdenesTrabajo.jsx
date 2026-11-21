@@ -654,9 +654,9 @@ export default function ListaOrdenesTrabajo() {
           Días desde recibido ↓
         </button>
 
-        {Object.values(filtros).some(Boolean) && (
+        {(Object.values(filtros).some(Boolean) || filtroEstadoPlanner !== "todos" || filtroEstadoTecnico !== "todos") && (
           <button
-            onClick={() => setFiltros(FILTROS_VACIO)}
+            onClick={() => { setFiltros(FILTROS_VACIO); setFiltroEstadoPlanner("todos"); setFiltroEstadoTecnico("todos"); }}
             className="text-sm text-gray-400 hover:text-gray-700 transition"
           >
             Limpiar

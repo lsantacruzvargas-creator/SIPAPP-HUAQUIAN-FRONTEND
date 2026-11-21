@@ -558,7 +558,7 @@ export default function ListaOrdenesCompra() {
             <option key={valor} value={valor}>Ordenar: {label}</option>
           ))}
         </select>
-        {hayFiltro && (
+        {(hayFiltro || vista !== "todasLasOC") && (
           <button
             onClick={() => { setBusqueda(""); setEstadoOT(""); setEmpresa(""); setPlanta(""); setAnio(""); setMes(""); setVista("todasLasOC"); }}
             className="text-sm text-gray-400 hover:text-gray-700 transition"

@@ -202,7 +202,7 @@ export default function IngresoEquipos() {
           onChange={(e) => setEstadoFiltro(e.target.value)}
           className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
         >
-          <option value="">Todo estado OT</option>
+          <option value="">Todo estado de servicio</option>
           {ESTADOS_SERVICIO.map(({ valor, label }) => (
             <option key={valor} value={valor}>{label}</option>
           ))}

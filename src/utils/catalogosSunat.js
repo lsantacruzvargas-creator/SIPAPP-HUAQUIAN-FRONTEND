@@ -49,6 +49,7 @@ export const TIPO_DOC_RECEPTOR = [
 
 export const ESTADO_COMPROBANTE = [
   { valor: "PENDIENTE", label: "Pendiente", cls: "bg-gray-100 text-gray-500" },
+  { valor: "EN_PROCESO", label: "En proceso", cls: "bg-blue-100 text-blue-700" },
   { valor: "ACEPTADO",  label: "Aceptado",  cls: "bg-green-100 text-green-700" },
   { valor: "RECHAZADO", label: "Rechazado", cls: "bg-red-100 text-red-700" },
   { valor: "ANULADO",   label: "Anulado",   cls: "bg-amber-100 text-amber-700" },
