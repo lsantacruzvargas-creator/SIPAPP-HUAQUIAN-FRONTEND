@@ -54,6 +54,9 @@ const compararTexto = (na, nb) => {
 const numerosOT = (ots) =>
   ots?.length ? ots.map((o) => o.numeroOT).filter(Boolean).join(", ") : null;
 
+const numerosOC = (ocs) =>
+  ocs?.length ? ocs.map((o) => o.numeroOrden || o.codigo).filter(Boolean) : [];
+
 const titulosOT = (ots) =>
   ots?.length ? ots.map((o) => o.titulo).filter(Boolean).join(", ") : null;
 
@@ -90,7 +93,7 @@ const titulosOT = (ots) =>
 const diasDesdeInforme = (c) =>
   c.fechaInformeEnviado ? Math.floor((Date.now() - new Date(c.fechaInformeEnviado).getTime()) / 86400000) : null;
 
-function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, tipoCambio, mostrarDiasInforme, puedeVerPrecios, mostrarEstadoServicio, mostrarTituloOT, otsPorCot, colOtEstrecha }) {
+function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, tipoCambio, mostrarDiasInforme, puedeVerPrecios, mostrarEstadoServicio, mostrarTituloOT, otsPorCot, ocsPorCot, colOtEstrecha }) {
   const pag = usePaginacion(cotizaciones);
   return (
     <div className="mb-6">
@@ -106,6 +109,7 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
             <tr>
               <th className={`${TH} text-left`}>N° Cotización</th>
               {mostrarEstadoServicio && <th className={`${TH} text-left ${colOtEstrecha ? "w-20" : ""}`}>N° OT</th>}
+              <th className={`${TH} text-left`}>N° OC</th>
               <th className={`${TH} text-left`}>Empresa</th>
               <th className={`${TH} text-left`}>Planta</th>
               <th className={`${TH} text-left`}>Contacto</th>
@@ -124,7 +128,7 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
           <tbody className="divide-y divide-gray-100">
             {cotizaciones.length === 0 ? (
               <tr>
-                <td colSpan={8 + (puedeVerPrecios ? 2 : 0) + (mostrarDiasInforme ? 1 : 0) + (mostrarEstadoServicio ? 3 : 0) + (mostrarTituloOT ? 1 : 0)} className="px-4 py-8 text-center text-gray-400">{vacioMsg}</td>
+                <td colSpan={9 + (puedeVerPrecios ? 2 : 0) + (mostrarDiasInforme ? 1 : 0) + (mostrarEstadoServicio ? 3 : 0) + (mostrarTituloOT ? 1 : 0)} className="px-4 py-8 text-center text-gray-400">{vacioMsg}</td>
               </tr>
             ) : (
               pag.visibles.map((c) => {
@@ -159,6 +163,10 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
                       {numerosOT(otsDeCot) || <span className="text-gray-300">—</span>}
                     </td>
                   )}
+                  <td className="px-4 py-3.5 text-gray-600 whitespace-nowrap">
+                    {numerosOC(ocsPorCot?.get(c._id)).map((n) => <div key={n}>{n}</div>)}
+                    {!numerosOC(ocsPorCot?.get(c._id)).length && <span className="text-gray-300">—</span>}
+                  </td>
                   <td className="px-4 py-3.5 text-gray-700">
                     {c.empresa?.razonSocial || <span className="text-gray-300">—</span>}
                   </td>
@@ -253,6 +261,7 @@ export default function ListaCotizaciones() {
   const [otsSinCotizacion, setOtsSinCotizacion] = useState([]);
   const [ocPorCot, setOcPorCot] = useState(new Map());
   const [ocPorNumDoc, setOcPorNumDoc] = useState(new Map());
+  const [ocsPorCot, setOcsPorCot] = useState(new Map());
   const [facturaPorNumDoc, setFacturaPorNumDoc] = useState(new Map());
   const [sortBy, setSortBy] = useState("numeroCotizacion");
   // "Todas las cotizaciones" (tabla única, sin categorizar por estado) es la
@@ -294,6 +303,24 @@ export default function ListaCotizaciones() {
     return m;
   };
 
+  // Todas las OC vigentes de cada cotización (varias si hay OCs parciales), por
+  // referencia directa o por la cadena (OCs importadas sin `cotizacion`).
+  const buildOcsPorCot = (ocs, cots) => {
+    const porCot = new Map(), porNumDoc = new Map();
+    const agregar = (m, k, oc) => m.set(k, [...(m.get(k) || []), oc]);
+    ocs.filter((oc) => !oc.anulado).forEach((oc) => {
+      const id = oc.cotizacion?._id || oc.cotizacion;
+      if (id) agregar(porCot, id, oc);
+      if (oc.numeroDocumento != null) agregar(porNumDoc, oc.numeroDocumento, oc);
+    });
+    const m = new Map();
+    cots.forEach((c) => {
+      const suyas = [...new Set([...(porCot.get(c._id) || []), ...(porNumDoc.get(c.numeroDocumento) || [])])];
+      if (suyas.length) m.set(c._id, suyas);
+    });
+    return m;
+  };
+
   const cargar = () =>
     Promise.all([
       fetchAuth("/cotizaciones").then((r) => r.ok ? r.json() : []),
@@ -307,6 +334,7 @@ export default function ListaCotizaciones() {
       setOtsPorCot(buildOtsMap(ots));
       setOcPorCot(buildOcMap(ocs));
       setOcPorNumDoc(buildOcPorNumDoc(ocs));
+      setOcsPorCot(buildOcsPorCot(ocs, cots));
       setTipoCambio(tc?.valor ?? null);
       // Una cotización está "facturada" si su cadena (mismo numeroDocumento)
       // tiene una factura con número de factura.
@@ -379,7 +407,7 @@ export default function ListaCotizaciones() {
         c.titulo?.toLowerCase().includes(q) ||
         c.numeroCotizacion?.toLowerCase().includes(q) ||
         numerosOT(otsPorCot.get(c._id))?.toLowerCase().includes(q) ||
-        (ocPorCot.get(c._id)?.numeroOrden || ocPorNumDoc.get(c.numeroDocumento)?.numeroOrden)?.toLowerCase().includes(q) ||
+        numerosOC(ocsPorCot.get(c._id)).some((n) => n.toLowerCase().includes(q)) ||
         facturaPorNumDoc.get(c.numeroDocumento)?.toLowerCase().includes(q) ||
         c.empresa?.razonSocial?.toLowerCase().includes(q) ||
         c.empresa?.ruc?.includes(q))
@@ -414,6 +442,7 @@ export default function ListaCotizaciones() {
     const { pen, usd } = totalesDuales(c, tipoCambio);
     return {
       "N° OT":                  numerosOT(otsPorCot.get(c._id)) || "—",
+      "N° OC":                  numerosOC(ocsPorCot.get(c._id)).join(", ") || "—",
       "N° Cotización":          c._esOT ? "Sin cotización" : (c.numeroCotizacion || "—"),
       "Fecha recibida":         c.fechaRecibida ? formatearFecha(c.fechaRecibida) : "—",
       "Empresa":                c.empresa?.razonSocial || "—",
@@ -578,6 +607,7 @@ export default function ListaCotizaciones() {
           onSelect={seleccionarFila}
           vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin cotizaciones registradas"}
           tipoCambio={tipoCambio}
+          ocsPorCot={ocsPorCot}
           puedeVerPrecios={puedeVerPrecios}
           mostrarEstadoServicio
           mostrarTituloOT
@@ -595,6 +625,7 @@ export default function ListaCotizaciones() {
           onSelect={seleccionarFila}
           vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Todas las cotizaciones ya tienen OT"}
           tipoCambio={tipoCambio}
+          ocsPorCot={ocsPorCot}
           puedeVerPrecios={puedeVerPrecios}
         />
       )}
@@ -607,6 +638,7 @@ export default function ListaCotizaciones() {
           onSelect={seleccionarFila}
           vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin cotizaciones pendientes"}
           tipoCambio={tipoCambio}
+          ocsPorCot={ocsPorCot}
           puedeVerPrecios={puedeVerPrecios}
           mostrarEstadoServicio
           mostrarTituloOT
@@ -623,6 +655,7 @@ export default function ListaCotizaciones() {
           onSelect={seleccionarFila}
           vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin cotizaciones con OC"}
           tipoCambio={tipoCambio}
+          ocsPorCot={ocsPorCot}
           puedeVerPrecios={puedeVerPrecios}
           mostrarTituloOT
           otsPorCot={otsPorCot}
@@ -637,6 +670,7 @@ export default function ListaCotizaciones() {
           onSelect={seleccionarFila}
           vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin cotizaciones cerradas"}
           tipoCambio={tipoCambio}
+          ocsPorCot={ocsPorCot}
           puedeVerPrecios={puedeVerPrecios}
           mostrarTituloOT
           otsPorCot={otsPorCot}

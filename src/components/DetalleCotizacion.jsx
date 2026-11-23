@@ -15,6 +15,7 @@ import ModalDetalleGuia from "./ModalDetalleGuia";
 import BuscadorOrdenTrabajo from "./BuscadorOrdenTrabajo";
 import SelectorEmpresas from "./SelectorEmpresas";
 import ConfirmacionAccion from "./ConfirmacionAccion";
+import AvisoAccion from "./AvisoAccion";
 import TablaItemsCotizacion from "./TablaItemsCotizacion";
 import TablaItemsCotizacionGloria from "./TablaItemsCotizacionGloria";
 import TablaItemsCotizacionAlicorp from "./TablaItemsCotizacionAlicorp";
@@ -123,6 +124,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   const [fechaPagoCierre, setFechaPagoCierre] = useState(() => fechaHoyLima());
   const [numeroFacturaCierre, setNumeroFacturaCierre] = useState("");
   const [cerrandoCadena, setCerrandoCadena] = useState(false);
+  const [avisoOCs, setAvisoOCs] = useState(null);
   const [buscadorOTOpen, setBuscadorOTOpen] = useState(false);
   const [confirmandoReasignarOT, setConfirmandoReasignarOT] = useState(null);
   const [reasignandoOT, setReasignandoOT] = useState(false);
@@ -549,6 +551,13 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
       setCot(actualizada);
       setItems((actualizada.items || []).map(itemDesdeDb));
       setIntentoGuardar(false);
+      if (actualizada.ocsActualizadas?.length) {
+        const lista = actualizada.ocsActualizadas.join(", ");
+        setAvisoOCs({
+          mensaje: `Se actualizó el monto de ${actualizada.ocsActualizadas.length === 1 ? "la OC" : "las OC"} ${lista} con el nuevo precio de la cotización.`,
+          alCerrar: null,
+        });
+      }
       return actualizada;
     }
     setError("Error al guardar los cambios.");
@@ -559,7 +568,10 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   // notifica al padre y cierra el modal (comportamiento esperado solo aquí).
   const persistir = async () => {
     const actualizada = await guardarCotizacion();
-    if (actualizada) onGuardada?.(actualizada);
+    if (!actualizada) return actualizada;
+    // Con OCs actualizadas, el modal se cierra recién al aceptar el aviso.
+    if (actualizada.ocsActualizadas?.length) setAvisoOCs((a) => ({ ...a, alCerrar: () => onGuardada?.(actualizada) }));
+    else onGuardada?.(actualizada);
     return actualizada;
   };
 
@@ -1495,6 +1507,13 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
               vincularOT(orden);
             }
           }}
+        />
+      )}
+
+      {avisoOCs && (
+        <AvisoAccion
+          mensaje={avisoOCs.mensaje}
+          onCerrar={() => { const cerrar = avisoOCs.alCerrar; setAvisoOCs(null); cerrar?.(); }}
         />
       )}
 
