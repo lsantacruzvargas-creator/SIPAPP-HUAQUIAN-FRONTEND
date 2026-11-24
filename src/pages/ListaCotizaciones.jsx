@@ -30,6 +30,8 @@ const VISTAS = [
   { valor: "conOC",      label: "Cotización con OC" },
   { valor: "enviadas",   label: "Cotizaciones enviadas" },
   { valor: "aprobadas",  label: "Cotizaciones aprobadas" },
+  { valor: "noEnviadas", label: "Cotizaciones no enviadas" },
+  { valor: "porAprobar", label: "Cotizaciones pendientes de aprobación" },
   { valor: "cerradas",   label: "Cotizaciones cerradas" },
 ];
 
@@ -57,9 +59,6 @@ const numerosOT = (ots) =>
 
 const numerosOC = (ocs) =>
   ocs?.length ? ocs.map((o) => o.numeroOrden || o.codigo).filter(Boolean) : [];
-
-const titulosOT = (ots) =>
-  ots?.length ? ots.map((o) => o.titulo).filter(Boolean).join(", ") : null;
 
 // Total real (tal como se guardó, en la moneda de la cotización) + su
 // conversión a la otra moneda usando el Tipo de Cambio compartido — la
@@ -138,17 +137,18 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
               <th className={`${TH} text-center`}><DosLineas>Estado de servicio</DosLineas></th>
               <th className={`${TH} text-center`}><DosLineas>Fecha de salida a cliente</DosLineas></th>
               <th className={`${TH} text-left`}><DosLineas>N° OC</DosLineas></th>
-              <th className={`${TH} text-left min-w-[13rem]`}><DosLineas>Título orden de trabajo</DosLineas></th>
-              <th className={`${TH} text-center`}><DosLineas>Días desde recibido</DosLineas></th>
               <th className={`${TH} text-center`}><DosLineas>Informe enviado</DosLineas></th>
+              <th className={`${TH} text-center`}><DosLineas>Días desde recibido</DosLineas></th>
               {puedeVerPrecios && <th className={`${TH} text-right`}><DosLineas>Total sin IGV (S/)</DosLineas></th>}
               {puedeVerPrecios && <th className={`${TH} text-right`}><DosLineas>Total sin IGV (US$)</DosLineas></th>}
+              <th className={`${TH} text-center`}><DosLineas>Estado de aprobación</DosLineas></th>
+              <th className={`${TH} text-center`}><DosLineas>Estado enviado</DosLineas></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {cotizaciones.length === 0 ? (
               <tr>
-                <td colSpan={12 + (puedeVerPrecios ? 2 : 0)} className="px-4 py-8 text-center text-gray-400">{vacioMsg}</td>
+                <td colSpan={13 + (puedeVerPrecios ? 2 : 0)} className="px-4 py-8 text-center text-gray-400">{vacioMsg}</td>
               </tr>
             ) : (
               pag.visibles.map((c) => {
@@ -198,16 +198,15 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
                   <td className="px-4 py-3.5 text-gray-600 whitespace-nowrap">
                     {ocs.length ? ocs.map((n) => <div key={n}>{n}</div>) : VACIO}
                   </td>
-                  <td className="px-4 py-3.5 text-gray-700">{titulosOT(otsDeCot) || VACIO}</td>
-                  <td className="px-4 py-3.5 text-center text-gray-600 tabular-nums">
-                    {dias != null ? `${dias} día${dias !== 1 ? "s" : ""}` : VACIO}
-                  </td>
                   <td className="px-4 py-3.5 text-center">
                     {c._esOT ? VACIO : (
                       <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full uppercase tracking-wide whitespace-nowrap ${c.informeEnviado ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
                         {c.informeEnviado ? "Enviado" : "No enviado"}
                       </span>
                     )}
+                  </td>
+                  <td className="px-4 py-3.5 text-center text-gray-600 tabular-nums">
+                    {dias != null ? `${dias} día${dias !== 1 ? "s" : ""}` : VACIO}
                   </td>
                   {puedeVerPrecios && (
                     <td className="px-4 py-3.5 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap">
@@ -219,6 +218,20 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
                       {usd != null ? usd.toLocaleString("es-PE", { minimumFractionDigits: 2 }) : "—"}
                     </td>
                   )}
+                  <td className="px-4 py-3.5 text-center">
+                    {c._esOT ? VACIO : (
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full uppercase tracking-wide whitespace-nowrap ${c.aprobado ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                        {c.aprobado ? "Aprobada" : "Pendiente"}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3.5 text-center">
+                    {c._esOT ? VACIO : (
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full uppercase tracking-wide whitespace-nowrap ${c.enviado ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                        {c.enviado ? "Enviada" : "No enviada"}
+                      </span>
+                    )}
+                  </td>
                 </tr>
                 );
               })
@@ -431,6 +444,10 @@ export default function ListaCotizaciones() {
   const sinOT = filtradas.filter((c) => !c._esOT && !esCerrada(c) && !otsPorCot.get(c._id)?.length);
   const enviadas = filtradas.filter((c) => !c._esOT && c.enviado);
   const aprobadas = filtradas.filter((c) => !c._esOT && c.aprobado);
+  // Pendientes de acción: sin anuladas ni cadenas cerradas.
+  const pendienteDeAccion = (c) => !c._esOT && !c.anulado && !esCerrada(c);
+  const noEnviadas = filtradas.filter((c) => pendienteDeAccion(c) && !c.enviado);
+  const porAprobar = filtradas.filter((c) => pendienteDeAccion(c) && !c.aprobado);
   const hayFiltro = Object.values(filtros).some(Boolean);
 
   // Misma columnas que TablaCotizaciones — una hoja por cada tabla visible.
@@ -447,13 +464,14 @@ export default function ListaCotizaciones() {
       "Estado de servicio":     otsPorCot.get(c._id)?.[0]?.estadoGeneral || "—",
       "Fecha de salida a cliente": fechaSalida ? formatearFecha(fechaSalida) : "—",
       "N° OC":                  numerosOC(ocsPorCot.get(c._id)).join(", ") || "—",
-      "Título orden de trabajo": titulosOT(otsPorCot.get(c._id)) || "—",
-      "Días desde recibido":    diasDesdeRecibido(fechaRecibidaDe(otsPorCot, c)) ?? "—",
       "Informe enviado":        c._esOT ? "—" : (c.informeEnviado ? "Enviado" : "No enviado"),
+      "Días desde recibido":    diasDesdeRecibido(fechaRecibidaDe(otsPorCot, c)) ?? "—",
       ...(puedeVerPrecios ? {
         "Total sin IGV (S/)":   pen != null ? pen.toFixed(2) : "—",
         "Total sin IGV (US$)":  usd != null ? usd.toFixed(2) : "—",
       } : {}),
+      "Estado de aprobación":   c._esOT ? "—" : (c.aprobado ? "Aprobada" : "Pendiente"),
+      "Estado enviado":         c._esOT ? "—" : (c.enviado ? "Enviada" : "No enviada"),
       "Fecha recibida":         c.fechaRecibida ? formatearFecha(c.fechaRecibida) : "—",
       "Encargado":              c.encargado || "—",
     };
@@ -468,6 +486,8 @@ export default function ListaCotizaciones() {
       ["Sin OT", sinOT],
       ["Enviadas", enviadas],
       ["Aprobadas", aprobadas],
+      ["No enviadas", noEnviadas],
+      ["Pend. aprobación", porAprobar],
     ].forEach(([nombre, lista]) => {
       const ws = XLSX.utils.json_to_sheet(lista.map(filaCotizacion));
       XLSX.utils.book_append_sheet(wb, ws, nombre);
@@ -681,6 +701,34 @@ export default function ListaCotizaciones() {
           cotizaciones={aprobadas}
           onSelect={seleccionarFila}
           vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin cotizaciones aprobadas"}
+          tipoCambio={tipoCambio}
+          ocsPorCot={ocsPorCot}
+          otsPorCot={otsPorCot}
+          puedeVerPrecios={puedeVerPrecios}
+        />
+      )}
+
+      {(vista === "todas" || vista === "noEnviadas") && (
+        <TablaCotizaciones
+          titulo="Cotizaciones no enviadas"
+          acento="bg-orange-500"
+          cotizaciones={noEnviadas}
+          onSelect={seleccionarFila}
+          vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Todas las cotizaciones ya fueron enviadas"}
+          tipoCambio={tipoCambio}
+          ocsPorCot={ocsPorCot}
+          otsPorCot={otsPorCot}
+          puedeVerPrecios={puedeVerPrecios}
+        />
+      )}
+
+      {(vista === "todas" || vista === "porAprobar") && (
+        <TablaCotizaciones
+          titulo="Cotizaciones pendientes de aprobación"
+          acento="bg-yellow-500"
+          cotizaciones={porAprobar}
+          onSelect={seleccionarFila}
+          vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin cotizaciones pendientes de aprobación"}
           tipoCambio={tipoCambio}
           ocsPorCot={ocsPorCot}
           otsPorCot={otsPorCot}
