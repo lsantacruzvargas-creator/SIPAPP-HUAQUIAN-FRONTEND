@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
+import DosLineas from "../components/DosLineas";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import { formatearFecha } from "../utils/fecha";
 import DetalleDocumento from "../components/DetalleDocumento";
 import TablaScroll from "../components/TablaScroll";
 import { DotChip, badgeGeneral, dotGeneral } from "../components/detalleShared";
 
-const TH = "px-4 py-3 font-semibold text-gray-500 whitespace-nowrap";
+const TH = "px-3 py-3 font-semibold text-gray-500 whitespace-nowrap align-bottom leading-tight";
 
 const money = (v) => "S/ " + Number(v ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2 });
 
@@ -23,14 +24,14 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, otGroupMap, mostrarOT
           <table className="w-full text-sm" style={{ minWidth: "900px" }}>
             <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-200">
               <tr>
-                <th className={`${TH} text-left`}>N° Cotización</th>
-                {mostrarOT && <th className={`${TH} text-left`}>N° OT</th>}
-                <th className={`${TH} text-left`}>Empresa</th>
-                <th className={`${TH} text-left`}>Título</th>
-                <th className={`${TH} text-right`}>Total</th>
-                <th className={`${TH} text-center`}>Fecha</th>
-                {mostrarAprobacion && <th className={`${TH} text-left`}>Aprobado por</th>}
-                <th className={`${TH} text-center`}>Aprobar</th>
+                <th className={`${TH} text-left`}><DosLineas>N° Cotización</DosLineas></th>
+                {mostrarOT && <th className={`${TH} text-left`}><DosLineas>N° OT</DosLineas></th>}
+                <th className={`${TH} text-left min-w-[13rem]`}><DosLineas>Empresa</DosLineas></th>
+                <th className={`${TH} text-left min-w-[13rem]`}><DosLineas>Título</DosLineas></th>
+                <th className={`${TH} text-right`}><DosLineas>Total</DosLineas></th>
+                <th className={`${TH} text-center`}><DosLineas>Fecha</DosLineas></th>
+                {mostrarAprobacion && <th className={`${TH} text-left`}><DosLineas>Aprobado por</DosLineas></th>}
+                <th className={`${TH} text-center`}><DosLineas>Aprobar</DosLineas></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">

@@ -90,6 +90,7 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
   const [buscadorOC, setBOC]      = useState(false);
   const [cot, setCot]             = useState(inicial.cotizacion || null);
   const [ot, setOt]               = useState(null);
+  const [consolidadas, setConsolidadas] = useState([]);
   const [informes, setInformes]   = useState([]);
   const [guardando, setGuardando] = useState(false);
   const [error, setError]         = useState("");
@@ -149,6 +150,24 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
         (ots && cotResuelta && ots.find(o => (o.cotizacion?._id || o.cotizacion) === cotResuelta._id)) ||
         null;
       setOt(otResuelta || null);
+
+      // OC consolidada: la factura cubre varias cotizaciones enteras, cada una con su OT.
+      const lineas = ocVinculada?.lineas || [];
+      if (lineas.length && cots && ots) {
+        const partes = lineas.map((l) => {
+          const id = l.cotizacion?._id || l.cotizacion;
+          return {
+            linea: l,
+            cot: cots.find(c => c._id === id) || null,
+            ots: ots.filter(o => !o.ordenPadre && (o.cotizacion?._id || o.cotizacion) === id),
+          };
+        });
+        setConsolidadas(partes);
+        const idsOT = partes.flatMap(p => p.ots.map(o => o._id));
+        Promise.all(idsOT.map(id => fetchAuth(`/informes?ordenTrabajo=${id}`).then(r => (r.ok ? r.json() : []))))
+          .then(listas => setInformes(listas.flat()));
+        return;
+      }
 
       if (otResuelta) {
         fetchAuth(`/informes?ordenTrabajo=${otResuelta._id}`)
@@ -511,19 +530,43 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
               <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Relaciones</h2>
             </div>
 
-            <TarjetaRelacion tipo="cotizacion" codigo={cot?.codigo} numero={cot?.numeroCotizacion} vacio={!cot}
-              onClick={cot ? () => onNavegar?.({ tipo: "cotizacion", data: cot }) : undefined}>
-              <p className="text-sm text-gray-700 line-clamp-2">{cot?.titulo}</p>
-              {puedeVerPrecios && cot?.total > 0 && <p className="text-xs text-gray-500">{money(cot.total)}</p>}
-            </TarjetaRelacion>
+            {consolidadas.length > 0 ? (
+              <>
+                {consolidadas.map(({ linea, cot: c }) => (
+                  <TarjetaRelacion key={linea.cotizacion?._id || linea.cotizacion} tipo="cotizacion"
+                    codigo={c?.codigo} numero={c?.numeroCotizacion}
+                    onClick={c ? () => onNavegar?.({ tipo: "cotizacion", data: c }) : undefined}>
+                    <p className="text-sm text-gray-700 line-clamp-2">{linea.titulo || c?.titulo}</p>
+                    {puedeVerPrecios && <p className="text-xs text-gray-500">{money(linea.subtotal, c?.moneda)} sin IGV</p>}
+                  </TarjetaRelacion>
+                ))}
+                {consolidadas.flatMap(p => p.ots).map(o => (
+                  <TarjetaRelacion key={o._id} tipo="ot" codigo={o.codigo} numero={o.numeroOT}
+                    onClick={() => onNavegar?.({ tipo: "ot", data: o })}>
+                    {o.estadoGeneral && <Chip className={badgeGeneral(o.estadoGeneral)}>{o.estadoGeneral}</Chip>}
+                    {o.personalEncargado?.nombre && (
+                      <p className="text-xs text-gray-500">Técnico: {o.personalEncargado.nombre}</p>
+                    )}
+                  </TarjetaRelacion>
+                ))}
+              </>
+            ) : (
+              <>
+                <TarjetaRelacion tipo="cotizacion" codigo={cot?.codigo} numero={cot?.numeroCotizacion} vacio={!cot}
+                  onClick={cot ? () => onNavegar?.({ tipo: "cotizacion", data: cot }) : undefined}>
+                  <p className="text-sm text-gray-700 line-clamp-2">{cot?.titulo}</p>
+                  {puedeVerPrecios && cot?.total > 0 && <p className="text-xs text-gray-500">{money(cot.total)}</p>}
+                </TarjetaRelacion>
 
-            <TarjetaRelacion tipo="ot" codigo={ot?.codigo} numero={ot?.numeroOT} vacio={!ot}
-              onClick={ot ? () => onNavegar?.({ tipo: "ot", data: ot }) : undefined}>
-              {ot?.estadoGeneral && <Chip className={badgeGeneral(ot.estadoGeneral)}>{ot.estadoGeneral}</Chip>}
-              {ot?.personalEncargado?.nombre && (
-                <p className="text-xs text-gray-500">Técnico: {ot.personalEncargado.nombre}</p>
-              )}
-            </TarjetaRelacion>
+                <TarjetaRelacion tipo="ot" codigo={ot?.codigo} numero={ot?.numeroOT} vacio={!ot}
+                  onClick={ot ? () => onNavegar?.({ tipo: "ot", data: ot }) : undefined}>
+                  {ot?.estadoGeneral && <Chip className={badgeGeneral(ot.estadoGeneral)}>{ot.estadoGeneral}</Chip>}
+                  {ot?.personalEncargado?.nombre && (
+                    <p className="text-xs text-gray-500">Técnico: {ot.personalEncargado.nombre}</p>
+                  )}
+                </TarjetaRelacion>
+              </>
+            )}
 
             <TarjetaRelacion
               tipo="informe"
@@ -543,6 +586,7 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
               onClick={oc ? abrirOC : undefined} cargando={cargandoOC}>
               {oc?.titulo && <p className="text-xs text-gray-500 line-clamp-2">{oc.titulo}</p>}
               {puedeVerPrecios && (oc?.monto || oc?.total) > 0 && <p className="text-xs text-gray-500">{money(oc.monto ?? oc.total)}</p>}
+              {consolidadas.length > 0 && <Chip className="bg-indigo-100 text-indigo-700">Consolidada · {consolidadas.length} cotizaciones</Chip>}
             </TarjetaRelacion>
 
             <TarjetaRelacion tipo="factura" codigo={inicial.codigo} numero={inicial.numeroFactura} actual>

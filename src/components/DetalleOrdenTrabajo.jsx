@@ -18,7 +18,7 @@ import ModalDetalleGuia from "./ModalDetalleGuia";
 import ConfirmacionAccion from "./ConfirmacionAccion";
 import { exportarInformeTecnicoExcel, exportarInformesTecnicosExcelCombinado } from "../utils/informeTecnicoExcel";
 import {
-  FlujoNegocio, TarjetaRelacion, Chip,
+  FlujoNegocio, TarjetaRelacion, Chip, ParteConsolidada,
   badgePago, badgeGeneral, money, BotonAnular, BotonCerrarCadena, BotonDesanular, BannerAnulado, bloqueadoPorCadenaCerrada,
 } from "./detalleShared";
 
@@ -954,6 +954,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
                 onClick={oc ? () => onNavegar?.({ tipo: "oc", data: oc, extra: factura }) : undefined}
                 onCrear={!oc && cot && !ot.anulado ? () => setCrearOCOpen(true) : undefined} crearLabel="OC">
                 {puedeVerPrecios && oc?.monto > 0 && <p className="text-xs text-gray-500">{money(oc.monto, cot?.moneda)}</p>}
+                <ParteConsolidada oc={oc} cotizacionId={cot?._id} moneda={cot?.moneda} verPrecios={puedeVerPrecios} />
               </TarjetaRelacion>
             )}
 
@@ -964,6 +965,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
                   <p className="text-xs text-gray-500">{money(factura.totalAPagar ?? factura.total, cot?.moneda)}</p>
                 )}
                 {factura?.estadoPago && <Chip className={badgePago(factura.estadoPago)}>{factura.estadoPago}</Chip>}
+                {factura && <ParteConsolidada oc={oc} cotizacionId={cot?._id} moneda={cot?.moneda} verPrecios={puedeVerPrecios} />}
               </TarjetaRelacion>
             )}
           </section>

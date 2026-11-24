@@ -141,6 +141,25 @@ export default function EmitirComprobante() {
     const unidad = esServicio ? "ZZ" : "NIU";
     setTipoBienServicio(esServicio ? "servicio" : "bien");
     if (cotizacion?.moneda) setMoneda(cotizacion.moneda);
+    setNumeroOrdenCompra(oc.numeroOrden || oc.codigo || "");
+    setOrdenCompraId(oc._id || "");
+    // OC consolidada: una línea por cotización anexada, por el monto de esa cotización en la OC.
+    if (oc.lineas?.length) {
+      setItems(oc.lineas.map((l) => {
+        const valor = r2(Number(l.subtotal) || 0);
+        return {
+          ...itemVacioComprobante(),
+          descripcion: l.titulo || l.cotizacion?.titulo || "",
+          cantidad: 1,
+          unidad,
+          valorUnitario: valor,
+          precioUnitario: precioUnitarioDesdeValor(valor, "10"),
+          afectacion: "10",
+          descuentoPorcentaje: 0,
+        };
+      }));
+      return;
+    }
     // Ítems Gloria del grupo "mano_obra" usan personas×horas×tarifaHora en
     // vez de cantidad/precio (ver Cotizacion.js itemSchema) — se traduce a
     // cantidad/valorUnitario equivalentes. Filas puramente informativas o
@@ -200,8 +219,6 @@ export default function EmitirComprobante() {
     } else {
       setItems([{ ...itemVacioComprobante(), descripcion: oc.descripcion || oc.titulo || "", unidad }]);
     }
-    setNumeroOrdenCompra(oc.numeroOrden || oc.codigo || "");
-    setOrdenCompraId(oc._id || "");
   };
 
   useEffect(() => {

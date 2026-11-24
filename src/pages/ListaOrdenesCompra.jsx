@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import DosLineas from "../components/DosLineas";
 import { fetchAuth, uploadAuth, abrirArchivoProtegido, getUsuario } from "../utils/fetchAuth";
 import { formatearFecha, anioLima, mesLima } from "../utils/fecha";
 import DetalleDocumento from "../components/DetalleDocumento";
@@ -11,7 +12,7 @@ import * as XLSX from "xlsx";
 import { r2 } from "../utils/redondeo";
 
 const MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
-const TH = "px-4 py-3 font-semibold text-gray-500 whitespace-nowrap";
+const TH = "px-3 py-3 font-semibold text-gray-500 whitespace-nowrap align-bottom leading-tight";
 
 // "Todas las Órdenes de Compra" (tabla única, sin categorizar por estado) es
 // la vista por defecto al abrir la página — mismo patrón pedido para
@@ -84,22 +85,22 @@ function TablaOC({
         <table className="w-full text-sm" style={{ minWidth: `${totalColumnas * 85}px` }}>
           <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-200">
             <tr>
-              <th className={`${TH} text-left`}>Cotización</th>
-              <th className={`${TH} text-left`}>N° OT</th>
-              <th className={`${TH} text-left`}>N° Orden de Compra</th>
-              <th className={`${TH} text-left`}>Fecha de creación</th>
-              {mostrarFactura && <th className={`${TH} text-left`}>N° Factura</th>}
-              <th className={`${TH} text-left`}>Empresa</th>
-              {mostrarTitulo && <th className={`${TH} text-left`}>Título</th>}
-              {puedeVerPrecios && <th className={`${TH} text-right`}>Total (S/)</th>}
-              {puedeVerPrecios && <th className={`${TH} text-right`}>Total (US$)</th>}
-              <th className={`${TH} text-center`}>Estado Cotización</th>
-              <th className={`${TH} text-center`}>Estado de servicio</th>
-              <th className={`${TH} text-center`}>Estado Informes</th>
-              <th className={`${TH} text-center`}>GRE</th>
-              {mostrarHesActa && <th className={`${TH} text-center`}>HES</th>}
-              {mostrarHesActa && <th className={`${TH} text-center`}>Acta de Conformidad</th>}
-              {mostrarDocumento && <th className={`${TH} text-center`}>Documento</th>}
+              <th className={`${TH} text-left`}><DosLineas>Cotización</DosLineas></th>
+              <th className={`${TH} text-left`}><DosLineas>N° OT</DosLineas></th>
+              <th className={`${TH} text-left`}><DosLineas>N° Orden de Compra</DosLineas></th>
+              <th className={`${TH} text-left`}><DosLineas>Fecha de creación</DosLineas></th>
+              {mostrarFactura && <th className={`${TH} text-left`}><DosLineas>N° Factura</DosLineas></th>}
+              <th className={`${TH} text-left min-w-[13rem]`}><DosLineas>Empresa</DosLineas></th>
+              {mostrarTitulo && <th className={`${TH} text-left min-w-[13rem]`}><DosLineas>Título</DosLineas></th>}
+              {puedeVerPrecios && <th className={`${TH} text-right`}><DosLineas>Total (S/)</DosLineas></th>}
+              {puedeVerPrecios && <th className={`${TH} text-right`}><DosLineas>Total (US$)</DosLineas></th>}
+              <th className={`${TH} text-center`}><DosLineas>Estado Cotización</DosLineas></th>
+              <th className={`${TH} text-center`}><DosLineas>Estado de servicio</DosLineas></th>
+              <th className={`${TH} text-center`}><DosLineas>Estado Informes</DosLineas></th>
+              <th className={`${TH} text-center`}><DosLineas>GRE</DosLineas></th>
+              {mostrarHesActa && <th className={`${TH} text-center`}><DosLineas>HES</DosLineas></th>}
+              {mostrarHesActa && <th className={`${TH} text-center`}><DosLineas>Acta de Conformidad</DosLineas></th>}
+              {mostrarDocumento && <th className={`${TH} text-center`}><DosLineas>Documento</DosLineas></th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">

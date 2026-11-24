@@ -4,6 +4,7 @@ import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import { formatearFecha, aInputFecha } from "../utils/fecha";
 import { estadoComprobanteClase } from "../utils/catalogosSunat";
 import ModalDetalleGuia from "./ModalDetalleGuia";
+import ConfirmacionAccion from "./ConfirmacionAccion";
 import {
   FlujoNegocio, TarjetaRelacion, Chip,
   badgePago, badgeGeneral, money, totalSinIgv, BotonAnular, BotonCerrarCadena, BotonDesanular, BannerAnulado, bloqueadoPorCadenaCerrada,
@@ -21,6 +22,88 @@ function calcular(sub) {
   // depósito se hace en números enteros (sin decimales).
   const detraccion = total >= 701 ? r0(total * 0.12) : 0;
   return { igv, total, detraccion, totalAPagar: r2((total - detraccion)) };
+}
+
+// El backend (GET /ordenes-compra/:id/anexables) ya filtra: misma empresa y moneda, sin OC ni factura.
+function ModalAnexarCotizaciones({ orden, moneda, verPrecios, onClose, onAnexada }) {
+  const [datos, setDatos] = useState(null);
+  const [elegidas, setElegidas] = useState([]);
+  const [q, setQ] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    fetchAuth(`/ordenes-compra/${orden._id}/anexables`)
+      .then(async (r) => (r.ok ? r.json() : { motivo: "No se pudo cargar la lista de cotizaciones.", cotizaciones: [] }))
+      .then(setDatos);
+  }, [orden._id]);
+
+  const lista = (datos?.cotizaciones || []).filter((c) =>
+    !q || [c.numeroCotizacion, c.codigo, c.titulo, ...(c.ots || [])].some((v) => String(v || "").toLowerCase().includes(q.toLowerCase())));
+  const alternar = (id) => setElegidas((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  const suma = (datos?.cotizaciones || []).filter((c) => elegidas.includes(c._id)).reduce((s, c) => s + c.subtotalOC, 0);
+
+  const anexar = async () => {
+    setGuardando(true); setError("");
+    const res = await fetchAuth(`/ordenes-compra/${orden._id}/anexar`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cotizaciones: elegidas }),
+    });
+    const data = await res.json();
+    setGuardando(false);
+    if (!res.ok) return setError(data.mensaje || "No se pudieron anexar las cotizaciones.");
+    onAnexada(data);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div>
+            <h3 className="font-semibold text-gray-800">Anexar cotizaciones a la OC</h3>
+            <p className="text-xs text-gray-400">Cada cotización pasa a la cadena de esta OC y se factura en su propia línea.</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl">✕</button>
+        </div>
+        <div className="px-6 pt-4">
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por N° cotización, título u OT…" className={INP} />
+        </div>
+        <div className="flex-1 overflow-y-auto px-6 py-3 space-y-1.5">
+          {!datos && <p className="text-sm text-gray-400 py-6 text-center">Cargando…</p>}
+          {datos?.motivo && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{datos.motivo}</p>}
+          {datos && !datos.motivo && lista.length === 0 && (
+            <p className="text-sm text-gray-400 py-6 text-center">No hay cotizaciones de esta empresa, en la misma moneda y sin OC.</p>
+          )}
+          {lista.map((c) => (
+            <label key={c._id} className={`flex items-start gap-3 rounded-xl border px-3 py-2.5 cursor-pointer transition ${elegidas.includes(c._id) ? "border-blue-300 bg-blue-50" : "border-gray-100 hover:bg-gray-50"}`}>
+              <input type="checkbox" checked={elegidas.includes(c._id)} onChange={() => alternar(c._id)} className="mt-1 w-4 h-4" />
+              <div className="flex-1 min-w-0">
+                <div className="flex justify-between gap-3">
+                  <span className="font-mono text-xs text-blue-600">{c.numeroCotizacion || c.codigo}</span>
+                  {verPrecios && <span className="text-xs text-gray-500 shrink-0">{money(c.subtotalOC, moneda)} sin IGV</span>}
+                </div>
+                <p className="text-sm text-gray-700 truncate">{c.titulo}</p>
+                <p className="text-xs text-gray-400">OT: {c.ots.join(", ") || "—"}</p>
+              </div>
+            </label>
+          ))}
+        </div>
+        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between gap-3">
+          <span className="text-xs text-gray-500">
+            {elegidas.length} seleccionada{elegidas.length !== 1 ? "s" : ""}{verPrecios && elegidas.length > 0 && ` · ${money(suma, moneda)} sin IGV`}
+          </span>
+          <div className="flex items-center gap-3">
+            {error && <span className="text-xs text-red-500">{error}</span>}
+            <button onClick={anexar} disabled={!elegidas.length || guardando}
+              className="bg-blue-600 text-white text-sm px-5 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition font-semibold">
+              {guardando ? "Anexando…" : "Anexar"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function DetalleOrdenCompra({ orden, onClose, onGuardada, facturaVinculada, onNavegar }) {
@@ -54,7 +137,12 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
   const [cargandoCrearFactura, setCargandoCrearFactura] = useState(false);
   const navigate = useNavigate();
   const [ordenActual, setOrdenActual] = useState(orden);
+  const consolidada = (ordenActual.lineas || []).length > 0;
   const [guardandoConfirmacion, setGuardandoConfirmacion] = useState("");
+  const [todasOTs, setTodasOTs] = useState([]);
+  const [anexando, setAnexando] = useState(false);
+  const [lineaADesanexar, setLineaADesanexar] = useState(null);
+  const [desanexando, setDesanexando] = useState(false);
   const rolActual = getUsuario()?.rol;
   const puedeEditar = ["admin", "asistente", "facturacion", "jefatura"].includes(rolActual);
   // Anular un documento queda reservado a Admin y Jefatura — Facturación ya
@@ -136,7 +224,7 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
     }
     setCargandoCrearFactura(false);
     navigate("/facturacion-electronica/emitir", {
-      state: { prellenarDesdeOC: { oc: orden, cotizacion: cotizacionCompleta } },
+      state: { prellenarDesdeOC: { oc: ordenActual, cotizacion: cotizacionCompleta } },
     });
   };
 
@@ -160,6 +248,7 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
   const cargarOTeInformes = () => {
     const cotId = orden.cotizacion?._id || orden.cotizacion;
     fetchAuth("/ordenes-trabajo").then(r => r.ok && r.json()).then(ots => {
+      setTodasOTs(ots || []);
       if (!cotId || !ots) return;
       const found = ots.find(o => (o.cotizacion?._id || o.cotizacion) === cotId);
       setOt(found || null);
@@ -213,6 +302,11 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
       fechaSalida:        form.fechaSalida || null,
     };
     if (form.empresa) payload.empresa = form.empresa;
+    // Ocultos en una OC consolidada: no se reenvían para no pisar los de la cotización de origen.
+    if (consolidada) {
+      ["titulo", "encargado", "planta", "numeroGuiaEmision", "numeroGuiaRemision", "codigoSap", "fechaSalida"]
+        .forEach((k) => delete payload[k]);
+    }
 
     const res = await fetchAuth(`/ordenes-compra/${orden._id}`, {
       method: "PUT",
@@ -231,7 +325,7 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
       body: JSON.stringify({ motivo }),
     });
     if (res.ok) { onGuardada(await res.json()); }
-    else { setError("Error al anular el documento."); }
+    else { setError((await res.json().catch(() => ({}))).mensaje || "Error al anular el documento."); }
   };
 
   const desanular = async () => {
@@ -252,6 +346,34 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
 
   const cot     = orden.cotizacion;
   const factura = facturaVinculada;
+
+  // OC consolidada (varias cotizaciones enteras en una OC): ver routes/ordenesCompra.js.
+  const cotId = cot?._id || cot;
+  const lineas = ordenActual.lineas || [];
+  const lineasMostradas = lineas.length ? lineas : (cot ? [{ cotizacion: cot, titulo: cot.titulo, subtotal: ordenActual.subtotal }] : []);
+  const puedeAnexar = puedeEditar && !orden.anulado && !cadenaCerrada && !factura && !ordenActual.numeroFactura
+    && !ordenActual.desdeItemsCotizacion && !!cot;
+  const otsDeCotizacion = (id) => todasOTs
+    .filter(o => !o.ordenPadre && (o.cotizacion?._id || o.cotizacion) === id)
+    .map(o => o.numeroOT || o.codigo);
+  const aplicarOrden = (nueva) => {
+    setOrdenActual(nueva);
+    setForm(prev => ({ ...prev, subtotal: String(nueva.subtotal ?? 0) }));
+    setCalc(calcular(nueva.subtotal ?? 0));
+  };
+  const confirmarDesanexo = async () => {
+    setDesanexando(true);
+    const res = await fetchAuth(`/ordenes-compra/${orden._id}/desanexar`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cotizacion: lineaADesanexar.cotizacion?._id || lineaADesanexar.cotizacion }),
+    });
+    const data = await res.json();
+    setDesanexando(false);
+    setLineaADesanexar(null);
+    if (res.ok) aplicarOrden(data);
+    else setError(data.mensaje || "No se pudo desanexar la cotización.");
+  };
   const ultimo  = informes[informes.length - 1];
 
   const pasos = [
@@ -289,7 +411,7 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
                 {puedeVerPrecios && (
                   <>
                     <p className="text-[10px] text-white/60 uppercase tracking-widest leading-none">Total sin IGV</p>
-                    <p className="text-lg font-bold leading-tight">{money(totalSinIgv(orden), cot?.moneda)}</p>
+                    <p className="text-lg font-bold leading-tight">{money(totalSinIgv(ordenActual), cot?.moneda)}</p>
                   </>
                 )}
                 {factura?.estadoPago && (
@@ -399,6 +521,8 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
               </select>
             </div>
 
+            {/* OC consolidada: estos datos son propios de cada cotización y su OT (se editan allí). */}
+            {!consolidada && (<>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-xs text-gray-500 block mb-1">Encargado</label>
@@ -451,6 +575,7 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
                 <input type="date" name="fechaSalida" value={form.fechaSalida} onChange={handleChange} className={INP} />
               </div>
             </div>
+            </>)}
 
             {/* Cálculos — ocultos para Administración y Coordinadora, que no ven/editan montos */}
             {puedeVerPrecios && (
@@ -571,10 +696,93 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
             </TarjetaRelacion>
           </section>
         </div>
+
+        {(lineas.length > 0 || puedeAnexar) && (
+          <div className="max-w-6xl mx-auto px-8 pb-8">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                <div className="flex items-center gap-2">
+                  <span className="w-1.5 h-5 rounded-full bg-sky-500" />
+                  <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Cotizaciones de esta OC</h2>
+                  <span className="text-xs text-gray-400">({lineasMostradas.length})</span>
+                </div>
+                {puedeAnexar && (
+                  <button type="button" onClick={() => setAnexando(true)}
+                    className="bg-sky-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-sky-700 transition font-medium">
+                    + Anexar cotizaciones
+                  </button>
+                )}
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                    <tr>
+                      <th className="px-3 py-3 text-center w-12">Item</th>
+                      <th className="px-3 py-3 text-left w-36">N° cotización</th>
+                      <th className="px-3 py-3 text-left w-36">N° OT</th>
+                      <th className="px-3 py-3 text-left">Título</th>
+                      {puedeVerPrecios && <th className="px-3 py-3 text-right w-40">Total sin IGV</th>}
+                      {puedeAnexar && lineas.length > 0 && <th className="px-3 py-3 w-10"><span className="sr-only">Desanexar</span></th>}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {lineasMostradas.map((l, idx) => {
+                      const id = l.cotizacion?._id || l.cotizacion;
+                      return (
+                        <tr key={id} className="align-top">
+                          <td className="px-3 py-3 text-center text-gray-400">{idx + 1}</td>
+                          <td className="px-3 py-3 font-mono text-sm text-sky-700 whitespace-nowrap">
+                            {l.cotizacion?.numeroCotizacion || l.cotizacion?.codigo || "—"}
+                            {id === cotId && lineas.length > 0 && (
+                              <span className="ml-2 font-sans text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-sky-50 text-sky-700 uppercase">Origen</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-3 font-mono text-sm text-gray-600">{otsDeCotizacion(id).join(", ") || "—"}</td>
+                          <td className="px-3 py-3 font-semibold text-gray-800 text-xs uppercase tracking-wide">{l.titulo}</td>
+                          {puedeVerPrecios && (
+                            <td className="px-3 py-3 text-right font-semibold text-gray-800 tabular-nums whitespace-nowrap">{money(l.subtotal, cot?.moneda)}</td>
+                          )}
+                          {puedeAnexar && lineas.length > 0 && (
+                            <td className="px-3 py-3 text-center">
+                              {id !== cotId && (
+                                <button type="button" title="Desanexar cotización" onClick={() => setLineaADesanexar(l)}
+                                  className="text-gray-300 hover:text-red-500 transition">✕</button>
+                              )}
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  {puedeVerPrecios && lineas.length > 0 && (
+                    <tfoot className="bg-gray-50 border-t border-gray-200">
+                      <tr>
+                        <td colSpan={4} className="px-3 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Total sin IGV de la OC</td>
+                        <td className="px-3 py-3 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap">{money(ordenActual.subtotal, cot?.moneda)}</td>
+                        {puedeAnexar && <td />}
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {guiaDetalle && (
         <ModalDetalleGuia guia={guiaDetalle} onClose={() => setGuiaDetalle(null)} />
+      )}
+      {anexando && (
+        <ModalAnexarCotizaciones orden={ordenActual} moneda={cot?.moneda} verPrecios={puedeVerPrecios}
+          onClose={() => setAnexando(false)}
+          onAnexada={(nueva) => { aplicarOrden(nueva); setAnexando(false); }} />
+      )}
+      {lineaADesanexar && (
+        <ConfirmacionAccion
+          mensaje={`¿Desanexar la cotización ${lineaADesanexar.cotizacion?.numeroCotizacion || lineaADesanexar.cotizacion?.codigo || ""}? Vuelve a su cadena original (con su OT) y sale del monto de esta OC.`}
+          textoConfirmar="Desanexar" procesando={desanexando}
+          onCancelar={() => setLineaADesanexar(null)} onConfirmar={confirmarDesanexo} />
       )}
     </div>
   );

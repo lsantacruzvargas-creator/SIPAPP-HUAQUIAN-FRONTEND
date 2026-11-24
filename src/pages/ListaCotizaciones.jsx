@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
+import DosLineas from "../components/DosLineas";
 import { useLocation, useNavigate } from "react-router-dom";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
-import { formatearFecha, anioLima, mesLima } from "../utils/fecha";
+import { formatearFecha, aInputFecha } from "../utils/fecha";
 import DetalleDocumento from "../components/DetalleDocumento";
 import ModalImportarExcel, { COLS_COT_OT, COLS_COTIZACIONES } from "../components/ModalImportarExcel";
 import ModalNuevaOT from "../components/ModalNuevaOT";
@@ -13,12 +14,10 @@ import { usePaginacion } from "../utils/usePaginacion";
 import * as XLSX from "xlsx";
 import { r2 } from "../utils/redondeo";
 
-const MESES = [
-  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
-];
-
-const FILTROS_VACIO = { empresa: "", planta: "", ano: "", mes: "", oc: "", estadoServicio: "", busqueda: "", informeEnviado: false };
+const FILTROS_VACIO = {
+  empresa: "", planta: "", oc: "", estadoServicio: "", busqueda: "", informeEnviado: false,
+  fechaDesde: "", fechaHasta: "", precioDesde: "", precioHasta: "",
+};
 
 // Valores de OrdenTrabajo.estadoGeneral; "sin_ot" = la cotización todavía no tiene OT (columna en "—").
 const FILTRO_ESTADOS_SERVICIO = [...ESTADOS_SERVICIO, { valor: "sin_ot", label: "Sin OT" }];
@@ -29,10 +28,12 @@ const VISTAS = [
   { valor: "sinOT",      label: "Cotizaciones sin OT" },
   { valor: "pendientes", label: "Cotizaciones pendientes de OC" },
   { valor: "conOC",      label: "Cotización con OC" },
+  { valor: "enviadas",   label: "Cotizaciones enviadas" },
+  { valor: "aprobadas",  label: "Cotizaciones aprobadas" },
   { valor: "cerradas",   label: "Cotizaciones cerradas" },
 ];
 
-const TH = "px-4 py-3 font-semibold text-gray-500 whitespace-nowrap";
+const TH = "px-3 py-3 font-semibold text-gray-500 whitespace-nowrap align-bottom leading-tight";
 
 const SORTS = [
   { valor: "numeroOT",          label: "N° OT" },
@@ -77,7 +78,8 @@ const titulosOT = (ots) =>
 // Se usa `total − igv` (exacto) y no `total / 1.18`: este último arrastra
 // decimales que, multiplicados por el TC, descuadraban la conversión en
 // ±0.01 (reportado por el usuario, 2026-11-06). `/1.18` queda solo de
-// respaldo para filas sin `igv` (pseudo-filas de OT).const totalesDuales = (c, tipoCambio) => {
+// respaldo para filas sin `igv` (pseudo-filas de OT).
+const totalesDuales = (c, tipoCambio) => {
   const total = Number(c.total) || 0;
   const igv = Number(c.igv) || 0;
   const sinIgv = r2(igv > 0 ? total - igv : c.total != null ? total / 1.18 : Number(c.subtotal) || 0);
@@ -88,12 +90,32 @@ const titulosOT = (ots) =>
   return { pen: sinIgv, usd: tc > 0 ? r2(sinIgv / tc) : null };
 };
 
-// Días transcurridos desde que se marcó "informe enviado" — null si nunca
-// se marcó (no hay `fechaInformeEnviado`).
-const diasDesdeInforme = (c) =>
-  c.fechaInformeEnviado ? Math.floor((Date.now() - new Date(c.fechaInformeEnviado).getTime()) / 86400000) : null;
+// Días transcurridos desde el ingreso (fechaRecibida) — mismo cálculo que
+// "Días desde recibido" en ListaOrdenesTrabajo.jsx; se toma la de la OT y, si
+// no tiene, la de la cotización.
+const diasDesdeRecibido = (fecha) => {
+  if (!fecha) return null;
+  return Math.max(0, Math.floor((Date.now() - new Date(fecha).getTime()) / 86400000));
+};
 
-function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, tipoCambio, mostrarDiasInforme, puedeVerPrecios, mostrarEstadoServicio, mostrarTituloOT, otsPorCot, ocsPorCot, colOtEstrecha }) {
+// Rango "desde/hasta" de un input type=date contra el día calendario de Lima
+// (mismo criterio que el filtro de fechas de ListaOrdenesTrabajo.jsx).
+const dentroDeRangoFecha = (fecha, desde, hasta) => {
+  if (!desde && !hasta) return true;
+  if (!fecha) return false;
+  const dia = aInputFecha(fecha);
+  if (desde && dia < desde) return false;
+  if (hasta && dia > hasta) return false;
+  return true;
+};
+
+const otPrincipalDe = (otsPorCot, c) => otsPorCot?.get(c._id)?.[0] || null;
+const fechaSalidaDe = (otsPorCot, c) => otPrincipalDe(otsPorCot, c)?.fechaSalida || c.fechaSalida || null;
+const fechaRecibidaDe = (otsPorCot, c) => otPrincipalDe(otsPorCot, c)?.fechaRecibida || c.fechaRecibida || null;
+
+const VACIO = <span className="text-gray-300">—</span>;
+
+function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, tipoCambio, puedeVerPrecios, otsPorCot, ocsPorCot, colOtEstrecha }) {
   const pag = usePaginacion(cotizaciones);
   return (
     <div className="mb-6">
@@ -107,41 +129,47 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
         <table className="w-full text-sm" style={{ minWidth: "1000px" }}>
           <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-200">
             <tr>
-              <th className={`${TH} text-left`}>N° Cotización</th>
-              {mostrarEstadoServicio && <th className={`${TH} text-left ${colOtEstrecha ? "w-20" : ""}`}>N° OT</th>}
-              <th className={`${TH} text-left`}>N° OC</th>
-              <th className={`${TH} text-left`}>Empresa</th>
-              <th className={`${TH} text-left`}>Planta</th>
-              <th className={`${TH} text-left`}>Contacto</th>
-              <th className={`${TH} text-left`}>Título cotización</th>
-              <th className={`${TH} text-center`}>Aprobado</th>
-              <th className={`${TH} text-center`}>Enviado</th>
-              {mostrarEstadoServicio && <th className={`${TH} text-center`}>Estado de servicio</th>}
-              {mostrarEstadoServicio && <th className={`${TH} text-center`}>Fecha de salida a cliente</th>}
-              <th className={`${TH} text-center`}>Informe enviado</th>
-              {mostrarTituloOT && <th className={`${TH} text-left`}>Título orden de trabajo</th>}
-              {mostrarDiasInforme && <th className={`${TH} text-center`}>Días desde informe enviado</th>}
-              {puedeVerPrecios && <th className={`${TH} text-right`}>Total sin IGV (S/)</th>}
-              {puedeVerPrecios && <th className={`${TH} text-right`}>Total sin IGV (US$)</th>}
+              <th className={`${TH} text-left ${colOtEstrecha ? "w-20" : ""}`}><DosLineas>N° OT</DosLineas></th>
+              <th className={`${TH} text-left min-w-[13rem]`}><DosLineas>Empresa</DosLineas></th>
+              <th className={`${TH} text-left`}><DosLineas>Planta</DosLineas></th>
+              <th className={`${TH} text-left`}><DosLineas>Supervisor solicitante</DosLineas></th>
+              <th className={`${TH} text-left`}><DosLineas>N° Cotización</DosLineas></th>
+              <th className={`${TH} text-left min-w-[13rem]`}><DosLineas>Título cotización</DosLineas></th>
+              <th className={`${TH} text-center`}><DosLineas>Estado de servicio</DosLineas></th>
+              <th className={`${TH} text-center`}><DosLineas>Fecha de salida a cliente</DosLineas></th>
+              <th className={`${TH} text-left`}><DosLineas>N° OC</DosLineas></th>
+              <th className={`${TH} text-left min-w-[13rem]`}><DosLineas>Título orden de trabajo</DosLineas></th>
+              <th className={`${TH} text-center`}><DosLineas>Días desde recibido</DosLineas></th>
+              <th className={`${TH} text-center`}><DosLineas>Informe enviado</DosLineas></th>
+              {puedeVerPrecios && <th className={`${TH} text-right`}><DosLineas>Total sin IGV (S/)</DosLineas></th>}
+              {puedeVerPrecios && <th className={`${TH} text-right`}><DosLineas>Total sin IGV (US$)</DosLineas></th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {cotizaciones.length === 0 ? (
               <tr>
-                <td colSpan={9 + (puedeVerPrecios ? 2 : 0) + (mostrarDiasInforme ? 1 : 0) + (mostrarEstadoServicio ? 3 : 0) + (mostrarTituloOT ? 1 : 0)} className="px-4 py-8 text-center text-gray-400">{vacioMsg}</td>
+                <td colSpan={12 + (puedeVerPrecios ? 2 : 0)} className="px-4 py-8 text-center text-gray-400">{vacioMsg}</td>
               </tr>
             ) : (
               pag.visibles.map((c) => {
                 const { pen, usd } = totalesDuales(c, tipoCambio);
-                const otsDeCot = (mostrarEstadoServicio || mostrarTituloOT) ? otsPorCot?.get(c._id) : null;
-                // Solo se usa (y se busca) en la tabla de Pendientes de OC.
-                const otPrincipal = mostrarEstadoServicio ? otsDeCot?.[0] : null;
+                const otsDeCot = otsPorCot?.get(c._id);
+                const otPrincipal = otsDeCot?.[0];
+                const ocs = numerosOC(ocsPorCot?.get(c._id));
+                const fechaSalida = fechaSalidaDe(otsPorCot, c);
+                const dias = diasDesdeRecibido(fechaRecibidaDe(otsPorCot, c));
                 return (
                 <tr
                   key={c._id}
                   className={`hover:bg-gray-50 cursor-pointer transition-colors ${c.anulado ? "opacity-50" : ""} ${c._esOT ? "bg-indigo-50/30" : ""}`}
                   onClick={() => onSelect(c)}
                 >
+                  <td className={`px-4 py-3.5 text-gray-600 ${colOtEstrecha ? "w-20 max-w-[5rem] whitespace-normal break-words" : "whitespace-nowrap"}`}>
+                    {numerosOT(otsDeCot) || VACIO}
+                  </td>
+                  <td className="px-4 py-3.5 text-gray-700">{c.empresa?.razonSocial || VACIO}</td>
+                  <td className="px-4 py-3.5 text-gray-600">{c.planta || VACIO}</td>
+                  <td className="px-4 py-3.5 text-gray-600">{c.jefeSupervisorSolicitante || VACIO}</td>
                   <td className="px-4 py-3.5 font-semibold text-gray-800 whitespace-nowrap">
                     <div className="flex items-center gap-1.5">
                       {c._esOT ? (
@@ -158,69 +186,29 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
                       )}
                     </div>
                   </td>
-                  {mostrarEstadoServicio && (
-                    <td className={`px-4 py-3.5 text-gray-600 ${colOtEstrecha ? "w-20 max-w-[5rem] whitespace-normal break-words" : "whitespace-nowrap"}`}>
-                      {numerosOT(otsDeCot) || <span className="text-gray-300">—</span>}
-                    </td>
-                  )}
-                  <td className="px-4 py-3.5 text-gray-600 whitespace-nowrap">
-                    {numerosOC(ocsPorCot?.get(c._id)).map((n) => <div key={n}>{n}</div>)}
-                    {!numerosOC(ocsPorCot?.get(c._id)).length && <span className="text-gray-300">—</span>}
-                  </td>
-                  <td className="px-4 py-3.5 text-gray-700">
-                    {c.empresa?.razonSocial || <span className="text-gray-300">—</span>}
-                  </td>
-                  <td className="px-4 py-3.5 text-gray-600">{c.planta || <span className="text-gray-300">—</span>}</td>
-                  <td className="px-4 py-3.5 text-gray-600">
-                    {c.personaContacto || c.contactoNombre || <span className="text-gray-300">—</span>}
-                  </td>
                   <td className="px-4 py-3.5 text-gray-700">{c.titulo}</td>
                   <td className="px-4 py-3.5 text-center">
-                    {c._esOT ? <span className="text-gray-300">—</span> : (
-                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full uppercase tracking-wide whitespace-nowrap ${c.aprobado ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-                        {c.aprobado ? "Aprobada" : "Pendiente"}
-                      </span>
-                    )}
+                    {otPrincipal
+                      ? <DotChip chip={badgeGeneral(otPrincipal.estadoGeneral)} dot={dotGeneral(otPrincipal.estadoGeneral)}>{otPrincipal.estadoGeneral}</DotChip>
+                      : VACIO}
+                  </td>
+                  <td className="px-4 py-3.5 text-center text-gray-500 whitespace-nowrap">
+                    {fechaSalida ? formatearFecha(fechaSalida) : VACIO}
+                  </td>
+                  <td className="px-4 py-3.5 text-gray-600 whitespace-nowrap">
+                    {ocs.length ? ocs.map((n) => <div key={n}>{n}</div>) : VACIO}
+                  </td>
+                  <td className="px-4 py-3.5 text-gray-700">{titulosOT(otsDeCot) || VACIO}</td>
+                  <td className="px-4 py-3.5 text-center text-gray-600 tabular-nums">
+                    {dias != null ? `${dias} día${dias !== 1 ? "s" : ""}` : VACIO}
                   </td>
                   <td className="px-4 py-3.5 text-center">
-                    {c._esOT ? <span className="text-gray-300">—</span> : (
-                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full uppercase tracking-wide whitespace-nowrap ${c.enviado ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-                        {c.enviado ? "Enviada" : "No enviada"}
-                      </span>
-                    )}
-                  </td>
-                  {mostrarEstadoServicio && (
-                    <td className="px-4 py-3.5 text-center">
-                      {otPrincipal
-                        ? <DotChip chip={badgeGeneral(otPrincipal.estadoGeneral)} dot={dotGeneral(otPrincipal.estadoGeneral)}>{otPrincipal.estadoGeneral}</DotChip>
-                        : <span className="text-gray-300">—</span>}
-                    </td>
-                  )}
-                  {mostrarEstadoServicio && (
-                    <td className="px-4 py-3.5 text-center text-gray-500 whitespace-nowrap">
-                      {otPrincipal?.fechaSalida ? formatearFecha(otPrincipal.fechaSalida) : <span className="text-gray-300">—</span>}
-                    </td>
-                  )}
-                  <td className="px-4 py-3.5 text-center">
-                    {c._esOT ? <span className="text-gray-300">—</span> : (
+                    {c._esOT ? VACIO : (
                       <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full uppercase tracking-wide whitespace-nowrap ${c.informeEnviado ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
                         {c.informeEnviado ? "Enviado" : "No enviado"}
                       </span>
                     )}
                   </td>
-                  {mostrarTituloOT && (
-                    <td className="px-4 py-3.5 text-gray-700">
-                      {titulosOT(otsDeCot) || <span className="text-gray-300">—</span>}
-                    </td>
-                  )}
-                  {mostrarDiasInforme && (
-                    <td className="px-4 py-3.5 text-center text-gray-600 tabular-nums">
-                      {(() => {
-                        const dias = c._esOT ? null : diasDesdeInforme(c);
-                        return dias != null ? `${dias} día${dias !== 1 ? "s" : ""}` : <span className="text-gray-300">—</span>;
-                      })()}
-                    </td>
-                  )}
                   {puedeVerPrecios && (
                     <td className="px-4 py-3.5 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap">
                       {pen != null ? pen.toLocaleString("es-PE", { minimumFractionDigits: 2 }) : "—"}
@@ -273,7 +261,8 @@ export default function ListaCotizaciones() {
   // Columnas de precio ocultas "por ahora" a pedido del usuario (2026-11-06),
   // en la tabla y en el Excel. Para volver a mostrarlas: MOSTRAR_PRECIOS = true.
   const MOSTRAR_PRECIOS = false;
-  const puedeVerPrecios = MOSTRAR_PRECIOS && ["admin", "facturacion", "jefatura"].includes(getUsuario()?.rol);
+  const rolVePrecios = ["admin", "facturacion", "jefatura"].includes(getUsuario()?.rol);
+  const puedeVerPrecios = MOSTRAR_PRECIOS && rolVePrecios;
 
   const buildOtsMap = (ots) => {
     const m = new Map();
@@ -370,10 +359,6 @@ export default function ListaCotizaciones() {
 
   const filas = [...cotizaciones, ...otsSinCotizacion.map(pseudoDeOT)];
 
-  const anos = [...new Set(filas.map((c) => anioLima(c.fecha)))].sort(
-    (a, b) => b - a
-  );
-
   const empresasLista = [
     ...new Map(
       filas.filter((c) => c.empresa?._id).map((c) => [c.empresa._id, c.empresa])
@@ -392,14 +377,23 @@ export default function ListaCotizaciones() {
   const tieneOC = (c) =>
     ocPorCot.has(c._id) || (c.numeroDocumento != null && ocPorNumDoc.has(c.numeroDocumento));
 
+  // Rango de precio: total sin IGV en soles (USD convertido con el tipo de cambio).
+  const dentroDeRangoPrecio = (c) => {
+    if (!rolVePrecios || (filtros.precioDesde === "" && filtros.precioHasta === "")) return true;
+    const { pen } = totalesDuales(c, tipoCambio);
+    if (pen == null) return false;
+    if (filtros.precioDesde !== "" && pen < Number(filtros.precioDesde)) return false;
+    if (filtros.precioHasta !== "" && pen > Number(filtros.precioHasta)) return false;
+    return true;
+  };
+
   const filtradas = filas.filter((c) => {
-    const fecha = new Date(c.fecha);
     const q = filtros.busqueda.toLowerCase();
     return (
       (!filtros.empresa || c.empresa?._id === filtros.empresa) &&
       (!filtros.planta || c.planta === filtros.planta) &&
-      (!filtros.ano || anioLima(fecha) === parseInt(filtros.ano)) &&
-      (!filtros.mes || mesLima(fecha) === parseInt(filtros.mes)) &&
+      dentroDeRangoFecha(fechaSalidaDe(otsPorCot, c), filtros.fechaDesde, filtros.fechaHasta) &&
+      dentroDeRangoPrecio(c) &&
       (!filtros.oc  || (filtros.oc === "con" ? tieneOC(c) : !tieneOC(c))) &&
       (!filtros.informeEnviado || c.informeEnviado) &&
       (!filtros.estadoServicio || (otsPorCot.get(c._id)?.[0]?.estadoGeneral ?? "sin_ot") === filtros.estadoServicio) &&
@@ -435,31 +429,33 @@ export default function ListaCotizaciones() {
   // "Cerradas" tiene prioridad: una cotización cerrada y sin OT solo debe
   // vivir en esa tabla, no duplicarse acá.
   const sinOT = filtradas.filter((c) => !c._esOT && !esCerrada(c) && !otsPorCot.get(c._id)?.length);
+  const enviadas = filtradas.filter((c) => !c._esOT && c.enviado);
+  const aprobadas = filtradas.filter((c) => !c._esOT && c.aprobado);
   const hayFiltro = Object.values(filtros).some(Boolean);
 
   // Misma columnas que TablaCotizaciones — una hoja por cada tabla visible.
   const filaCotizacion = (c) => {
     const { pen, usd } = totalesDuales(c, tipoCambio);
+    const fechaSalida = fechaSalidaDe(otsPorCot, c);
     return {
       "N° OT":                  numerosOT(otsPorCot.get(c._id)) || "—",
-      "N° OC":                  numerosOC(ocsPorCot.get(c._id)).join(", ") || "—",
-      "N° Cotización":          c._esOT ? "Sin cotización" : (c.numeroCotizacion || "—"),
-      "Fecha recibida":         c.fechaRecibida ? formatearFecha(c.fechaRecibida) : "—",
       "Empresa":                c.empresa?.razonSocial || "—",
-      "Contacto":               c.personaContacto || c.contactoNombre || "—",
-      "Título cotización":      c.titulo,
-      "Título orden de trabajo": titulosOT(otsPorCot.get(c._id)) || "—",
       "Planta":                 c.planta || "—",
-      "Encargado":              c.encargado || "—",
-      "Aprobado":               c._esOT ? "—" : (c.aprobado ? "Aprobada" : "Pendiente"),
-      "Enviado":                c._esOT ? "—" : (c.enviado ? "Enviada" : "No enviada"),
-      "Informe enviado":        c._esOT ? "—" : (c.informeEnviado ? "Enviado" : "No enviado"),
-      "Días desde informe enviado": c._esOT ? "—" : (diasDesdeInforme(c) ?? "—"),
+      "Supervisor solicitante": c.jefeSupervisorSolicitante || "—",
+      "N° Cotización":          c._esOT ? "Sin cotización" : (c.numeroCotizacion || "—"),
+      "Título cotización":      c.titulo,
       "Estado de servicio":     otsPorCot.get(c._id)?.[0]?.estadoGeneral || "—",
+      "Fecha de salida a cliente": fechaSalida ? formatearFecha(fechaSalida) : "—",
+      "N° OC":                  numerosOC(ocsPorCot.get(c._id)).join(", ") || "—",
+      "Título orden de trabajo": titulosOT(otsPorCot.get(c._id)) || "—",
+      "Días desde recibido":    diasDesdeRecibido(fechaRecibidaDe(otsPorCot, c)) ?? "—",
+      "Informe enviado":        c._esOT ? "—" : (c.informeEnviado ? "Enviado" : "No enviado"),
       ...(puedeVerPrecios ? {
         "Total sin IGV (S/)":   pen != null ? pen.toFixed(2) : "—",
         "Total sin IGV (US$)":  usd != null ? usd.toFixed(2) : "—",
       } : {}),
+      "Fecha recibida":         c.fechaRecibida ? formatearFecha(c.fechaRecibida) : "—",
+      "Encargado":              c.encargado || "—",
     };
   };
 
@@ -470,6 +466,8 @@ export default function ListaCotizaciones() {
       ["Con OC", conOC],
       ["Cerradas", cerradas],
       ["Sin OT", sinOT],
+      ["Enviadas", enviadas],
+      ["Aprobadas", aprobadas],
     ].forEach(([nombre, lista]) => {
       const ws = XLSX.utils.json_to_sheet(lista.map(filaCotizacion));
       XLSX.utils.book_append_sheet(wb, ws, nombre);
@@ -538,19 +536,25 @@ export default function ListaCotizaciones() {
           </select>
         )}
 
-        <select name="ano" value={filtros.ano} onChange={handleFiltro} className={SELECT}>
-          <option value="">Todos los años</option>
-          {anos.map((a) => (
-            <option key={a} value={a}>{a}</option>
-          ))}
-        </select>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-gray-400">Salida</span>
+          <input type="date" name="fechaDesde" value={filtros.fechaDesde} onChange={handleFiltro}
+            className={SELECT} title="Fecha de salida desde" />
+          <span className="text-gray-400 text-xs">a</span>
+          <input type="date" name="fechaHasta" value={filtros.fechaHasta} onChange={handleFiltro}
+            className={SELECT} title="Fecha de salida hasta" />
+        </div>
 
-        <select name="mes" value={filtros.mes} onChange={handleFiltro} className={SELECT}>
-          <option value="">Todos los meses</option>
-          {MESES.map((m, i) => (
-            <option key={i + 1} value={i + 1}>{m}</option>
-          ))}
-        </select>
+        {rolVePrecios && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-gray-400">Precio S/</span>
+            <input type="number" name="precioDesde" value={filtros.precioDesde} onChange={handleFiltro}
+              min="0" step="0.01" placeholder="Desde" title="Total sin IGV desde (S/)" className={`${SELECT} w-28`} />
+            <span className="text-gray-400 text-xs">a</span>
+            <input type="number" name="precioHasta" value={filtros.precioHasta} onChange={handleFiltro}
+              min="0" step="0.01" placeholder="Hasta" title="Total sin IGV hasta (S/)" className={`${SELECT} w-28`} />
+          </div>
+        )}
 
         <select value={vista} onChange={(e) => setVista(e.target.value)} className={SELECT}>
           {VISTAS.map(({ valor, label }) => (
@@ -608,11 +612,8 @@ export default function ListaCotizaciones() {
           vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin cotizaciones registradas"}
           tipoCambio={tipoCambio}
           ocsPorCot={ocsPorCot}
-          puedeVerPrecios={puedeVerPrecios}
-          mostrarEstadoServicio
-          mostrarTituloOT
           otsPorCot={otsPorCot}
-          mostrarDiasInforme
+          puedeVerPrecios={puedeVerPrecios}
           colOtEstrecha
         />
       )}
@@ -626,6 +627,7 @@ export default function ListaCotizaciones() {
           vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Todas las cotizaciones ya tienen OT"}
           tipoCambio={tipoCambio}
           ocsPorCot={ocsPorCot}
+          otsPorCot={otsPorCot}
           puedeVerPrecios={puedeVerPrecios}
         />
       )}
@@ -639,11 +641,8 @@ export default function ListaCotizaciones() {
           vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin cotizaciones pendientes"}
           tipoCambio={tipoCambio}
           ocsPorCot={ocsPorCot}
-          puedeVerPrecios={puedeVerPrecios}
-          mostrarEstadoServicio
-          mostrarTituloOT
           otsPorCot={otsPorCot}
-          mostrarDiasInforme
+          puedeVerPrecios={puedeVerPrecios}
         />
       )}
 
@@ -656,9 +655,36 @@ export default function ListaCotizaciones() {
           vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin cotizaciones con OC"}
           tipoCambio={tipoCambio}
           ocsPorCot={ocsPorCot}
-          puedeVerPrecios={puedeVerPrecios}
-          mostrarTituloOT
           otsPorCot={otsPorCot}
+          puedeVerPrecios={puedeVerPrecios}
+        />
+      )}
+
+      {(vista === "todas" || vista === "enviadas") && (
+        <TablaCotizaciones
+          titulo="Cotizaciones enviadas"
+          acento="bg-sky-500"
+          cotizaciones={enviadas}
+          onSelect={seleccionarFila}
+          vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin cotizaciones enviadas"}
+          tipoCambio={tipoCambio}
+          ocsPorCot={ocsPorCot}
+          otsPorCot={otsPorCot}
+          puedeVerPrecios={puedeVerPrecios}
+        />
+      )}
+
+      {(vista === "todas" || vista === "aprobadas") && (
+        <TablaCotizaciones
+          titulo="Cotizaciones aprobadas"
+          acento="bg-green-600"
+          cotizaciones={aprobadas}
+          onSelect={seleccionarFila}
+          vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin cotizaciones aprobadas"}
+          tipoCambio={tipoCambio}
+          ocsPorCot={ocsPorCot}
+          otsPorCot={otsPorCot}
+          puedeVerPrecios={puedeVerPrecios}
         />
       )}
 
@@ -671,9 +697,8 @@ export default function ListaCotizaciones() {
           vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin cotizaciones cerradas"}
           tipoCambio={tipoCambio}
           ocsPorCot={ocsPorCot}
-          puedeVerPrecios={puedeVerPrecios}
-          mostrarTituloOT
           otsPorCot={otsPorCot}
+          puedeVerPrecios={puedeVerPrecios}
         />
       )}
     </div>

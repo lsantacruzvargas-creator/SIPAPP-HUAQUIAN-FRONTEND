@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
+import DosLineas from "../components/DosLineas";
 import { fetchAuth } from "../utils/fetchAuth";
 import { formatearFecha } from "../utils/fecha";
 import { money } from "../components/detalleShared";
 import TablaScroll from "../components/TablaScroll";
 import * as XLSX from "xlsx";
 
-const TH = "px-4 py-3 font-semibold text-gray-500 whitespace-nowrap";
+const TH = "px-3 py-3 font-semibold text-gray-500 whitespace-nowrap align-bottom leading-tight";
 const VACIO = { facturacion: [], valorizado: { total: 0, materiales: [] }, consumo: [], ocSinHesActa: [], ranking: [], mora: [] };
 
 const nombreEmpresa = (e) => e?.razonSocial || "Sin empresa";
@@ -145,11 +146,11 @@ export default function Reportes() {
       <Seccion titulo="Facturación por Empresa" acento="bg-blue-500" count={data.facturacion.length}>
         <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-200">
           <tr>
-            <th className={`${TH} text-left`}>Empresa</th>
-            <th className={`${TH} text-right`}>N° OTs Facturadas</th>
-            <th className={`${TH} text-right`}>N° OTs Pendientes por Facturar</th>
-            <th className={`${TH} text-right`}>Facturas Vencidas</th>
-            <th className={`${TH} text-right`}>Días Atraso Máx.</th>
+            <th className={`${TH} text-left min-w-[13rem]`}><DosLineas>Empresa</DosLineas></th>
+            <th className={`${TH} text-right`}><DosLineas>N° OTs Facturadas</DosLineas></th>
+            <th className={`${TH} text-right`}><DosLineas>N° OTs Pendientes por Facturar</DosLineas></th>
+            <th className={`${TH} text-right`}><DosLineas>Facturas Vencidas</DosLineas></th>
+            <th className={`${TH} text-right`}><DosLineas>Días Atraso Máx.</DosLineas></th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
@@ -183,12 +184,12 @@ export default function Reportes() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-200">
                 <tr>
-                  <th className={`${TH} text-left`}>Código</th>
-                  <th className={`${TH} text-left`}>Nombre</th>
-                  <th className={`${TH} text-left`}>Unidad</th>
-                  <th className={`${TH} text-center`}>Tipo</th>
-                  <th className={`${TH} text-right`}>Stock</th>
-                  <th className={`${TH} text-right`}>Valorizado</th>
+                  <th className={`${TH} text-left`}><DosLineas>Código</DosLineas></th>
+                  <th className={`${TH} text-left`}><DosLineas>Nombre</DosLineas></th>
+                  <th className={`${TH} text-left`}><DosLineas>Unidad</DosLineas></th>
+                  <th className={`${TH} text-center`}><DosLineas>Tipo</DosLineas></th>
+                  <th className={`${TH} text-right`}><DosLineas>Stock</DosLineas></th>
+                  <th className={`${TH} text-right`}><DosLineas>Valorizado</DosLineas></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -218,12 +219,12 @@ export default function Reportes() {
       <Seccion titulo="Consumo de RQ y Servicios Externos por OT" acento="bg-indigo-500" count={data.consumo.length}>
         <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-200">
           <tr>
-            <th className={`${TH} text-left`}>N° OT</th>
-            <th className={`${TH} text-left`}>Título</th>
-            <th className={`${TH} text-left`}>Empresa</th>
-            <th className={`${TH} text-right`}>Costo Materiales</th>
-            <th className={`${TH} text-right`}>Costo Servicios</th>
-            <th className={`${TH} text-right`}>Costo Total</th>
+            <th className={`${TH} text-left`}><DosLineas>N° OT</DosLineas></th>
+            <th className={`${TH} text-left min-w-[13rem]`}><DosLineas>Título</DosLineas></th>
+            <th className={`${TH} text-left min-w-[13rem]`}><DosLineas>Empresa</DosLineas></th>
+            <th className={`${TH} text-right`}><DosLineas>Costo Materiales</DosLineas></th>
+            <th className={`${TH} text-right`}><DosLineas>Costo Servicios</DosLineas></th>
+            <th className={`${TH} text-right`}><DosLineas>Costo Total</DosLineas></th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
@@ -246,11 +247,11 @@ export default function Reportes() {
       <Seccion titulo="Órdenes de Compra sin HES / Acta de Conformidad" acento="bg-amber-500" count={data.ocSinHesActa.length}>
         <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-200">
           <tr>
-            <th className={`${TH} text-left`}>N° Orden</th>
-            <th className={`${TH} text-left`}>Código</th>
-            <th className={`${TH} text-left`}>Empresa</th>
-            <th className={`${TH} text-center`}>HES</th>
-            <th className={`${TH} text-center`}>Acta de Conformidad</th>
+            <th className={`${TH} text-left`}><DosLineas>N° Orden</DosLineas></th>
+            <th className={`${TH} text-left`}><DosLineas>Código</DosLineas></th>
+            <th className={`${TH} text-left min-w-[13rem]`}><DosLineas>Empresa</DosLineas></th>
+            <th className={`${TH} text-center`}><DosLineas>HES</DosLineas></th>
+            <th className={`${TH} text-center`}><DosLineas>Acta de Conformidad</DosLineas></th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
@@ -272,8 +273,8 @@ export default function Reportes() {
       <Seccion titulo="Ranking de OT por Cliente" acento="bg-purple-500" count={data.ranking.length}>
         <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-200">
           <tr>
-            <th className={`${TH} text-left`}>Empresa</th>
-            <th className={`${TH} text-right`}>Cantidad OT</th>
+            <th className={`${TH} text-left min-w-[13rem]`}><DosLineas>Empresa</DosLineas></th>
+            <th className={`${TH} text-right`}><DosLineas>Cantidad OT</DosLineas></th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
@@ -292,14 +293,14 @@ export default function Reportes() {
       <Seccion titulo="Mora de Pago por Cliente" acento="bg-red-500" count={data.mora.length}>
         <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-200">
           <tr>
-            <th className={`${TH} text-left`}>Código</th>
-            <th className={`${TH} text-left`}>N° Factura</th>
-            <th className={`${TH} text-left`}>Empresa</th>
-            <th className={`${TH} text-center`}>Cuota</th>
-            <th className={`${TH} text-right`}>Monto</th>
-            <th className={`${TH} text-left`}>Fecha Vencimiento</th>
-            <th className={`${TH} text-center`}>Estado</th>
-            <th className={`${TH} text-right`}>Días Atraso</th>
+            <th className={`${TH} text-left`}><DosLineas>Código</DosLineas></th>
+            <th className={`${TH} text-left`}><DosLineas>N° Factura</DosLineas></th>
+            <th className={`${TH} text-left min-w-[13rem]`}><DosLineas>Empresa</DosLineas></th>
+            <th className={`${TH} text-center`}><DosLineas>Cuota</DosLineas></th>
+            <th className={`${TH} text-right`}><DosLineas>Monto</DosLineas></th>
+            <th className={`${TH} text-left`}><DosLineas>Fecha Vencimiento</DosLineas></th>
+            <th className={`${TH} text-center`}><DosLineas>Estado</DosLineas></th>
+            <th className={`${TH} text-right`}><DosLineas>Días Atraso</DosLineas></th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import DosLineas from "../components/DosLineas";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import { formatearFecha, anioLima, mesLima, aInputFecha, fechaHoyLima } from "../utils/fecha";
 import DetalleDocumento from "../components/DetalleDocumento";
@@ -40,7 +41,7 @@ function BadgeCancelacion({ fecha, pagado }) {
 
 const SELECT = "border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300";
 const TD_NUM = "px-3 py-3.5 text-right tabular-nums";
-const TH     = "px-3 py-3 font-semibold text-gray-500 whitespace-nowrap";
+const TH     = "px-3 py-3 font-semibold text-gray-500 whitespace-nowrap align-bottom leading-tight";
 
 const SORTS = [
   { valor: "fecha",             label: "Más reciente" },
@@ -165,19 +166,19 @@ function TablaFacturas({ titulo, acento, facturas, onSelect, handlePagoMonto, ha
           <table className="w-full text-sm" style={{ minWidth: "1000px" }}>
             <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-200">
               <tr>
-                <th className={`${TH} text-left`}>N° OT</th>
-                <th className={`${TH} text-left`}>N° Factura</th>
-                <th className={`${TH} text-center`}>Fecha emisión</th>
-                <th className={`${TH} text-center`}>Fecha cancelación</th>
-                <th className={`${TH} text-left`}>Orden de Compra</th>
-                <th className={`${TH} text-left`}>Empresa</th>
-                <th className={`${TH} text-right`}>Subtotal (S/)</th>
-                <th className={`${TH} text-right`}>IGV 18% (S/)</th>
-                <th className={`${TH} text-right`}>Total (S/)</th>
-                <th className={`${TH} text-right`}>Detracción 12% (S/)</th>
-                <th className={`${TH} text-right`}>Total a pagar (S/)</th>
-                <th className={`${TH} text-center`}>Estado pago</th>
-                <th className={`${TH} text-center`}>Estado de servicio</th>
+                <th className={`${TH} text-left`}><DosLineas>N° OT</DosLineas></th>
+                <th className={`${TH} text-left`}><DosLineas>N° Factura</DosLineas></th>
+                <th className={`${TH} text-center`}><DosLineas>Fecha emisión</DosLineas></th>
+                <th className={`${TH} text-center`}><DosLineas>Fecha cancelación</DosLineas></th>
+                <th className={`${TH} text-left`}><DosLineas>Orden de Compra</DosLineas></th>
+                <th className={`${TH} text-left min-w-[13rem]`}><DosLineas>Empresa</DosLineas></th>
+                <th className={`${TH} text-right`}><DosLineas>Subtotal (S/)</DosLineas></th>
+                <th className={`${TH} text-right`}><DosLineas>IGV 18% (S/)</DosLineas></th>
+                <th className={`${TH} text-right`}><DosLineas>Total (S/)</DosLineas></th>
+                <th className={`${TH} text-right`}><DosLineas>Detracción 12% (S/)</DosLineas></th>
+                <th className={`${TH} text-right`}><DosLineas>Total a pagar (S/)</DosLineas></th>
+                <th className={`${TH} text-center`}><DosLineas>Estado pago</DosLineas></th>
+                <th className={`${TH} text-center`}><DosLineas>Estado de servicio</DosLineas></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import CampoSupervisorSolicitante from "./CampoSupervisorSolicitante";
 import { useNavigate } from "react-router-dom";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import { formatearFecha, fechaHoyLima, aInputFecha } from "../utils/fecha";
@@ -10,7 +11,7 @@ import {
   itemDesdeDb, itemInvalido, RUC_GLORIA, esFormatoAlicorp,
 } from "../utils/cotizacionItems";
 import { estadoComprobanteClase } from "../utils/catalogosSunat";
-import { ModalOrdenCompraItems } from "./ModalOrdenCompra";
+import ModalOrdenCompra, { ModalOrdenCompraItems } from "./ModalOrdenCompra";
 import ModalDetalleGuia from "./ModalDetalleGuia";
 import BuscadorOrdenTrabajo from "./BuscadorOrdenTrabajo";
 import SelectorEmpresas from "./SelectorEmpresas";
@@ -20,7 +21,7 @@ import TablaItemsCotizacion from "./TablaItemsCotizacion";
 import TablaItemsCotizacionGloria from "./TablaItemsCotizacionGloria";
 import TablaItemsCotizacionAlicorp from "./TablaItemsCotizacionAlicorp";
 import {
-  FlujoNegocio, TarjetaRelacion, Chip,
+  FlujoNegocio, TarjetaRelacion, Chip, ParteConsolidada,
   badgePago, badgeGeneral, money, totalSinIgv, BotonAnular, BotonCerrarCadena, BotonDesanular, BannerAnulado, bloqueadoPorCadenaCerrada,
 } from "./detalleShared";
 import { r2 } from "../utils/redondeo";
@@ -114,6 +115,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   const [guiaDetalle, setGuiaDetalle] = useState(null);
   const [informes, setInformes] = useState([]);
   const [ocs, setOcs] = useState([]);
+  const [crearOCOpen, setCrearOCOpen] = useState(false);
   const [facturas, setFacturas] = useState([]);
   const oc = ocs[0] || null;
   const factura = facturas[0] || null;
@@ -199,7 +201,8 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
       }
       // Varias OCs por cotización (OCs parciales por ítems) — en orden de creación.
       const ocsFound = ocs
-        .filter(o => (o.cotizacion?._id || o.cotizacion) === cot._id)
+        .filter(o => (o.cotizacion?._id || o.cotizacion) === cot._id
+          || (o.lineas || []).some(l => (l.cotizacion?._id || l.cotizacion) === cot._id))
         .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
       setOcs(ocsFound);
       const idsOC = new Set(ocsFound.map(o => o._id));
@@ -251,8 +254,12 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
     setForm(prev => ({
       ...prev,
       [name]: value,
-      ...(name === "empresa" ? { planta: "", personaContacto: "" } : {}),
-      ...(name === "planta" ? { personaContacto: "" } : {}),
+      ...(name === "empresa" ? { planta: "", personaContacto: "", jefeSupervisorSolicitante: "" } : {}),
+      ...(name === "planta" ? {
+        personaContacto: "",
+        // Con plantas registradas se propone su supervisor; con planta en texto libre no se borra lo escrito.
+        ...(plantasEmpresa.length ? { jefeSupervisorSolicitante: plantasEmpresa.find(p => p.nombre === value)?.supervisor?.nombre || "" } : {}),
+      } : {}),
     }));
   };
 
@@ -263,7 +270,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   ).slice(0, 50);
 
   const seleccionarEmpresa = (e) => {
-    setForm(f => ({ ...f, empresa: e._id, planta: "", personaContacto: "" }));
+    setForm(f => ({ ...f, empresa: e._id, planta: "", personaContacto: "", jefeSupervisorSolicitante: "" }));
     setBusquedaEmpresa(e.alias ? `${e.alias} — ${e.razonSocial}` : e.razonSocial);
     setListaEmpresaAbierta(false);
   };
@@ -271,7 +278,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   const cambiarBusquedaEmpresa = (e) => {
     setBusquedaEmpresa(e.target.value);
     setListaEmpresaAbierta(true);
-    if (form.empresa) setForm(f => ({ ...f, empresa: "", planta: "", personaContacto: "" }));
+    if (form.empresa) setForm(f => ({ ...f, empresa: "", planta: "", personaContacto: "", jefeSupervisorSolicitante: "" }));
   };
 
   // Copia fiel con N° nuevo y sin relaciones — ver POST /cotizaciones/:id/duplicar.
@@ -1002,8 +1009,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
                   </div>
                   <div>
                     <label className="text-xs text-gray-500 block mb-1">Jefe / Supervisor solicitante</label>
-                    <input name="jefeSupervisorSolicitante" value={form.jefeSupervisorSolicitante} onChange={handleChange}
-                      placeholder="—" className={INP} />
+                    <CampoSupervisorSolicitante planta={plantaSel} value={form.jefeSupervisorSolicitante} onChange={handleChange} className={INP} />
                   </div>
                 </div>
 
@@ -1342,13 +1348,16 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
             </TarjetaRelacion>
 
             {ocs.length === 0 ? (
-              <TarjetaRelacion tipo="oc" vacio />
+              <TarjetaRelacion tipo="oc" vacio
+                onCrear={puedeGenerarOC && !bloqueadoPorCadenaCerrada(cot.estadoCadena, rolActual) ? () => setCrearOCOpen(true) : undefined}
+                crearLabel="OC completa" />
             ) : (
               ocs.map(o => (
                 <TarjetaRelacion key={o._id} tipo="oc" codigo={o.codigo} numero={o.numeroOrden} onClick={() => abrirOC(o)}>
                   {o.desdeItemsCotizacion && <p className="text-sm text-gray-600 line-clamp-2">{o.titulo}</p>}
                   {puedeVerPrecios && o.monto > 0 && <p className="text-xs text-gray-500">{money(o.monto, cot.moneda)}</p>}
                   {o.anulado && <Chip className="bg-red-100 text-red-600">Anulada</Chip>}
+                  <ParteConsolidada oc={o} cotizacionId={cot._id} moneda={cot.moneda} verPrecios={puedeVerPrecios} />
                 </TarjetaRelacion>
               ))
             )}
@@ -1363,6 +1372,8 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
                     <p className="text-xs text-gray-500">{money(f.totalAPagar ?? f.total, cot.moneda)}</p>
                   )}
                   {f.estadoPago && <Chip className={badgePago(f.estadoPago)}>{f.estadoPago}</Chip>}
+                  <ParteConsolidada oc={ocs.find(o => o._id === (f.ordenCompra?._id || f.ordenCompra))}
+                    cotizacionId={cot._id} moneda={cot.moneda} verPrecios={puedeVerPrecios} />
                 </TarjetaRelacion>
               ))
             ))}
@@ -1488,7 +1499,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
           onCambio={async (guardada, { esNueva }) => {
             await cargarEmpresas();
             if (esNueva) {
-              setForm(f => ({ ...f, empresa: guardada._id, planta: "", personaContacto: "" }));
+              setForm(f => ({ ...f, empresa: guardada._id, planta: "", personaContacto: "", jefeSupervisorSolicitante: "" }));
               setBusquedaEmpresa(guardada.alias ? `${guardada.alias} — ${guardada.razonSocial}` : guardada.razonSocial);
             }
           }}
@@ -1537,6 +1548,14 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
         />
       )}
 
+
+      {crearOCOpen && (
+        <ModalOrdenCompra
+          cotizacion={cot}
+          onClose={() => setCrearOCOpen(false)}
+          onCreada={() => { setCrearOCOpen(false); cargarRelaciones(); }}
+        />
+      )}
 
       {indicesNuevaOC && (
         <ModalOrdenCompraItems

@@ -269,6 +269,22 @@ export const money = (v, moneda = "PEN") =>
 export const totalSinIgv = (doc) =>
   r2(((Number(doc?.total) || 0) - (Number(doc?.igv) || 0)));
 
+// OC consolidada (varias cotizaciones enteras en una OC, ver OrdenCompra.lineas): etiqueta para las
+// tarjetas de OC y Factura vistas desde una de sus cotizaciones u OTs, con la parte que le toca.
+export function ParteConsolidada({ oc, cotizacionId, moneda, verPrecios }) {
+  const lineas = oc?.lineas || [];
+  if (!lineas.length) return null;
+  const linea = lineas.find((l) => (l.cotizacion?._id || l.cotizacion) === cotizacionId);
+  return (
+    <>
+      <Chip className="bg-indigo-100 text-indigo-700">Consolidada · {lineas.length} cotizaciones</Chip>
+      {verPrecios && linea && (
+        <p className="text-xs text-gray-500">Esta cotización: {money(linea.subtotal, moneda)} sin IGV</p>
+      )}
+    </>
+  );
+}
+
 /* ─── Anulación de documentos ────────────────────────────────────── */
 export function BotonAnular({ onAnular }) {
   const [abierto, setAbierto]   = useState(false);

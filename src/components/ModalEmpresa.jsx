@@ -2,7 +2,17 @@ import { useState, useRef } from "react";
 import { fetchAuth } from "../utils/fetchAuth";
 
 const FORM_VACIO = { razonSocial: "", ruc: "", direccion: "", alias: "", requiereHes: false, requiereActaConformidad: false, plantas: [] };
-const PLANTA_VACIA = { nombre: "", ubigeo: "", direccion: "", contactoNombre: "", contactoTelefono: "", contactoCorreo: "" };
+const PLANTA_VACIA = {
+  nombre: "", ubigeo: "", direccion: "",
+  supervisorNombre: "", supervisorTelefono: "", supervisorCorreo: "",
+  contactoNombre: "", contactoTelefono: "", contactoCorreo: "",
+};
+const supervisorDe = (input) => ({
+  nombre: input.supervisorNombre.trim(),
+  telefono: input.supervisorTelefono.trim(),
+  correo: input.supervisorCorreo.trim(),
+});
+const SUBTITULO = "text-[11px] font-semibold text-gray-400 uppercase tracking-wide";
 
 export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
   const [form, setForm] = useState(
@@ -88,10 +98,15 @@ export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
       setErrorPlanta("Completa el nombre de la planta y su primer contacto (nombre y teléfono).");
       return;
     }
+    const supervisor = supervisorDe(plantaInput);
+    if (!supervisor.nombre && (supervisor.telefono || supervisor.correo)) {
+      setErrorPlanta("El supervisor solicitante necesita un nombre.");
+      return;
+    }
     setErrorPlanta("");
     setForm((f) => ({
       ...f,
-      plantas: [...f.plantas, { nombre, ubigeo, direccion, contactos: [{ nombre: contactoNombre, telefono: contactoTelefono, correo: contactoCorreo }] }],
+      plantas: [...f.plantas, { nombre, ubigeo, direccion, supervisor, contactos: [{ nombre: contactoNombre, telefono: contactoTelefono, correo: contactoCorreo }] }],
     }));
     setPlantaInput(PLANTA_VACIA);
   };
@@ -101,7 +116,11 @@ export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
 
   const abrirEditarPlanta = (idx) => {
     const p = form.plantas[idx];
-    setPlantaEditInput({ nombre: p.nombre || "", ubigeo: p.ubigeo || "", direccion: p.direccion || "" });
+    setPlantaEditInput({
+      ...PLANTA_VACIA,
+      nombre: p.nombre || "", ubigeo: p.ubigeo || "", direccion: p.direccion || "",
+      supervisorNombre: p.supervisor?.nombre || "", supervisorTelefono: p.supervisor?.telefono || "", supervisorCorreo: p.supervisor?.correo || "",
+    });
     setPlantaEditContactos((p.contactos || []).map((c) => ({ ...c })));
     setPlantaEditandoIdx(idx);
     setErrorPlanta("");
@@ -135,11 +154,16 @@ export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
       setErrorPlanta("Cada contacto necesita nombre y teléfono.");
       return;
     }
+    const supervisor = supervisorDe(plantaEditInput);
+    if (!supervisor.nombre && (supervisor.telefono || supervisor.correo)) {
+      setErrorPlanta("El supervisor solicitante necesita un nombre.");
+      return;
+    }
     setErrorPlanta("");
     setForm((f) => ({
       ...f,
       plantas: f.plantas.map((p, i) =>
-        i === idx ? { ...p, nombre, ubigeo: plantaEditInput.ubigeo.trim(), direccion: plantaEditInput.direccion.trim(), contactos } : p
+        i === idx ? { ...p, nombre, ubigeo: plantaEditInput.ubigeo.trim(), direccion: plantaEditInput.direccion.trim(), supervisor, contactos } : p
       ),
     }));
     setPlantaEditandoIdx(null);
@@ -260,7 +284,7 @@ export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
           <div className="col-span-2">
             <label className="block text-xs font-medium text-gray-600 mb-1">Plantas</label>
             <p className="text-xs text-gray-400 mb-2">
-              Cada planta requiere al menos un contacto (nombre y teléfono) — se pueden agregar más después.
+              Cada planta tiene un supervisor solicitante y requiere al menos un contacto (nombre y teléfono) — se pueden agregar más contactos después.
               Ubigeo y dirección son opcionales, pero se usan para autocompletar el punto de llegada al emitir una guía hacia esta planta.
             </p>
             <div className="grid grid-cols-2 gap-2 mb-2">
@@ -286,6 +310,30 @@ export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
                 placeholder="Dirección de la planta…"
                 className="col-span-2 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
               />
+              <p className={`col-span-2 ${SUBTITULO} pt-1`}>Supervisor solicitante</p>
+              <input
+                name="supervisorNombre"
+                value={plantaInput.supervisorNombre}
+                onChange={handlePlantaInputChange}
+                placeholder="Nombre del supervisor…"
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
+              />
+              <input
+                name="supervisorTelefono"
+                value={plantaInput.supervisorTelefono}
+                onChange={handlePlantaInputChange}
+                placeholder="Teléfono…"
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
+              />
+              <input
+                name="supervisorCorreo"
+                type="email"
+                value={plantaInput.supervisorCorreo}
+                onChange={handlePlantaInputChange}
+                placeholder="Correo…"
+                className="col-span-2 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
+              />
+              <p className={`col-span-2 ${SUBTITULO} pt-1`}>Primer contacto</p>
               <input
                 name="contactoNombre"
                 value={plantaInput.contactoNombre}
@@ -350,8 +398,20 @@ export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
                             className="col-span-2 border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-gray-400"
                           />
                         </div>
+                        <div className="space-y-1.5 pt-1 border-t border-gray-100">
+                          <p className={`${SUBTITULO} pt-1`}>Supervisor solicitante</p>
+                          <div className="flex flex-wrap gap-2">
+                            <input name="supervisorNombre" value={plantaEditInput.supervisorNombre} onChange={handlePlantaEditChange}
+                              placeholder="Nombre" className="flex-1 min-w-[100px] border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-gray-400" />
+                            <input name="supervisorTelefono" value={plantaEditInput.supervisorTelefono} onChange={handlePlantaEditChange}
+                              placeholder="Teléfono" className="flex-1 min-w-[90px] border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-gray-400" />
+                            <input name="supervisorCorreo" value={plantaEditInput.supervisorCorreo} onChange={handlePlantaEditChange}
+                              placeholder="Correo (opcional)" className="flex-1 min-w-[120px] border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-gray-400" />
+                          </div>
+                          <p className={`${SUBTITULO} pt-1`}>Contactos</p>
+                        </div>
                         {plantaEditContactos.length > 0 && (
-                          <div className="space-y-1.5 pt-1 border-t border-gray-100">
+                          <div className="space-y-1.5">
                             {plantaEditContactos.map((c, ci) => (
                               <div key={ci} className="flex flex-wrap gap-2 pt-1.5">
                                 <input
@@ -421,10 +481,16 @@ export default function ModalEmpresa({ empresa, onClose, onGuardada }) {
                             {p.ubigeo && <span className="font-mono">{p.ubigeo}</span>}{p.ubigeo && p.direccion ? " — " : ""}{p.direccion}
                           </p>
                         )}
+                        <p className="text-xs text-gray-600 pl-1">
+                          <span className="text-gray-400">Supervisor solicitante: </span>
+                          {p.supervisor?.nombre
+                            ? <>{p.supervisor.nombre}{p.supervisor.telefono ? ` · ${p.supervisor.telefono}` : ""}{p.supervisor.correo ? ` · ${p.supervisor.correo}` : ""}</>
+                            : <span className="text-gray-300">—</span>}
+                        </p>
                         {(p.contactos || []).length > 0 && (
-                          <ul className="space-y-1">
+                          <ul className="space-y-1 border-l-2 border-gray-200 ml-1 pl-2">
                             {p.contactos.map((c, ci) => (
-                              <li key={ci} className="text-xs text-gray-500 pl-1">
+                              <li key={ci} className="text-xs text-gray-500">
                                 {c.nombre} · {c.telefono}{c.correo ? ` · ${c.correo}` : ""}
                               </li>
                             ))}

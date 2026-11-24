@@ -58,11 +58,14 @@ export default function AlertaGlobal() {
   if (visibles.length === 0) return null;
 
   return (
-    <div className="fixed top-4 right-4 z-[100] w-full max-w-sm space-y-2 pointer-events-none">
-      {visibles.map((a) => (
+    <div className="fixed top-4 right-4 z-[100] w-full max-w-sm pointer-events-none">
+      {/* Apiladas una sobre otra: la más reciente (llegan ordenadas por fecha desc.) queda encima y
+          las de abajo asoman unos píxeles; al cerrarla aparece la siguiente. */}
+      {visibles.map((a, i) => (
         <div
           key={a._id}
-          className="pointer-events-auto bg-white border border-sky-200 border-l-4 border-l-sky-500 rounded-xl shadow-lg px-4 py-3 flex items-start gap-3"
+          style={{ top: Math.min(i, 3) * 6, zIndex: visibles.length - i }}
+          className="absolute right-0 w-full pointer-events-auto bg-white border border-sky-200 border-l-4 border-l-sky-500 rounded-xl shadow-lg px-4 py-3 flex items-start gap-3"
         >
           <div className="flex-1 min-w-0">
             <p className="text-sm text-gray-800">{a.mensaje}</p>

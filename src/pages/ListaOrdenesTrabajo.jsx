@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import DosLineas from "../components/DosLineas";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import { formatearFecha, aInputFecha } from "../utils/fecha";
 import DetalleDocumento from "../components/DetalleDocumento";
@@ -46,7 +47,7 @@ const compararTexto = (na, nb) => {
 const SELECT =
   "border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400";
 
-const TH = "px-4 py-3 font-semibold text-gray-500 whitespace-nowrap";
+const TH = "px-3 py-3 font-semibold text-gray-500 whitespace-nowrap align-bottom leading-tight";
 
 // Si nadie está asignado a ese track, `estadoPrueba`/`estado` se quedan en
 // el default "pendiente" del modelo — visualmente eso confunde con "ya
@@ -111,19 +112,19 @@ function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg, sortBy, onSortF
           <table className="w-full text-sm" style={{ minWidth: "1100px" }}>
             <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-200">
               <tr>
-                <th className={`${TH} text-left`}>N° OT</th>
-                <th className={`${TH} text-left`}>N° Cotización</th>
-                <th className={`${TH} text-center`}>Servicio</th>
-                <th className={`${TH} text-left`}>Empresa</th>
-                <th className={`${TH} text-left`}>Contacto</th>
-                <th className={`${TH} text-left`}>Descripción</th>
-                <th className={`${TH} text-center`}>Prueba</th>
-                <th className={`${TH} text-left`}>Técnico de prueba</th>
-                <th className={`${TH} text-center`}>Intervención</th>
-                <th className={`${TH} text-left`}>Técnico de intervención</th>
-                <th className={`${TH} text-center`}>Estado Informes</th>
-                <th className={`${TH} text-center`}>Días desde recibido</th>
-                <th className={`${TH} text-center`}>Fecha de Ingreso</th>
+                <th className={`${TH} text-left`}><DosLineas>N° OT</DosLineas></th>
+                <th className={`${TH} text-left`}><DosLineas>N° Cotización</DosLineas></th>
+                <th className={`${TH} text-center`}><DosLineas>Servicio</DosLineas></th>
+                <th className={`${TH} text-left min-w-[13rem]`}><DosLineas>Empresa</DosLineas></th>
+                <th className={`${TH} text-left`}><DosLineas>Contacto</DosLineas></th>
+                <th className={`${TH} text-left min-w-[13rem]`}><DosLineas>Descripción</DosLineas></th>
+                <th className={`${TH} text-center`}><DosLineas>Prueba</DosLineas></th>
+                <th className={`${TH} text-left`}><DosLineas>Técnico de prueba</DosLineas></th>
+                <th className={`${TH} text-center`}><DosLineas>Intervención</DosLineas></th>
+                <th className={`${TH} text-left`}><DosLineas>Técnico de intervención</DosLineas></th>
+                <th className={`${TH} text-center`}><DosLineas>Estado Informes</DosLineas></th>
+                <th className={`${TH} text-center`}><DosLineas>Días desde recibido</DosLineas></th>
+                <th className={`${TH} text-center`}><DosLineas>Fecha de Ingreso</DosLineas></th>
                 <th className={`${TH} text-center`}>
                   <button
                     type="button"
@@ -133,7 +134,7 @@ function TablaOTs({ titulo, acento, ordenes, onSelect, vacioMsg, sortBy, onSortF
                       sortBy?.startsWith("fechaSalida") ? "text-gray-800" : ""
                     }`}
                   >
-                    Fecha de Salida <span className="text-sm leading-none">{ordenSalida}</span>
+                    <DosLineas>Fecha de Salida</DosLineas> <span className="text-sm leading-none">{ordenSalida}</span>
                   </button>
                 </th>
               </tr>

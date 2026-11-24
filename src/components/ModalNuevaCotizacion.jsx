@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import CampoSupervisorSolicitante from "./CampoSupervisorSolicitante";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import { calcSubtotalGloria, calcularGloria, calcularAlicorp, itemInvalido, RUC_GLORIA, esFormatoAlicorp } from "../utils/cotizacionItems";
 import TablaItemsCotizacion from "./TablaItemsCotizacion";
@@ -121,8 +122,12 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
     setForm(prev => ({
       ...prev,
       [name]: value,
-      ...(name === "empresa" ? { planta: "", personaContacto: "" } : {}),
-      ...(name === "planta" ? { personaContacto: "" } : {}),
+      ...(name === "empresa" ? { planta: "", personaContacto: "", jefeSupervisorSolicitante: "" } : {}),
+      ...(name === "planta" ? {
+        personaContacto: "",
+        // Con plantas registradas se propone su supervisor; con planta en texto libre no se borra lo escrito.
+        ...(plantasEmpresa.length ? { jefeSupervisorSolicitante: plantasEmpresa.find(p => p.nombre === value)?.supervisor?.nombre || "" } : {}),
+      } : {}),
     }));
   };
 
@@ -133,7 +138,7 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
   ).slice(0, 50);
 
   const seleccionarEmpresa = (e) => {
-    setForm(f => ({ ...f, empresa: e._id, planta: "", personaContacto: "" }));
+    setForm(f => ({ ...f, empresa: e._id, planta: "", personaContacto: "", jefeSupervisorSolicitante: "" }));
     setBusquedaEmpresa(e.alias ? `${e.alias} — ${e.razonSocial}` : e.razonSocial);
     setListaEmpresaAbierta(false);
   };
@@ -141,7 +146,7 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
   const cambiarBusquedaEmpresa = (e) => {
     setBusquedaEmpresa(e.target.value);
     setListaEmpresaAbierta(true);
-    if (form.empresa) setForm(f => ({ ...f, empresa: "", planta: "", personaContacto: "" }));
+    if (form.empresa) setForm(f => ({ ...f, empresa: "", planta: "", personaContacto: "", jefeSupervisorSolicitante: "" }));
   };
 
   // calcSubtotalGloria degrada a calcSubtotal (cantidad×precio) para
@@ -411,7 +416,7 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 block mb-1">Jefe / Supervisor solicitante</label>
-                  <input name="jefeSupervisorSolicitante" value={form.jefeSupervisorSolicitante} onChange={handleChange} placeholder="—" className={INP} />
+                  <CampoSupervisorSolicitante planta={plantaSel} value={form.jefeSupervisorSolicitante} onChange={handleChange} className={INP} />
                 </div>
               </div>
 
@@ -722,7 +727,7 @@ export default function ModalNuevaCotizacion({ onClose, onCreada }) {
           onCambio={async (guardada, { esNueva }) => {
             await cargarEmpresas();
             if (esNueva) {
-              setForm(f => ({ ...f, empresa: guardada._id, planta: "", personaContacto: "" }));
+              setForm(f => ({ ...f, empresa: guardada._id, planta: "", personaContacto: "", jefeSupervisorSolicitante: "" }));
               setBusquedaEmpresa(guardada.alias ? `${guardada.alias} — ${guardada.razonSocial}` : guardada.razonSocial);
             }
           }}

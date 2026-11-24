@@ -1,5 +1,6 @@
 import { useState } from "react";
 import SelectorCatalogoServicios from "./SelectorCatalogoServicios";
+import ListaSubItems from "./ListaSubItems";
 import ConfirmacionAccion from "./ConfirmacionAccion";
 import TablaScroll from "./TablaScroll";
 import { CeldaOCItem, BotonGenerarOC } from "./detalleShared";
@@ -46,19 +47,8 @@ export default function TablaItemsCotizacion({
         : i
     ));
 
-  const eliminarSubItem = (key, subKey) =>
-    onItemsChange(items.map(i =>
-      i._key === key
-        ? { ...i, subItems: i.subItems.filter(s => s._subKey !== subKey) }
-        : i
-    ));
-
-  const handleSubItem = (key, subKey, valor) =>
-    onItemsChange(items.map(i =>
-      i._key === key
-        ? { ...i, subItems: i.subItems.map(s => (s._subKey === subKey ? { ...s, texto: valor } : s)) }
-        : i
-    ));
+  const setSubItems = (key, subItems) =>
+    onItemsChange(items.map((i) => (i._key === key ? { ...i, subItems } : i)));
 
   // Si hay una fila puntual como destino (catalogoTarget), el ítem elegido se
   // agrega como descripción de esa fila sin importar su grupo. Si no, se
@@ -212,26 +202,8 @@ export default function TablaItemsCotizacion({
                     ) : (
                       <p className="font-semibold text-gray-800 text-xs uppercase tracking-wide">{item.descripcion}</p>
                     )}
-                    {item.subItems?.length > 0 && (
-                      <ul className="mt-1.5 space-y-1">
-                        {item.subItems.map(sub => (
-                          <li key={sub._subKey} className="flex items-start gap-1.5 text-xs text-gray-600">
-                            <span className="text-sky-400 shrink-0">•</span>
-                            {editable ? (
-                              <>
-                                <input value={sub.texto}
-                                  onChange={(e) => handleSubItem(item._key, sub._subKey, e.target.value)}
-                                  className="flex-1 border border-gray-200 rounded px-2 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-sky-300" />
-                                <button type="button" onClick={() => eliminarSubItem(item._key, sub._subKey)}
-                                  className="text-gray-300 hover:text-red-500 shrink-0">✕</button>
-                              </>
-                            ) : (
-                              <span className="flex-1">{sub.texto}</span>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
+                    <ListaSubItems subItems={item.subItems} editable={editable}
+                      onChange={(subs) => setSubItems(item._key, subs)} />
                     {editable && (
                       <div className="mt-1.5 flex items-center gap-3">
                         <button type="button" onClick={() => agregarSubItem(item._key)}
