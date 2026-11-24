@@ -398,6 +398,10 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
 
     const body = {
       numeroDocumento: ot.numeroDocumento,
+
+      // Si la OT es de una cotización anexada a una OC consolidada, la nueva queda en su misma sub-cadena.
+
+      numeroDocumentoOriginal: ot.numeroDocumentoOriginal ?? null,
       titulo: ot.titulo,
       numeroCotizacion: siguiente,
       tipo: "servicio",
