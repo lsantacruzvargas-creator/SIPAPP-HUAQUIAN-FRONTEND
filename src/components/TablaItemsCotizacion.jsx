@@ -20,7 +20,7 @@ export default function TablaItemsCotizacion({
   items, onItemsChange,
   tipo, puedeEditar, disabled, intentoGuardar, totalesMostrados,
   seleccionables = false, seleccionados = new Set(), onToggleSeleccion, onGenerarOT, generando = false, onVerOT, onQuitarOT, puedeQuitarOT = false,
-  seleccionablesOC = false, seleccionadosOC = new Set(), onToggleSeleccionOC, onGenerarOC, onVerOC, ocCompleta,
+  seleccionablesOC = false, seleccionadosOC = new Set(), onToggleSeleccionOC, onGenerarOC, onVerOC,
   puedeVerPrecios = true,
 }) {
   const [catalogoOpen, setCatalogoOpen] = useState(false);
@@ -190,7 +190,7 @@ export default function TablaItemsCotizacion({
                   )}
                   {seleccionablesOC && (
                     <CeldaOCItem item={item} idx={idx} seleccionados={seleccionadosOC}
-                      onToggle={onToggleSeleccionOC} onVerOC={onVerOC} ocCompleta={ocCompleta} />
+                      onToggle={onToggleSeleccionOC} onVerOC={onVerOC} />
                   )}
                   <td className="px-3 py-3 text-center text-gray-400">{idx + 1}</td>
                   <td className="px-3 py-3">

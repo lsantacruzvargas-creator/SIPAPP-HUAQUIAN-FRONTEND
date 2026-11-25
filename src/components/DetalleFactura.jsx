@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { fetchAuth, getUsuario, mensajeError } from "../utils/fetchAuth";
 import { formatearFecha, aInputFecha } from "../utils/fecha";
 import { generarFacturaPdf } from "../utils/facturaPdf";
+import { lineasConsolidadas } from "../utils/cotizacionItems";
 import {
   FlujoNegocio, TarjetaRelacion, Chip,
   badgeGeneral, badgePago, money, BotonAnular, BannerAnulado, bloqueadoPorCadenaCerrada, MensajeError,
@@ -155,7 +156,7 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
       setOt(otResuelta || null);
 
       // OC consolidada: la factura cubre varias cotizaciones enteras, cada una con su OT.
-      const lineas = ocVinculada?.lineas || [];
+      const lineas = lineasConsolidadas(ocVinculada);
       if (lineas.length && cots && ots) {
         const partes = lineas.map((l) => {
           const id = l.cotizacion?._id || l.cotizacion;

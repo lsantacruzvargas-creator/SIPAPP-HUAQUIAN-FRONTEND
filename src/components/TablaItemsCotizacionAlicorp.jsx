@@ -28,7 +28,7 @@ const ACENTOS = {
 export default function TablaItemsCotizacionAlicorp({
   items, onItemsChange, puedeEditar, disabled, puedeVerPrecios = true,
   seleccionables = false, seleccionados = new Set(), onToggleSeleccion, onGenerarOT, generando = false, onVerOT, onQuitarOT, puedeQuitarOT = false,
-  seleccionablesOC = false, seleccionadosOC = new Set(), onToggleSeleccionOC, onGenerarOC, onVerOC, ocCompleta,
+  seleccionablesOC = false, seleccionadosOC = new Set(), onToggleSeleccionOC, onGenerarOC, onVerOC,
 }) {
   const editable = puedeEditar && !disabled;
   // Qué grupo (clave de GRUPOS_ALICORP) recibe lo elegido en el catálogo —
@@ -168,7 +168,7 @@ export default function TablaItemsCotizacionAlicorp({
                           )}
                           {seleccionablesOC && (
                             <CeldaOCItem item={item} idx={idx} seleccionados={seleccionadosOC} className="px-3 py-2"
-                              onToggle={onToggleSeleccionOC} onVerOC={onVerOC} ocCompleta={ocCompleta} />
+                              onToggle={onToggleSeleccionOC} onVerOC={onVerOC} />
                           )}
                           <td className="px-3 py-2">
                             {editable ? (

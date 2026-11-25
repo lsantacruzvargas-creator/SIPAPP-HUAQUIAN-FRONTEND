@@ -141,6 +141,27 @@ export function montoAjustadoItem(cotizacion, item) {
   return r2(calcSubtotalGloria(item) * factor);
 }
 
+// OC consolidada = partidas de más de una cotización. Devuelve una línea por cotización
+// ({ cotizacion, titulo, subtotal }); vacío si la OC no es consolidada.
+export function lineasConsolidadas(oc) {
+  const porCot = new Map();
+  for (const p of oc?.partidas || []) {
+    const id = p.cotizacion?._id || p.cotizacion;
+    const previa = porCot.get(id);
+    if (previa) previa.subtotal = r2(previa.subtotal + (Number(p.subtotal) || 0));
+    else porCot.set(id, { cotizacion: p.cotizacion, titulo: p.titulo, subtotal: Number(p.subtotal) || 0 });
+  }
+  return porCot.size > 1 ? [...porCot.values()] : [];
+}
+
+// Posiciones de los ítems de la cotización que aún no están en una OC vigente
+// (los ítems no tienen `_id`: la OC los identifica por índice).
+export const indicesLibresOC = (cotizacion) =>
+  (cotizacion?.items || []).reduce((acc, item, idx) => {
+    if (!item.ocGenerada || item.ocGenerada.anulado) acc.push(idx);
+    return acc;
+  }, []);
+
 // ── Formato "Alicorp" — compartido por Alicorp, Intradevco y Masterbread ────
 // Mismo criterio de agrupación que Gloria (5 grupos fijos), pero acá los 5
 // comparten las mismas columnas — no hay variante de Mano de Obra por

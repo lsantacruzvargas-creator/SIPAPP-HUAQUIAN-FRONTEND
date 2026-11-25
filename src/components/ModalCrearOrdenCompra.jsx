@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import { money, totalSinIgv } from "./detalleShared";
+import { indicesLibresOC, montoAjustadoItem } from "../utils/cotizacionItems";
 import { r2, r0 } from "../utils/redondeo";
 
 const INP     = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 w-full";
@@ -93,28 +94,58 @@ export default function ModalCrearOrdenCompra({ onClose, onCreada }) {
   const seleccionarCot = (cot) => {
     setCot(cot);
     setBCot(false);
-    // La OC parte de la base sin IGV real de la cotización (con descuento o
-    // gastos + utilidad), no de `total`, que ya trae el IGV.
-    const base = totalSinIgv(cot);
-    setForm(prev => {
-      const nuevoSub = prev.subtotal || (base > 0 ? String(base) : prev.subtotal);
-      if (!prev.subtotal && base > 0) setCalc(calcular(base));
-      return {
-        ...prev,
-        titulo:   prev.titulo   || cot.titulo           || "",
-        empresa:  prev.empresa  || cot.empresa?._id     || "",
-        subtotal: nuevoSub,
-      };
-    });
+    // El monto lo calcula el backend desde la cotización (solo los ítems aún libres); acá
+    // es una vista previa de solo lectura: base sin IGV real, con descuento o gastos + utilidad.
+    const libres = indicesLibresOC(cot);
+    const items = cot.items || [];
+    const base = !items.length || libres.length === items.length
+      ? totalSinIgv(cot)
+      : r2(libres.reduce((s, i) => s + montoAjustadoItem(cot, items[i]), 0));
+    setCalc(calcular(base));
+    setForm(prev => ({
+      ...prev,
+      titulo:   prev.titulo   || cot.titulo           || "",
+      empresa:  prev.empresa  || cot.empresa?._id     || "",
+      subtotal: base > 0 ? String(base) : "",
+    }));
   };
 
   const guardar = async () => {
     // Administración no ve/edita el monto — su OC se crea en 0 y un rol con
     // acceso a precios lo completa después (mismo criterio que cotizaciones).
-    if (!esAsistente && (!form.subtotal || Number(form.subtotal) <= 0)) {
+    if (!cotVinculada && !esAsistente && (!form.subtotal || Number(form.subtotal) <= 0)) {
       return setError("El subtotal debe ser mayor a 0.");
     }
+    if (cotVinculada) {
+      if (!form.numeroOrden.trim()) return setError("El número de orden de compra es obligatorio.");
+      if (!form.titulo.trim()) return setError("El título es obligatorio.");
+      if ((cotVinculada.items || []).length > 0 && indicesLibresOC(cotVinculada).length === 0) {
+        return setError("Todos los ítems de la cotización ya están en una orden de compra.");
+      }
+    }
     setError(""); setGuardando(true);
+
+    if (cotVinculada) {
+      const res = await fetchAuth("/ordenes-compra/partidas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cotizacion: cotVinculada._id,
+          indices: indicesLibresOC(cotVinculada),
+          numeroOrden: form.numeroOrden.trim(),
+          titulo: form.titulo.trim(),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setExito(data.codigo);
+        setTimeout(() => onCreada(data), 1800);
+      } else {
+        setError(data.mensaje || "No se pudo crear la orden de compra.");
+      }
+      setGuardando(false);
+      return;
+    }
 
     const payload = {
       titulo:        form.titulo       || "por definir",
@@ -127,10 +158,8 @@ export default function ModalCrearOrdenCompra({ onClose, onCreada }) {
       descripcion:   form.descripcion,
       encargado:     form.encargado,
       planta:        form.planta,
-      cotizacion:    cotVinculada?._id,
     };
     if (form.empresa)       payload.empresa    = form.empresa;
-    if (!payload.cotizacion) delete payload.cotizacion;
 
     const res = await fetchAuth("/ordenes-compra", {
       method: "POST",
@@ -188,14 +217,17 @@ export default function ModalCrearOrdenCompra({ onClose, onCreada }) {
               <input name="numeroOrden" value={form.numeroOrden} onChange={handleChange}
                 placeholder="Ej. OC-2024-001" className={INP} />
             </div>
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">N° de factura</label>
-              <input name="numeroFactura" value={form.numeroFactura} onChange={handleChange}
-                placeholder="Ej. F001-00123" className={INP} />
-            </div>
+            {!cotVinculada && (
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">N° de factura</label>
+                <input name="numeroFactura" value={form.numeroFactura} onChange={handleChange}
+                  placeholder="Ej. F001-00123" className={INP} />
+              </div>
+            )}
           </div>
 
-          {/* Empresa */}
+          {/* Empresa: con cotización vinculada la OC toma la de la cotización */}
+          {!cotVinculada && (
           <div>
             <label className="text-xs text-gray-500 block mb-1">Empresa</label>
             <select name="empresa" value={form.empresa} onChange={handleChange} className={INP}>
@@ -207,6 +239,7 @@ export default function ModalCrearOrdenCompra({ onClose, onCreada }) {
               ))}
             </select>
           </div>
+          )}
 
           {/* Cálculos — ocultos para Administración, que no ve/edita montos */}
           {!esAsistente && (
@@ -214,7 +247,7 @@ export default function ModalCrearOrdenCompra({ onClose, onCreada }) {
               <div className="col-span-2">
                 <label className="text-xs text-gray-500 block mb-1">Subtotal sin IGV *</label>
                 <input type="number" name="subtotal" value={form.subtotal} onChange={handleChange}
-                  disabled={esAsistente} step="0.01" min="0" placeholder="0.00" className={INP} />
+                  disabled={esAsistente || !!cotVinculada} step="0.01" min="0" placeholder="0.00" className={INP} />
               </div>
               <div>
                 <label className="text-xs text-gray-500 block mb-1">IGV 18%</label>
@@ -241,6 +274,7 @@ export default function ModalCrearOrdenCompra({ onClose, onCreada }) {
             <input name="titulo" value={form.titulo} onChange={handleChange}
               placeholder="Descripción del servicio u obra" className={INP} />
           </div>
+          {!cotVinculada && (
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-xs text-gray-500 block mb-1">Encargado</label>
@@ -262,6 +296,7 @@ export default function ModalCrearOrdenCompra({ onClose, onCreada }) {
               )}
             </div>
           </div>
+          )}
 
           {exito && (
             <div className="bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg px-4 py-3">

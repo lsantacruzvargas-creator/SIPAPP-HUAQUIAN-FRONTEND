@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { fetchAuth, getUsuario, mensajeError } from "../utils/fetchAuth";
 import { formatearFecha, aInputFecha } from "../utils/fecha";
 import { estadoComprobanteClase } from "../utils/catalogosSunat";
-import ModalOrdenCompra from "./ModalOrdenCompra";
+import ModalGenerarOC from "./ModalOrdenCompra";
+import { indicesLibresOC } from "../utils/cotizacionItems";
 import SelectorEmpresas from "./SelectorEmpresas";
 import ModalSeleccionarTipoInforme from "./ModalSeleccionarTipoInforme";
 import FormInformeTecnico from "./FormInformeTecnico";
@@ -1196,8 +1197,9 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
       )}
 
       {crearOCOpen && cot && (
-        <ModalOrdenCompra
+        <ModalGenerarOC
           cotizacion={cot}
+          indices={indicesLibresOC(cot)}
           onClose={() => setCrearOCOpen(false)}
           onCreada={() => { setCrearOCOpen(false); cargarRelaciones(); }}
         />

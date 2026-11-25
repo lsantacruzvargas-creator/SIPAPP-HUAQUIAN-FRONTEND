@@ -144,13 +144,13 @@ export default function EmitirComprobante() {
     if (cotizacion?.moneda) setMoneda(cotizacion.moneda);
     setNumeroOrdenCompra(oc.numeroOrden || oc.codigo || "");
     setOrdenCompraId(oc._id || "");
-    // OC consolidada: una línea por cotización anexada, por el monto de esa cotización en la OC.
-    if (oc.lineas?.length) {
-      setItems(oc.lineas.map((l) => {
-        const valor = r2(Number(l.subtotal) || 0);
+    // OC con varias partidas: una línea por partida, por el monto de esa partida en la OC.
+    if (oc.partidas?.length > 1) {
+      setItems(oc.partidas.map((p) => {
+        const valor = r2(Number(p.subtotal) || 0);
         return {
           ...itemVacioComprobante(),
-          descripcion: l.titulo || l.cotizacion?.titulo || "",
+          descripcion: p.titulo || p.cotizacion?.titulo || "",
           cantidad: 1,
           unidad,
           valorUnitario: valor,
@@ -165,8 +165,11 @@ export default function EmitirComprobante() {
     // vez de cantidad/precio (ver Cotizacion.js itemSchema) — se traduce a
     // cantidad/valorUnitario equivalentes. Filas puramente informativas o
     // de agrupación (sin cantidad ni precio) se descartan del prellenado.
-    // OC parcial (generada desde ítems puntuales): solo se facturan sus ítems.
-    const itemsDeOC = (cotizacion?.items || []).filter((i) => (i.ocGenerada?._id || i.ocGenerada) === oc._id);
+    // OC con una sola partida: solo se facturan los ítems de esa partida.
+    const partidaUnica = oc.partidas?.[0];
+    const itemsDeOC = (cotizacion?.items || []).filter((i) => partidaUnica
+      ? String(i.partidaOC) === String(partidaUnica._id)
+      : (i.ocGenerada?._id || i.ocGenerada) === oc._id);
     const itemsValidos = (itemsDeOC.length ? itemsDeOC : cotizacion?.items || [])
       .map((i) => {
         const esManoObra = i.grupo === "mano_obra";

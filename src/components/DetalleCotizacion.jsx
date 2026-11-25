@@ -8,10 +8,10 @@ import { exportarCotizacionGloriaPdf } from "../utils/cotizacionGloriaPdf";
 import { exportarCotizacionAlicorpPdf } from "../utils/cotizacionAlicorpPdf";
 import {
   calcSubtotalGloria, calcularGloria, calcSubtotal, calcularAlicorp,
-  itemDesdeDb, itemInvalido, RUC_GLORIA, esFormatoAlicorp,
+  itemDesdeDb, itemInvalido, indicesLibresOC, RUC_GLORIA, esFormatoAlicorp,
 } from "../utils/cotizacionItems";
 import { estadoComprobanteClase } from "../utils/catalogosSunat";
-import ModalOrdenCompra, { ModalOrdenCompraItems } from "./ModalOrdenCompra";
+import ModalGenerarOC from "./ModalOrdenCompra";
 import ModalDetalleGuia from "./ModalDetalleGuia";
 import BuscadorOrdenTrabajo from "./BuscadorOrdenTrabajo";
 import SelectorEmpresas from "./SelectorEmpresas";
@@ -115,7 +115,6 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   const [guiaDetalle, setGuiaDetalle] = useState(null);
   const [informes, setInformes] = useState([]);
   const [ocs, setOcs] = useState([]);
-  const [crearOCOpen, setCrearOCOpen] = useState(false);
   const [facturas, setFacturas] = useState([]);
   const oc = ocs[0] || null;
   const factura = facturas[0] || null;
@@ -203,7 +202,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
       // Varias OCs por cotización (OCs parciales por ítems) — en orden de creación.
       const ocsFound = ocs
         .filter(o => (o.cotizacion?._id || o.cotizacion) === cot._id
-          || (o.lineas || []).some(l => (l.cotizacion?._id || l.cotizacion) === cot._id))
+          || (o.partidas || []).some(p => (p.cotizacion?._id || p.cotizacion) === cot._id))
         .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
       setOcs(ocsFound);
       const idsOC = new Set(ocsFound.map(o => o._id));
@@ -343,7 +342,6 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
     (ocs.length === 1 ? facturas.find(f => !f.ordenCompra) : null) ||
     null;
 
-  const ocCompleta = ocs.find(o => !o.anulado && !o.desdeItemsCotizacion);
   const abrirOC = (o) => {
     const full = ocs.find(x => x._id === o._id) || o;
     onNavegar?.({ tipo: "oc", data: full, extra: facturaDeOC(full) });
@@ -362,6 +360,13 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
     const guardada = puedeEditar && !cot.enviado && !cadenaCerrada ? await guardarCotizacion() : cot;
     if (!guardada) return;
     setIndicesNuevaOC([...seleccionadosOC].sort((a, b) => a - b));
+  };
+
+  // Atajo «OC completa»: marca todos los ítems que aún no están en una OC.
+  const abrirOCCompleta = async () => {
+    const guardada = puedeEditar && !cot.enviado && !cadenaCerrada ? await guardarCotizacion() : cot;
+    if (!guardada) return;
+    setIndicesNuevaOC(indicesLibresOC(guardada));
   };
 
   const toggleSeleccion = (idx) => setSeleccionados(prev => {
@@ -1383,7 +1388,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
 
             {ocs.length === 0 ? (
               <TarjetaRelacion tipo="oc" vacio
-                onCrear={puedeGenerarOC && !bloqueadoPorCadenaCerrada(cot.estadoCadena, rolActual) ? () => setCrearOCOpen(true) : undefined}
+                onCrear={puedeGenerarOC && !bloqueadoPorCadenaCerrada(cot.estadoCadena, rolActual) ? abrirOCCompleta : undefined}
                 crearLabel="OC completa" />
             ) : (
               ocs.map(o => (
@@ -1472,7 +1477,6 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
               onToggleSeleccionOC={toggleSeleccionOC}
               onGenerarOC={abrirNuevaOC}
               onVerOC={abrirOC}
-              ocCompleta={ocCompleta}
             />
           ) : esAlicorp ? (
             <TablaItemsCotizacionAlicorp
@@ -1494,7 +1498,6 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
               onToggleSeleccionOC={toggleSeleccionOC}
               onGenerarOC={abrirNuevaOC}
               onVerOC={abrirOC}
-              ocCompleta={ocCompleta}
             />
           ) : (
             <TablaItemsCotizacion
@@ -1518,7 +1521,6 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
               onToggleSeleccionOC={toggleSeleccionOC}
               onGenerarOC={abrirNuevaOC}
               onVerOC={abrirOC}
-              ocCompleta={ocCompleta}
               puedeVerPrecios={puedeVerPrecios}
             />
           )}
@@ -1586,16 +1588,8 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
       )}
 
 
-      {crearOCOpen && (
-        <ModalOrdenCompra
-          cotizacion={cot}
-          onClose={() => setCrearOCOpen(false)}
-          onCreada={() => { setCrearOCOpen(false); cargarRelaciones(); }}
-        />
-      )}
-
       {indicesNuevaOC && (
-        <ModalOrdenCompraItems
+        <ModalGenerarOC
           cotizacion={cot}
           indices={indicesNuevaOC}
           onClose={() => setIndicesNuevaOC(null)}

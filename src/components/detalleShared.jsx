@@ -2,6 +2,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { formatearFechaHora } from "../utils/fecha";
 import ConfirmacionAccion from "./ConfirmacionAccion";
 import { r2 } from "../utils/redondeo";
+import { lineasConsolidadas } from "../utils/cotizacionItems";
 
 /* ─── Iconos SVG (stroke, currentColor) ─────────────────────────── */
 const svg = "w-5 h-5";
@@ -269,10 +270,10 @@ export const money = (v, moneda = "PEN") =>
 export const totalSinIgv = (doc) =>
   r2(((Number(doc?.total) || 0) - (Number(doc?.igv) || 0)));
 
-// OC consolidada (varias cotizaciones enteras en una OC, ver OrdenCompra.lineas): etiqueta para las
-// tarjetas de OC y Factura vistas desde una de sus cotizaciones u OTs, con la parte que le toca.
+// Etiqueta (ver lineasConsolidadas) para las tarjetas de OC y Factura vistas desde una de sus cotizaciones u OTs,
+// con la parte que le toca.
 export function ParteConsolidada({ oc, cotizacionId, moneda, verPrecios }) {
-  const lineas = oc?.lineas || [];
+  const lineas = lineasConsolidadas(oc);
   if (!lineas.length) return null;
   const linea = lineas.find((l) => (l.cotizacion?._id || l.cotizacion) === cotizacionId);
   return (
@@ -454,15 +455,13 @@ export function BannerAnulado({ motivo, por, fecha }) {
 // Un ítem está cubierto si su OC existe y no fue anulada.
 const itemConOC = (item) => !!item.ocGenerada && !item.ocGenerada.anulado;
 
-// `ocCompleta`: OC vigente que cubre la cotización entera (creada con «OC completa» o consolidada);
-// no marca `ocGenerada` en los ítems, pero los cubre a todos.
-export function CeldaOCItem({ item, idx, seleccionados, onToggle, onVerOC, deshabilitado, ocCompleta, className = "px-3 py-3" }) {
-  const oc = itemConOC(item) ? item.ocGenerada : ocCompleta;
+export function CeldaOCItem({ item, idx, seleccionados, onToggle, onVerOC, deshabilitado, className = "px-3 py-3" }) {
+  const oc = itemConOC(item) ? item.ocGenerada : null;
   return (
     <td className={`${className} text-center`}>
       {oc ? (
         <button type="button" onClick={() => onVerOC?.(oc)}
-          title={oc === ocCompleta ? "Cubierto por la orden de compra completa de la cotización" : "Orden de compra que cubre este ítem"}
+          title="Orden de compra que cubre este ítem"
           className="text-[11px] font-mono font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 hover:bg-amber-100 transition whitespace-nowrap">
           {oc.numeroOrden || oc.codigo}
         </button>

@@ -3,10 +3,10 @@ import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import { formatearFecha, aInputFecha } from "../utils/fecha";
 import { exportarCotizacionPdf } from "../utils/cotizacionPdf";
 import ModalCrearOT from "./ModalCrearOT";
-import ModalOrdenCompra from "./ModalOrdenCompra";
+import ModalGenerarOC from "./ModalOrdenCompra";
 import {
   calcSubtotal, INP, INP_RO,
-  itemDesdeDb, itemVacioVenta, itemVacioServicio,
+  itemDesdeDb, itemVacioVenta, itemVacioServicio, indicesLibresOC,
 } from "../utils/cotizacionItems";
 import CeldasNumericas from "./CeldasNumericas";
 import TablaScroll from "./TablaScroll";
@@ -717,8 +717,9 @@ export default function ModalCotizacion({ cotizacion: inicial, onClose, onSaved 
       )}
 
       {crearOC && (
-        <ModalOrdenCompra
+        <ModalGenerarOC
           cotizacion={cot}
+          indices={indicesLibresOC(cot)}
           onClose={() => setCrearOC(false)}
           onCreada={() => setCrearOC(false)}
         />

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { Fragment, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchAuth, getUsuario, mensajeError } from "../utils/fetchAuth";
 import { formatearFecha, aInputFecha } from "../utils/fecha";
@@ -10,6 +10,7 @@ import {
   badgePago, badgeGeneral, money, totalSinIgv, BotonAnular, BotonCerrarCadena, BotonDesanular, BannerAnulado, bloqueadoPorCadenaCerrada, MensajeError,
 } from "./detalleShared";
 import { r2, r0 } from "../utils/redondeo";
+import { montoAjustadoItem, lineasConsolidadas } from "../utils/cotizacionItems";
 
 const INP = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 w-full transition";
 const codigoDeGuia = (g) => `${g.serie}-${String(g.correlativo).padStart(4, "0")}`;
@@ -22,88 +23,6 @@ function calcular(sub) {
   // depósito se hace en números enteros (sin decimales).
   const detraccion = total >= 701 ? r0(total * 0.12) : 0;
   return { igv, total, detraccion, totalAPagar: r2((total - detraccion)) };
-}
-
-// El backend (GET /ordenes-compra/:id/anexables) ya filtra: misma empresa y moneda, sin OC ni factura.
-function ModalAnexarCotizaciones({ orden, moneda, verPrecios, onClose, onAnexada }) {
-  const [datos, setDatos] = useState(null);
-  const [elegidas, setElegidas] = useState([]);
-  const [q, setQ] = useState("");
-  const [guardando, setGuardando] = useState(false);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    fetchAuth(`/ordenes-compra/${orden._id}/anexables`)
-      .then(async (r) => (r.ok ? r.json() : { motivo: "No se pudo cargar la lista de cotizaciones.", cotizaciones: [] }))
-      .then(setDatos);
-  }, [orden._id]);
-
-  const lista = (datos?.cotizaciones || []).filter((c) =>
-    !q || [c.numeroCotizacion, c.codigo, c.titulo, ...(c.ots || [])].some((v) => String(v || "").toLowerCase().includes(q.toLowerCase())));
-  const alternar = (id) => setElegidas((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-  const suma = (datos?.cotizaciones || []).filter((c) => elegidas.includes(c._id)).reduce((s, c) => s + c.subtotalOC, 0);
-
-  const anexar = async () => {
-    setGuardando(true); setError("");
-    const res = await fetchAuth(`/ordenes-compra/${orden._id}/anexar`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cotizaciones: elegidas }),
-    });
-    const data = await res.json();
-    setGuardando(false);
-    if (!res.ok) return setError(data.mensaje || "No se pudieron anexar las cotizaciones.");
-    onAnexada(data);
-  };
-
-  return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh]">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <div>
-            <h3 className="font-semibold text-gray-800">Anexar cotizaciones a la OC</h3>
-            <p className="text-xs text-gray-400">Cada cotización pasa a la cadena de esta OC y se factura en su propia línea.</p>
-          </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl">✕</button>
-        </div>
-        <div className="px-6 pt-4">
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por N° cotización, título u OT…" className={INP} />
-        </div>
-        <div className="flex-1 overflow-y-auto px-6 py-3 space-y-1.5">
-          {!datos && <p className="text-sm text-gray-400 py-6 text-center">Cargando…</p>}
-          {datos?.motivo && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{datos.motivo}</p>}
-          {datos && !datos.motivo && lista.length === 0 && (
-            <p className="text-sm text-gray-400 py-6 text-center">No hay cotizaciones de esta empresa, en la misma moneda y sin OC.</p>
-          )}
-          {lista.map((c) => (
-            <label key={c._id} className={`flex items-start gap-3 rounded-xl border px-3 py-2.5 cursor-pointer transition ${elegidas.includes(c._id) ? "border-blue-300 bg-blue-50" : "border-gray-100 hover:bg-gray-50"}`}>
-              <input type="checkbox" checked={elegidas.includes(c._id)} onChange={() => alternar(c._id)} className="mt-1 w-4 h-4" />
-              <div className="flex-1 min-w-0">
-                <div className="flex justify-between gap-3">
-                  <span className="font-mono text-xs text-blue-600">{c.numeroCotizacion || c.codigo}</span>
-                  {verPrecios && <span className="text-xs text-gray-500 shrink-0">{money(c.subtotalOC, moneda)} sin IGV</span>}
-                </div>
-                <p className="text-sm text-gray-700 truncate">{c.titulo}</p>
-                <p className="text-xs text-gray-400">OT: {c.ots.join(", ") || "—"}</p>
-              </div>
-            </label>
-          ))}
-        </div>
-        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between gap-3">
-          <span className="text-xs text-gray-500">
-            {elegidas.length} seleccionada{elegidas.length !== 1 ? "s" : ""}{verPrecios && elegidas.length > 0 && ` · ${money(suma, moneda)} sin IGV`}
-          </span>
-          <div className="flex items-center gap-3">
-            {error && <span className="text-xs text-red-500">{error}</span>}
-            <button onClick={anexar} disabled={!elegidas.length || guardando}
-              className="bg-blue-600 text-white text-sm px-5 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition font-semibold">
-              {guardando ? "Anexando…" : "Anexar"}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 export default function DetalleOrdenCompra({ orden, onClose, onGuardada, facturaVinculada, onNavegar }) {
@@ -137,12 +56,14 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
   const [cargandoCrearFactura, setCargandoCrearFactura] = useState(false);
   const navigate = useNavigate();
   const [ordenActual, setOrdenActual] = useState(orden);
-  const consolidada = (ordenActual.lineas || []).length > 0;
+  const consolidada = lineasConsolidadas(ordenActual).length > 0;
   const [guardandoConfirmacion, setGuardandoConfirmacion] = useState("");
   const [todasOTs, setTodasOTs] = useState([]);
-  const [anexando, setAnexando] = useState(false);
-  const [lineaADesanexar, setLineaADesanexar] = useState(null);
-  const [desanexando, setDesanexando] = useState(false);
+  const [cotizacionesPartidas, setCotizacionesPartidas] = useState({});
+  const [partidaExpandida, setPartidaExpandida] = useState(null);
+  const [partidaADesvincular, setPartidaADesvincular] = useState(null);
+  const [desvinculando, setDesvinculando] = useState(false);
+  const [errorDesvincular, setErrorDesvincular] = useState("");
   const rolActual = getUsuario()?.rol;
   const puedeEditar = ["admin", "asistente", "facturacion", "jefatura"].includes(rolActual);
   // Anular un documento queda reservado a Admin y Jefatura — Facturación ya
@@ -266,7 +187,14 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
   };
 
   useEffect(() => {
-    fetchAuth("/empresas").then(r => r.ok && r.json()).then(emps => setEmpresas(emps || []));
+    const idsCot = new Set((orden.partidas || []).map(p => p.cotizacion?._id || p.cotizacion));
+    Promise.all([
+      fetchAuth("/empresas").then(r => r.ok ? r.json() : []),
+      idsCot.size ? fetchAuth("/cotizaciones").then(r => r.ok ? r.json() : []) : [],
+    ]).then(([emps, cots]) => {
+      setEmpresas(emps || []);
+      setCotizacionesPartidas(Object.fromEntries(cots.filter(c => idsCot.has(c._id)).map(c => [c._id, c])));
+    });
     cargarOTeInformes();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -352,12 +280,17 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
   const cot     = orden.cotizacion;
   const factura = facturaVinculada;
 
-  // OC consolidada (varias cotizaciones enteras en una OC): ver routes/ordenesCompra.js.
+  // Una partida por cotización (ver routes/ordenesCompra.js); sus ítems son los de la cotización con `partidaOC` igual a su _id.
   const cotId = cot?._id || cot;
-  const lineas = ordenActual.lineas || [];
-  const lineasMostradas = lineas.length ? lineas : (cot ? [{ cotizacion: cot, titulo: cot.titulo, subtotal: ordenActual.subtotal }] : []);
-  const puedeAnexar = puedeEditar && !orden.anulado && !cadenaCerrada && !factura && !ordenActual.numeroFactura
-    && !ordenActual.desdeItemsCotizacion && !!cot;
+  const partidas = ordenActual.partidas || [];
+  const idCotDe = (p) => p.cotizacion?._id || p.cotizacion;
+  // La partida de origen no se desvincula si es la única de esa cotización: se anula la OC.
+  const puedeDesvincular = (p) => puedeEditar && !orden.anulado && !cadenaCerrada
+    && (idCotDe(p) !== cotId || partidas.filter(x => idCotDe(x) === cotId).length > 1);
+  const hayColumnaDesvincular = partidas.some(puedeDesvincular);
+  const itemsDePartida = (p) => (cotizacionesPartidas[idCotDe(p)]?.items || [])
+    .map((item, idx) => ({ item, idx }))
+    .filter(e => e.item.partidaOC && String(e.item.partidaOC) === String(p._id));
   const otsDeCotizacion = (id) => todasOTs
     .filter(o => !o.ordenPadre && (o.cotizacion?._id || o.cotizacion) === id)
     .map(o => o.numeroOT || o.codigo);
@@ -366,18 +299,16 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
     setForm(prev => ({ ...prev, subtotal: String(nueva.subtotal ?? 0) }));
     setCalc(calcular(nueva.subtotal ?? 0));
   };
-  const confirmarDesanexo = async () => {
-    setDesanexando(true);
-    const res = await fetchAuth(`/ordenes-compra/${orden._id}/desanexar`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cotizacion: lineaADesanexar.cotizacion?._id || lineaADesanexar.cotizacion }),
-    });
-    const data = await res.json();
-    setDesanexando(false);
-    setLineaADesanexar(null);
-    if (res.ok) aplicarOrden(data);
-    else setError(data.mensaje || "No se pudo desanexar la cotización.");
+  const confirmarDesvincular = async () => {
+    setDesvinculando(true);
+    setErrorDesvincular("");
+    const res = await fetchAuth(`/ordenes-compra/${orden._id}/partidas/${partidaADesvincular._id}`, { method: "DELETE" });
+    const data = await res.json().catch(() => ({}));
+    setDesvinculando(false);
+    if (!res.ok) return setErrorDesvincular(data.mensaje || "No se pudo desvincular la partida.");
+    setPartidaADesvincular(null);
+    setPartidaExpandida(null);
+    aplicarOrden(data);
   };
   const ultimo  = informes[informes.length - 1];
 
@@ -702,69 +633,101 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
           </section>
         </div>
 
-        {(lineas.length > 0 || puedeAnexar) && (
+        {partidas.length > 0 && (
           <div className="max-w-6xl mx-auto px-8 pb-8">
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-                <div className="flex items-center gap-2">
-                  <span className="w-1.5 h-5 rounded-full bg-sky-500" />
-                  <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Cotizaciones de esta OC</h2>
-                  <span className="text-xs text-gray-400">({lineasMostradas.length})</span>
-                </div>
-                {puedeAnexar && (
-                  <button type="button" onClick={() => setAnexando(true)}
-                    className="bg-sky-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-sky-700 transition font-medium">
-                    + Anexar cotizaciones
-                  </button>
-                )}
+              <div className="flex items-center gap-2 px-6 py-4 border-b border-gray-100">
+                <span className="w-1.5 h-5 rounded-full bg-sky-500" />
+                <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Partidas</h2>
+                <span className="text-xs text-gray-400">({partidas.length})</span>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
                     <tr>
-                      <th className="px-3 py-3 text-center w-12">Item</th>
+                      <th className="px-3 py-3 text-center w-16">Pos.</th>
                       <th className="px-3 py-3 text-left w-36">N° cotización</th>
                       <th className="px-3 py-3 text-left w-36">N° OT</th>
                       <th className="px-3 py-3 text-left">Título</th>
+                      <th className="px-3 py-3 text-left w-28">Ítems</th>
                       {puedeVerPrecios && <th className="px-3 py-3 text-right w-40">Total sin IGV</th>}
-                      {puedeAnexar && lineas.length > 0 && <th className="px-3 py-3 w-10"><span className="sr-only">Desanexar</span></th>}
+                      {hayColumnaDesvincular && <th className="px-3 py-3 w-10"><span className="sr-only">Desvincular</span></th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {lineasMostradas.map((l, idx) => {
-                      const id = l.cotizacion?._id || l.cotizacion;
+                    {partidas.map((p, idx) => {
+                      const id = idCotDe(p);
+                      const cotP = cotizacionesPartidas[id];
+                      const itemsP = itemsDePartida(p);
+                      const abierta = partidaExpandida === p._id;
                       return (
-                        <tr key={id} className="align-top">
-                          <td className="px-3 py-3 text-center text-gray-400">{idx + 1}</td>
-                          <td className="px-3 py-3 font-mono text-sm text-sky-700 whitespace-nowrap">
-                            {l.cotizacion?.numeroCotizacion || l.cotizacion?.codigo || "—"}
-                            {id === cotId && lineas.length > 0 && (
-                              <span className="ml-2 font-sans text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-sky-50 text-sky-700 uppercase">Origen</span>
-                            )}
-                          </td>
-                          <td className="px-3 py-3 font-mono text-sm text-gray-600">{otsDeCotizacion(id).join(", ") || "—"}</td>
-                          <td className="px-3 py-3 font-semibold text-gray-800 text-xs uppercase tracking-wide">{l.titulo}</td>
-                          {puedeVerPrecios && (
-                            <td className="px-3 py-3 text-right font-semibold text-gray-800 tabular-nums whitespace-nowrap">{money(l.subtotal, cot?.moneda)}</td>
-                          )}
-                          {puedeAnexar && lineas.length > 0 && (
-                            <td className="px-3 py-3 text-center">
-                              {id !== cotId && (
-                                <button type="button" title="Desanexar cotización" onClick={() => setLineaADesanexar(l)}
-                                  className="text-gray-300 hover:text-red-500 transition">✕</button>
+                        <Fragment key={p._id}>
+                          <tr className="align-top">
+                            <td className="px-3 py-3 text-center text-gray-500 font-mono text-xs whitespace-nowrap">{idx + 1}/{partidas.length}</td>
+                            <td className="px-3 py-3 font-mono text-sm text-sky-700 whitespace-nowrap">
+                              {p.cotizacion?.numeroCotizacion || p.cotizacion?.codigo || "—"}
+                              {id === cotId && partidas.length > 1 && (
+                                <span className="ml-2 font-sans text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-sky-50 text-sky-700 uppercase">Origen</span>
                               )}
                             </td>
+                            <td className="px-3 py-3 font-mono text-sm text-gray-600">{otsDeCotizacion(id).join(", ") || "—"}</td>
+                            <td className="px-3 py-3 font-semibold text-gray-800 text-xs uppercase tracking-wide">{p.titulo}</td>
+                            <td className="px-3 py-3">
+                              <button type="button" onClick={() => setPartidaExpandida(abierta ? null : p._id)}
+                                aria-expanded={abierta}
+                                className="text-xs text-sky-700 hover:text-sky-900 underline whitespace-nowrap">
+                                {cotP ? `${itemsP.length} ítem${itemsP.length !== 1 ? "s" : ""}` : "Ver ítems"} {abierta ? "▴" : "▾"}
+                              </button>
+                            </td>
+                            {puedeVerPrecios && (
+                              <td className="px-3 py-3 text-right font-semibold text-gray-800 tabular-nums whitespace-nowrap">{money(p.subtotal, cot?.moneda)}</td>
+                            )}
+                            {hayColumnaDesvincular && (
+                              <td className="px-3 py-3 text-center">
+                                {puedeDesvincular(p) && (
+                                  <button type="button" title="Desvincular partida" aria-label="Desvincular partida"
+                                    onClick={() => { setErrorDesvincular(""); setPartidaADesvincular(p); }}
+                                    className="text-gray-300 hover:text-red-500 transition">✕</button>
+                                )}
+                              </td>
+                            )}
+                          </tr>
+                          {abierta && (
+                            <tr className="bg-gray-50/60">
+                              <td />
+                              <td colSpan={4 + (puedeVerPrecios ? 1 : 0) + (hayColumnaDesvincular ? 1 : 0)} className="px-3 py-3">
+                                {!cotP ? (
+                                  <p className="text-xs text-gray-400">Cargando ítems…</p>
+                                ) : itemsP.length === 0 ? (
+                                  <p className="text-xs text-gray-500">La partida cubre la cotización completa (no tiene ítems individuales).</p>
+                                ) : (
+                                  <ul className="divide-y divide-gray-200 text-sm">
+                                    {itemsP.map(({ item, idx: iIdx }) => (
+                                      <li key={iIdx} className="flex items-start justify-between gap-4 py-1.5">
+                                        <span className="text-gray-700 min-w-0">
+                                          <span className="text-gray-400 mr-1.5">{iIdx + 1}.</span>{item.descripcion}
+                                        </span>
+                                        <span className="text-xs text-gray-500 tabular-nums whitespace-nowrap shrink-0">
+                                          {item.cantidad} {item.unidad}
+                                          {puedeVerPrecios && <span className="ml-3 text-sm text-gray-700">{money(montoAjustadoItem(cotP, item), cot?.moneda)}</span>}
+                                        </span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </td>
+                            </tr>
                           )}
-                        </tr>
+                        </Fragment>
                       );
                     })}
                   </tbody>
-                  {puedeVerPrecios && lineas.length > 0 && (
+                  {puedeVerPrecios && (
                     <tfoot className="bg-gray-50 border-t border-gray-200">
                       <tr>
-                        <td colSpan={4} className="px-3 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Total sin IGV de la OC</td>
+                        <td colSpan={5} className="px-3 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Total sin IGV de la OC</td>
                         <td className="px-3 py-3 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap">{money(ordenActual.subtotal, cot?.moneda)}</td>
-                        {puedeAnexar && <td />}
+                        {hayColumnaDesvincular && <td />}
                       </tr>
                     </tfoot>
                   )}
@@ -778,16 +741,11 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
       {guiaDetalle && (
         <ModalDetalleGuia guia={guiaDetalle} onClose={() => setGuiaDetalle(null)} />
       )}
-      {anexando && (
-        <ModalAnexarCotizaciones orden={ordenActual} moneda={cot?.moneda} verPrecios={puedeVerPrecios}
-          onClose={() => setAnexando(false)}
-          onAnexada={(nueva) => { aplicarOrden(nueva); setAnexando(false); }} />
-      )}
-      {lineaADesanexar && (
+      {partidaADesvincular && (
         <ConfirmacionAccion
-          mensaje={`¿Desanexar la cotización ${lineaADesanexar.cotizacion?.numeroCotizacion || lineaADesanexar.cotizacion?.codigo || ""}? Vuelve a su cadena original (con su OT) y sale del monto de esta OC.`}
-          textoConfirmar="Desanexar" procesando={desanexando}
-          onCancelar={() => setLineaADesanexar(null)} onConfirmar={confirmarDesanexo} />
+          mensaje={`¿Desvincular la partida de la cotización ${partidaADesvincular.cotizacion?.numeroCotizacion || partidaADesvincular.cotizacion?.codigo || ""}? Sus ítems quedan libres para otra OC y salen del monto de esta OC.`}
+          textoConfirmar="Desvincular" procesando={desvinculando} error={errorDesvincular}
+          onCancelar={() => setPartidaADesvincular(null)} onConfirmar={confirmarDesvincular} />
       )}
     </div>
   );
