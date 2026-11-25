@@ -133,7 +133,7 @@ export default function ModalOrdenCompra({ cotizacion, onClose, onCreada }) {
 
           {!esAsistente && (
             <div>
-              <label className="text-xs text-gray-500 block mb-1">Monto sin IGV (S/)</label>
+              <label className="text-xs text-gray-500 block mb-1">Monto sin IGV ({cotizacion.moneda === "USD" ? "US$" : "S/"})</label>
               <input
                 type="number"
                 value={monto}

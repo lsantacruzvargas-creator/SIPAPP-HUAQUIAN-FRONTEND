@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { fetchAuth, getUsuario } from "../utils/fetchAuth";
+import { fetchAuth, getUsuario, mensajeError } from "../utils/fetchAuth";
 import { formatearFecha, aInputFecha } from "../utils/fecha";
 import ModalSeleccionarTipoInforme from "./ModalSeleccionarTipoInforme";
 import FormInformeTecnico from "./FormInformeTecnico";
@@ -8,7 +8,7 @@ import ModalRequerimiento from "./ModalRequerimiento";
 import TablaServiciosExternos from "./TablaServiciosExternos";
 import TarjetaDatosAdjuntos from "./TarjetaDatosAdjuntos";
 import TablaScroll from "./TablaScroll";
-import { Chip, badgeGeneral, BotonAnular, BotonCerrarCadena, BotonDesanular, BannerAnulado, bloqueadoPorCadenaCerrada } from "./detalleShared";
+import { Chip, badgeGeneral, BotonAnular, BotonCerrarCadena, BotonDesanular, BannerAnulado, bloqueadoPorCadenaCerrada, MensajeError } from "./detalleShared";
 
 const CATEGORIAS_SERVICIO = ["SOPORTE", "DEVOLUCION", "DIAGNOSTICO", "GARANTIA", "MANTENIMIENTO", "REPARACION", "PRESTAMO", "SUMINISTRO", "MANTENIMIENTO EN PLANTA"];
 
@@ -138,19 +138,24 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
     if (!body.personalAsignado) delete body.personalAsignado;
     if (!body.fechaEntrega) delete body.fechaEntrega;
 
-    const res = await fetchAuth(`/ordenes-trabajo/${ot._id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (res.ok) {
-      const actualizada = await res.json();
-      setOt(actualizada);
-      onGuardada?.(actualizada);
-    } else {
-      setError("Error al guardar los cambios.");
+    try {
+      const res = await fetchAuth(`/ordenes-trabajo/${ot._id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        const actualizada = await res.json();
+        setOt(actualizada);
+        onGuardada?.(actualizada);
+      } else {
+        setError(await mensajeError(res, "Error al guardar los cambios."));
+      }
+    } catch {
+      setError("No se pudo conectar con el servidor. Tus cambios siguen en pantalla: inténtalo de nuevo.");
+    } finally {
+      setGuardando(false);
     }
-    setGuardando(false);
   };
 
   // Cambian de inmediato (sin pasar por "Guardar cambios", que técnico no
@@ -202,7 +207,7 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
       setOt(actualizada);
       onGuardada?.(actualizada);
     } else {
-      setError("Error al anular el documento.");
+      return mensajeError(res, "Error al anular el documento.");
     }
   };
 
@@ -213,7 +218,7 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
       setOt(actualizada);
       onGuardada?.(actualizada);
     } else {
-      setError("Error al desanular el documento.");
+      return mensajeError(res, "Error al desanular el documento.");
     }
   };
 
@@ -228,7 +233,7 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
       setOt(actualizada);
       onGuardada?.(actualizada);
     } else {
-      setError("Error al cerrar/abrir la cadena.");
+      return mensajeError(res, "Error al cerrar/abrir la cadena.");
     }
   };
 
@@ -478,7 +483,7 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
               Irreparable
             </label>
 
-            {error && <p className="text-xs text-red-500">{error}</p>}
+            <MensajeError mensaje={error} />
           </fieldset>
 
           {/* Relaciones — todos los informes de ESTA sub-OT, cada uno como su

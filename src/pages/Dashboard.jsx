@@ -60,6 +60,7 @@ function KpiCard({ label, value, sub, color }) {
 }
 
 const fmt = (n) => `S/ ${Number(n).toLocaleString("es-PE", { minimumFractionDigits: 2 })}`;
+const fmtUSD = (n) => `US$ ${Number(n).toLocaleString("es-PE", { minimumFractionDigits: 2 })}`;
 
 // ── Fila de conversión (una etapa de la cadena de documentos) ───────────────
 // `enlazados` = cuántos elementos de origen SÍ tienen al menos un documento
@@ -390,12 +391,14 @@ export default function Dashboard() {
   // criterio que usa DetalleFactura.jsx). "Total pagado" suma las facturas
   // ya marcadas como pagadas; "Por cobrar" suma las que todavía no.
   const montoFactura = (f) => Number(f.totalAPagar ?? f.total) || 0;
-  const totalPagado = factsFiltradas
-    .filter((f) => f.estadoPago === "pagado")
+  // Soles y dólares no se suman: el KPI va en S/ y lo facturado en US$ se informa aparte.
+  const sumar = (pagadas, moneda) => factsFiltradas
+    .filter((f) => (f.estadoPago === "pagado") === pagadas && (f.moneda || "PEN") === moneda)
     .reduce((s, f) => s + montoFactura(f), 0);
-  const porCobrar = factsFiltradas
-    .filter((f) => f.estadoPago !== "pagado")
-    .reduce((s, f) => s + montoFactura(f), 0);
+  const totalPagado = sumar(true, "PEN");
+  const porCobrar = sumar(false, "PEN");
+  const totalPagadoUSD = sumar(true, "USD");
+  const porCobrarUSD = sumar(false, "USD");
 
   if (cargando) {
     return <div className="p-8 text-sm text-gray-400">Cargando dashboard…</div>;
@@ -461,8 +464,8 @@ export default function Dashboard() {
 
       {/* KPIs — fila 2 */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <KpiCard label="Total pagado" value={fmt(totalPagado)} sub="suma de facturas pagadas"      color="green" />
-        <KpiCard label="Por cobrar"   value={fmt(porCobrar)}   sub="suma de facturas sin pagar"    color="red"   />
+        <KpiCard label="Total pagado" value={fmt(totalPagado)} sub={totalPagadoUSD > 0 ? `+ ${fmtUSD(totalPagadoUSD)} en facturas en dólares` : "suma de facturas pagadas"} color="green" />
+        <KpiCard label="Por cobrar"   value={fmt(porCobrar)}   sub={porCobrarUSD > 0 ? `+ ${fmtUSD(porCobrarUSD)} en facturas en dólares` : "suma de facturas sin pagar"} color="red" />
       </div>
 
       {/* Contraste OC vs Cotizaciones */}

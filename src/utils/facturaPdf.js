@@ -43,7 +43,7 @@ export async function generarFacturaPdf({ factura, comprobante, empresa }) {
   ]);
 
   const c = comprobante;
-  const moneda = c?.totales?.moneda || "PEN";
+  const moneda = c?.totales?.moneda || factura.moneda || "PEN";
   const simbolo = moneda === "USD" ? "US$" : "S/";
   const numero = c ? `${c.serie}-${c.correlativo}` : (factura.numeroFactura || "");
 

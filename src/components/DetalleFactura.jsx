@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
-import { fetchAuth, getUsuario } from "../utils/fetchAuth";
+import { useNavigate } from "react-router-dom";
+import { fetchAuth, getUsuario, mensajeError } from "../utils/fetchAuth";
 import { formatearFecha, aInputFecha } from "../utils/fecha";
 import { generarFacturaPdf } from "../utils/facturaPdf";
 import {
   FlujoNegocio, TarjetaRelacion, Chip,
-  badgeGeneral, badgePago, money, BotonAnular, BannerAnulado, bloqueadoPorCadenaCerrada,
+  badgeGeneral, badgePago, money, BotonAnular, BannerAnulado, bloqueadoPorCadenaCerrada, MensajeError,
 } from "./detalleShared";
 import { r2, r0 } from "../utils/redondeo";
 
@@ -98,6 +99,7 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
   const [imprimiendo, setImprimiendo] = useState(false);
   // "jefatura" agregado acá para calzar con el gate real del backend
   // (routes/facturas.js `puedeEditar`) — se había quedado desactualizado.
+  const navigate = useNavigate();
   const rolActual = getUsuario()?.rol;
   const puedeEditar = ["admin", "facturacion", "jefatura"].includes(rolActual);
   // Montos de las cards de "Relaciones" (Cotización/OC) — mismo criterio que
@@ -105,6 +107,7 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
   // DetalleOrdenCompra.jsx).
   const puedeVerPrecios = ["admin", "facturacion", "jefatura"].includes(rolActual);
   const cadenaCerrada = bloqueadoPorCadenaCerrada(inicial.estadoCadena, rolActual);
+  const cpeAceptado = !!inicial.comprobanteEmitido;
 
   const abrirOC = async () => {
     if (!ocVinculada || cargandoOC) return;
@@ -233,19 +236,37 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
     if (form.empresa)          payload.empresa          = form.empresa;
     if (!payload.ordenCompra)  delete payload.ordenCompra;
 
-    const res = await fetchAuth(`/facturas/${inicial._id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (res.ok) { onGuardada(await res.json()); }
-    else { setError("No se pudo guardar los cambios."); }
-    setGuardando(false);
+    try {
+      const res = await fetchAuth(`/facturas/${inicial._id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) { onGuardada(await res.json()); }
+      else { setError(await mensajeError(res, "No se pudo guardar los cambios.")); }
+    } catch {
+      setError("No se pudo conectar con el servidor. Tus cambios siguen en pantalla: inténtalo de nuevo.");
+    } finally {
+      setGuardando(false);
+    }
   };
 
   // El CPE con lo que se llenó en Emitir Comprobante (ítems, cuotas,
   // detracción…). Las facturas creadas desde "Nueva Factura" no guardan el
   // enlace `comprobante`, así que se ubica por serie-correlativo.
+  // Con el CPE aceptado la factura no se anula internamente (el backend lo rechaza): se anula con NC,
+  // que al aceptarse sincroniza la factura. Misma precarga que "Emitir Nota de Crédito" en Comprobantes.
+  const emitirNotaCredito = async () => {
+    setError("");
+    try {
+      const comprobante = await buscarComprobante();
+      if (!comprobante) { setError("No se encontró el comprobante electrónico de esta factura."); return; }
+      navigate("/facturacion-electronica/emitir", { state: { comprobante } });
+    } catch {
+      setError("No se pudo conectar con el servidor. Inténtalo de nuevo.");
+    }
+  };
+
   const buscarComprobante = async () => {
     if (inicial.comprobante) {
       const data = await fetchAuth(`/cpe/${inicial.comprobante._id || inicial.comprobante}`).then(r => r.json());
@@ -296,7 +317,7 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
       body: JSON.stringify({ motivo }),
     });
     if (res.ok) { onGuardada(await res.json()); }
-    else { setError("Error al anular el documento."); }
+    else { return mensajeError(res, "Error al anular el documento."); }
   };
 
   const oc     = ocVinculada;
@@ -345,7 +366,14 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
                 className="border border-white/40 text-white text-sm px-4 py-2 rounded-lg hover:bg-white/10 disabled:opacity-60 transition font-semibold shrink-0">
                 {imprimiendo ? "Generando…" : "Imprimir PDF"}
               </button>
-              {!inicial.anulado && !cadenaCerrada && puedeEditar && <BotonAnular onAnular={anular} />}
+              {!inicial.anulado && !cadenaCerrada && puedeEditar && (cpeAceptado ? (
+                <button onClick={emitirNotaCredito}
+                  className="text-xs text-white/70 hover:text-white underline transition">
+                  Emitir nota de crédito
+                </button>
+              ) : (
+                <BotonAnular onAnular={anular} />
+              ))}
               {!inicial.anulado && !cadenaCerrada && puedeEditar && (
                 <button onClick={guardar} disabled={guardando}
                   className="bg-white text-emerald-700 text-sm px-5 py-2 rounded-lg hover:bg-emerald-50 disabled:opacity-60 transition font-semibold shadow-sm shrink-0">
@@ -384,11 +412,17 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
               </p>
             )}
 
+            {cpeAceptado && (
+              <p className="text-xs text-sky-800 bg-sky-50 border border-sky-100 rounded-lg px-3 py-2">
+                Comprobante aceptado por SUNAT: número, empresa y montos son los del XML y no se editan aquí. Para corregirlos emite una Nota de Crédito o Débito.
+              </p>
+            )}
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-xs text-gray-500 block mb-1">N° de factura</label>
                 <input name="numeroFactura" value={form.numeroFactura} onChange={handleChange}
-                  placeholder="Ej. F001-00123" className={INP} />
+                  placeholder="Ej. F001-00123" disabled={cpeAceptado} className={cpeAceptado ? INP_RO : INP} />
               </div>
               <div>
                 <label className="text-xs text-gray-500 block mb-1">N° Orden de Compra</label>
@@ -413,7 +447,7 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
 
             <div>
               <label className="text-xs text-gray-500 block mb-1">Empresa</label>
-              <select name="empresa" value={form.empresa} onChange={handleChange} className={INP}>
+              <select name="empresa" value={form.empresa} onChange={handleChange} disabled={cpeAceptado} className={cpeAceptado ? INP_RO : INP}>
                 <option value="">— Sin empresa —</option>
                 {empresas.map(e => (
                   <option key={e._id} value={e._id}>
@@ -496,31 +530,31 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
             {/* Cálculos */}
             <div className="rounded-xl bg-gradient-to-br from-gray-50 to-emerald-50/40 border border-gray-100 p-4 space-y-4">
               <div>
-                <label className="text-xs text-gray-500 block mb-1">Subtotal sin IGV</label>
-                <input type="number" name="subtotal" value={form.subtotal} onChange={handleChange}
-                  step="0.01" min="0" placeholder="0.00" className={`${INP} text-lg font-semibold`} />
+                <label className="text-xs text-gray-500 block mb-1">Subtotal sin IGV{inicial.moneda === "USD" ? " (US$)" : ""}</label>
+                <input type="number" name="subtotal" value={form.subtotal} onChange={handleChange} disabled={cpeAceptado}
+                  step="0.01" min="0" placeholder="0.00" className={`${cpeAceptado ? INP_RO : INP} text-lg font-semibold`} />
               </div>
               <div className="grid grid-cols-3 gap-3 text-sm">
                 <div className="text-center">
                   <p className="text-xs text-gray-400">IGV 18%</p>
-                  <p className="font-semibold text-gray-700">{calc.igv.toFixed(2)}</p>
+                  <p className="font-semibold text-gray-700">{money(calc.igv, inicial.moneda)}</p>
                 </div>
                 <div className="text-center">
                   <p className="text-xs text-gray-400">Total</p>
-                  <p className="font-semibold text-gray-700">{calc.total.toFixed(2)}</p>
+                  <p className="font-semibold text-gray-700">{money(calc.total, inicial.moneda)}</p>
                 </div>
                 <div className="text-center">
                   <p className="text-xs text-gray-400">{retencionPct > 0 ? `Retención ${retencionPct}%` : "Detracción 12%"}</p>
-                  <p className="font-semibold text-gray-700">{(retencionPct > 0 ? calc.retencion : calc.detraccion).toFixed(2)}</p>
+                  <p className="font-semibold text-gray-700">{money(retencionPct > 0 ? calc.retencion : calc.detraccion, inicial.moneda)}</p>
                 </div>
               </div>
               <div className="flex items-center justify-between pt-3 border-t border-gray-200">
                 <span className="text-sm font-medium text-gray-600">Total a pagar</span>
-                <span className="text-lg font-bold text-emerald-700">{money(calc.totalAPagar)}</span>
+                <span className="text-lg font-bold text-emerald-700">{money(calc.totalAPagar, inicial.moneda)}</span>
               </div>
             </div>
 
-            {error && <p className="text-xs text-red-500">{error}</p>}
+            <MensajeError mensaje={error} />
           </fieldset>
 
           {/* Relaciones */}

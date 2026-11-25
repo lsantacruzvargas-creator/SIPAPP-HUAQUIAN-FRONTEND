@@ -4,7 +4,7 @@ import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import { formatearFecha, anioLima, mesLima, aInputFecha, fechaHoyLima } from "../utils/fecha";
 import DetalleDocumento from "../components/DetalleDocumento";
 import ModalImportarExcel, { COLS_FACTURAS } from "../components/ModalImportarExcel";
-import { DotChip, badgePago, dotPago, badgeGeneral, dotGeneral, ESTADOS_SERVICIO } from "../components/detalleShared";
+import { DotChip, badgePago, dotPago, badgeGeneral, dotGeneral, ESTADOS_SERVICIO, money } from "../components/detalleShared";
 import TablaScroll from "../components/TablaScroll";
 import Paginacion from "../components/Paginacion";
 import { usePaginacion } from "../utils/usePaginacion";
@@ -144,14 +144,21 @@ function TablaFacturas({ titulo, acento, facturas, onSelect, handlePagoMonto, ha
   const rolActual = getUsuario()?.rol;
   // Las anuladas siguen visibles en la tabla, pero no cuentan en los totales
   const noAnuladas = facturas.filter(f => !f.anulado);
-  const totales = {
-    subtotal:    noAnuladas.reduce((s, f) => s + (Number(f.subtotal ?? f.monto)    || 0), 0),
-    igv:         noAnuladas.reduce((s, f) => s + (Number(f.igv)                   || 0), 0),
-    total:       noAnuladas.reduce((s, f) => s + (Number(f.total)                 || 0), 0),
-    detraccion:  noAnuladas.reduce((s, f) => s + (Number(f.detraccion)            || 0), 0),
-    totalAPagar: noAnuladas.reduce((s, f) => s + (Number(f.totalAPagar)           || 0), 0),
-    pagado:      noAnuladas.reduce((s, f) => s + (Number(f.montoPagado)           || 0), 0),
-  };
+  // Soles y dólares no se suman entre sí: un total por moneda.
+  const totalesPorMoneda = ["PEN", "USD"].map((moneda) => {
+    const grupo = noAnuladas.filter(f => (f.moneda || "PEN") === moneda);
+    const sumar = (fn) => grupo.reduce((s, f) => s + (Number(fn(f)) || 0), 0);
+    return {
+      moneda, n: grupo.length,
+      subtotal:    sumar(f => f.subtotal ?? f.monto),
+      igv:         sumar(f => f.igv),
+      total:       sumar(f => f.total),
+      detraccion:  sumar(f => f.detraccion),
+      totalAPagar: sumar(f => f.totalAPagar),
+      pagado:      sumar(f => f.montoPagado),
+    };
+  }).filter((t, i) => i === 0 || t.n > 0);
+  const hayUSD = totalesPorMoneda.length > 1;
   const pag = usePaginacion(facturas);
 
   return (
@@ -172,11 +179,11 @@ function TablaFacturas({ titulo, acento, facturas, onSelect, handlePagoMonto, ha
                 <th className={`${TH} text-center`}><DosLineas>Fecha cancelación</DosLineas></th>
                 <th className={`${TH} text-left`}><DosLineas>Orden de Compra</DosLineas></th>
                 <th className={`${TH} text-left min-w-[13rem]`}><DosLineas>Empresa</DosLineas></th>
-                <th className={`${TH} text-right`}><DosLineas>Subtotal (S/)</DosLineas></th>
-                <th className={`${TH} text-right`}><DosLineas>IGV 18% (S/)</DosLineas></th>
-                <th className={`${TH} text-right`}><DosLineas>Total (S/)</DosLineas></th>
-                <th className={`${TH} text-right`}><DosLineas>Detracción 12% (S/)</DosLineas></th>
-                <th className={`${TH} text-right`}><DosLineas>Total a pagar (S/)</DosLineas></th>
+                <th className={`${TH} text-right`}><DosLineas>Subtotal</DosLineas></th>
+                <th className={`${TH} text-right`}><DosLineas>IGV 18%</DosLineas></th>
+                <th className={`${TH} text-right`}><DosLineas>Total</DosLineas></th>
+                <th className={`${TH} text-right`}><DosLineas>Detracción</DosLineas></th>
+                <th className={`${TH} text-right`}><DosLineas>Total a pagar</DosLineas></th>
                 <th className={`${TH} text-center`}><DosLineas>Estado pago</DosLineas></th>
                 <th className={`${TH} text-center`}><DosLineas>Estado de servicio</DosLineas></th>
               </tr>
@@ -230,7 +237,7 @@ function TablaFacturas({ titulo, acento, facturas, onSelect, handlePagoMonto, ha
                         {Number(f.igv ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2 })}
                       </td>
                       <td className={`${TD_NUM} text-gray-600`}>
-                        {Number(f.total ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2 })}
+                        {money(f.total, f.moneda)}
                       </td>
                       <td className={`${TD_NUM} text-gray-400`} onClick={e => e.stopPropagation()}>
                         <div className="flex flex-col items-end gap-1">
@@ -253,7 +260,7 @@ function TablaFacturas({ titulo, acento, facturas, onSelect, handlePagoMonto, ha
                         </div>
                       </td>
                       <td className={`${TD_NUM} font-bold text-gray-900`}>
-                        {Number(f.totalAPagar ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2 })}
+                        {money(f.totalAPagar, f.moneda)}
                       </td>
                       <td className="px-3 py-2 text-center" onClick={e => e.stopPropagation()}>
                         <div className="flex flex-col items-center gap-1.5 min-w-[110px]">
@@ -305,24 +312,26 @@ function TablaFacturas({ titulo, acento, facturas, onSelect, handlePagoMonto, ha
 
                   return [filaPrincipal, ...filasCuotas];
                 })}
-                {/* Fila de totales */}
-                <tr className="bg-gray-50 border-t-2 border-gray-200 font-semibold text-sm">
+                {/* Fila(s) de totales: una por moneda */}
+                {totalesPorMoneda.map((totales) => (
+                <tr key={totales.moneda} className="bg-gray-50 border-t-2 border-gray-200 font-semibold text-sm">
                   <td colSpan={6} className="px-3 py-3.5 text-right text-xs uppercase tracking-wide text-gray-400">
-                    Totales ({facturas.length})
+                    Totales {totales.moneda === "USD" ? "US$" : "S/"} ({hayUSD ? totales.n : facturas.length})
                   </td>
-                  <td className={`${TD_NUM} text-gray-500`}>{totales.subtotal.toLocaleString("es-PE", { minimumFractionDigits: 2 })}</td>
-                  <td className={`${TD_NUM} text-gray-500`}>{totales.igv.toLocaleString("es-PE", { minimumFractionDigits: 2 })}</td>
-                  <td className={`${TD_NUM} text-gray-700`}>{totales.total.toLocaleString("es-PE", { minimumFractionDigits: 2 })}</td>
-                  <td className={`${TD_NUM} text-gray-500`}>{totales.detraccion.toLocaleString("es-PE", { minimumFractionDigits: 2 })}</td>
-                  <td className={`${TD_NUM} font-bold text-gray-900`}>{totales.totalAPagar.toLocaleString("es-PE", { minimumFractionDigits: 2 })}</td>
+                  <td className={`${TD_NUM} text-gray-500`}>{Number(totales.subtotal).toLocaleString("es-PE", { minimumFractionDigits: 2 })}</td>
+                  <td className={`${TD_NUM} text-gray-500`}>{Number(totales.igv).toLocaleString("es-PE", { minimumFractionDigits: 2 })}</td>
+                  <td className={`${TD_NUM} text-gray-700`}>{money(totales.total, totales.moneda)}</td>
+                  <td className={`${TD_NUM} text-gray-500`}>{Number(totales.detraccion).toLocaleString("es-PE", { minimumFractionDigits: 2 })}</td>
+                  <td className={`${TD_NUM} font-bold text-gray-900`}>{money(totales.totalAPagar, totales.moneda)}</td>
                   <td className="px-3 py-3.5 text-center">
                     <div className="flex flex-col items-center">
                       <span className="text-[10px] uppercase tracking-wide text-gray-400">Cobrado</span>
-                      <span className="tabular-nums text-emerald-700 font-bold">{totales.pagado.toLocaleString("es-PE", { minimumFractionDigits: 2 })}</span>
+                      <span className="tabular-nums text-emerald-700 font-bold">{money(totales.pagado, totales.moneda)}</span>
                     </div>
                   </td>
                   <td className="px-3 py-3.5"></td>
                 </tr>
+                ))}
                 </>
               )}
             </tbody>
@@ -593,6 +602,7 @@ export default function ListaFacturas() {
     "Fecha cancelación": f.fechaCancelacion ? formatearFecha(f.fechaCancelacion) : "—",
     "Orden de Compra":   f.ordenCompra?.numeroOrden || f.numeroOrdenCompra || "—",
     "Empresa":           f.empresa?.razonSocial || "—",
+    "Moneda":            f.moneda === "USD" ? "US$" : "S/",
     "Subtotal":          Number(f.subtotal ?? f.monto ?? 0).toFixed(2),
     "IGV 18%":           Number(f.igv ?? 0).toFixed(2),
     "Total":             Number(f.total ?? 0).toFixed(2),

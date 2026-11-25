@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import CampoSupervisorSolicitante from "./CampoSupervisorSolicitante";
 import { useNavigate } from "react-router-dom";
-import { fetchAuth, getUsuario } from "../utils/fetchAuth";
+import { fetchAuth, getUsuario, mensajeError } from "../utils/fetchAuth";
 import { formatearFecha, fechaHoyLima, aInputFecha } from "../utils/fecha";
 import { exportarCotizacionPdf } from "../utils/cotizacionPdf";
 import { exportarCotizacionGloriaPdf } from "../utils/cotizacionGloriaPdf";
@@ -22,7 +22,7 @@ import TablaItemsCotizacionGloria from "./TablaItemsCotizacionGloria";
 import TablaItemsCotizacionAlicorp from "./TablaItemsCotizacionAlicorp";
 import {
   FlujoNegocio, TarjetaRelacion, Chip, ParteConsolidada,
-  badgePago, badgeGeneral, money, totalSinIgv, BotonAnular, BotonCerrarCadena, BotonDesanular, BannerAnulado, bloqueadoPorCadenaCerrada,
+  badgePago, badgeGeneral, money, totalSinIgv, BotonAnular, BotonCerrarCadena, BotonDesanular, BannerAnulado, bloqueadoPorCadenaCerrada, MensajeError,
 } from "./detalleShared";
 import { r2 } from "../utils/redondeo";
 
@@ -126,6 +126,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   const [fechaPagoCierre, setFechaPagoCierre] = useState(() => fechaHoyLima());
   const [numeroFacturaCierre, setNumeroFacturaCierre] = useState("");
   const [cerrandoCadena, setCerrandoCadena] = useState(false);
+  const [errorCierre, setErrorCierre] = useState("");
   const [avisoOCs, setAvisoOCs] = useState(null);
   const [buscadorOTOpen, setBuscadorOTOpen] = useState(false);
   const [confirmandoReasignarOT, setConfirmandoReasignarOT] = useState(null);
@@ -342,6 +343,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
     (ocs.length === 1 ? facturas.find(f => !f.ordenCompra) : null) ||
     null;
 
+  const ocCompleta = ocs.find(o => !o.anulado && !o.desdeItemsCotizacion);
   const abrirOC = (o) => {
     const full = ocs.find(x => x._id === o._id) || o;
     onNavegar?.({ tipo: "oc", data: full, extra: facturaDeOC(full) });
@@ -383,12 +385,22 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
     if (!guardada) { setGenerandoOT(false); return; }
     const indices = [...seleccionados].sort((a, b) => a - b);
     let ultimaCot = guardada;
+    const fallidas = [];
     for (const idx of indices) {
-      const res = await fetchAuth(`/cotizaciones/${ultimaCot._id}/items/${idx}/generar-ot`, { method: "PATCH" });
-      if (res.ok) {
-        const data = await res.json();
-        ultimaCot = data.cotizacion;
+      try {
+        const res = await fetchAuth(`/cotizaciones/${ultimaCot._id}/items/${idx}/generar-ot`, { method: "PATCH" });
+        if (res.ok) {
+          const data = await res.json();
+          ultimaCot = data.cotizacion;
+        } else {
+          fallidas.push(`ítem ${idx + 1}: ${await mensajeError(res, "error al generar la OT")}`);
+        }
+      } catch {
+        fallidas.push(`ítem ${idx + 1}: sin conexión con el servidor`);
       }
+    }
+    if (fallidas.length) {
+      setError(`Se generaron ${indices.length - fallidas.length} de ${indices.length} OT. Fallaron — ${fallidas.join("; ")}`);
     }
     setCot(ultimaCot);
     setItems((ultimaCot.items || []).map(itemDesdeDb));
@@ -536,6 +548,9 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
           precio: i.precio,
           moneda: i.moneda,
           subtotal: calcSubtotalGloria(i),
+          // El backend los usa para que el vínculo siga a su ítem (no a su posición).
+          otGenerada: i.otGenerada?._id ?? i.otGenerada ?? null,
+          ocGenerada: i.ocGenerada?._id ?? i.ocGenerada ?? null,
         };
         if (i.fechaEntrega) it.fechaEntrega = i.fechaEntrega;
         if (i.subItems?.length > 0) it.subItems = i.subItems.map(s => s.texto).filter(Boolean);
@@ -567,7 +582,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
       }
       return actualizada;
     }
-    setError("Error al guardar los cambios.");
+    setError(await mensajeError(res, "Error al guardar los cambios."));
     return null;
   };
 
@@ -584,8 +599,13 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
 
   const guardar = async () => {
     setGuardando(true);
-    await persistir();
-    setGuardando(false);
+    try {
+      await persistir();
+    } catch {
+      setError("No se pudo conectar con el servidor. Tus cambios siguen en pantalla: inténtalo de nuevo.");
+    } finally {
+      setGuardando(false);
+    }
   };
 
   const anular = async (motivo) => {
@@ -599,7 +619,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
       setCot(actualizada);
       onGuardada?.(actualizada);
     } else {
-      setError("Error al anular el documento.");
+      return mensajeError(res, "Error al anular el documento.");
     }
   };
 
@@ -610,7 +630,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
       setCot(actualizada);
       onGuardada?.(actualizada);
     } else {
-      setError("Error al desanular el documento.");
+      return mensajeError(res, "Error al desanular el documento.");
     }
   };
 
@@ -629,7 +649,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
       setCot(actualizada);
       onGuardada?.(actualizada);
     } else {
-      setError("Error al cerrar/abrir la cadena.");
+      return mensajeError(res, "Error al cerrar/abrir la cadena.");
     }
   };
 
@@ -639,10 +659,17 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   // Pedido explícito del usuario, 2026-09-16.
   const confirmarCerrarCadena = async () => {
     setCerrandoCadena(true);
-    await toggleCerrarCadena(true, fechaPagoCierre, numeroFacturaCierre.trim());
-    setCerrandoCadena(false);
-    setModalCerrarCadenaOpen(false);
-    setNumeroFacturaCierre("");
+    setErrorCierre("");
+    try {
+      const err = await toggleCerrarCadena(true, fechaPagoCierre, numeroFacturaCierre.trim());
+      if (err) { setErrorCierre(err); return; }
+      setModalCerrarCadenaOpen(false);
+      setNumeroFacturaCierre("");
+    } catch {
+      setErrorCierre("No se pudo conectar con el servidor. Inténtalo de nuevo.");
+    } finally {
+      setCerrandoCadena(false);
+    }
   };
 
   const toggleAprobar = async () => {
@@ -655,6 +682,8 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
       const actualizada = await res.json();
       setCot(actualizada);
       onGuardada?.(actualizada);
+    } else {
+      setError(await mensajeError(res, "No se pudo cambiar la aprobación."));
     }
   };
 
@@ -668,6 +697,8 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
       const actualizada = await res.json();
       setCot(actualizada);
       onGuardada?.(actualizada);
+    } else {
+      setError(await mensajeError(res, "No se pudo cambiar el estado de envío."));
     }
   };
 
@@ -681,6 +712,8 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
       const actualizada = await res.json();
       setCot(actualizada);
       onGuardada?.(actualizada);
+    } else {
+      setError(await mensajeError(res, "No se pudo cambiar el estado del informe."));
     }
   };
 
@@ -1274,7 +1307,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
               )}
             </fieldset>
 
-            {error && <p className="text-xs text-red-500">{error}</p>}
+            <MensajeError mensaje={error} />
           </div>
 
           {/* Relaciones */}
@@ -1369,7 +1402,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
                 <TarjetaRelacion key={f._id} tipo="factura" codigo={f.codigo} numero={f.numeroFactura}
                   onClick={() => onNavegar?.({ tipo: "factura", data: f })}>
                   {puedeVerPrecios && (f.totalAPagar || f.total) > 0 && (
-                    <p className="text-xs text-gray-500">{money(f.totalAPagar ?? f.total, cot.moneda)}</p>
+                    <p className="text-xs text-gray-500">{money(f.totalAPagar ?? f.total, f.moneda ?? cot.moneda)}</p>
                   )}
                   {f.estadoPago && <Chip className={badgePago(f.estadoPago)}>{f.estadoPago}</Chip>}
                   <ParteConsolidada oc={ocs.find(o => o._id === (f.ordenCompra?._id || f.ordenCompra))}
@@ -1438,6 +1471,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
               onToggleSeleccionOC={toggleSeleccionOC}
               onGenerarOC={abrirNuevaOC}
               onVerOC={abrirOC}
+              ocCompleta={ocCompleta}
             />
           ) : esAlicorp ? (
             <TablaItemsCotizacionAlicorp
@@ -1459,6 +1493,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
               onToggleSeleccionOC={toggleSeleccionOC}
               onGenerarOC={abrirNuevaOC}
               onVerOC={abrirOC}
+              ocCompleta={ocCompleta}
             />
           ) : (
             <TablaItemsCotizacion
@@ -1482,6 +1517,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
               onToggleSeleccionOC={toggleSeleccionOC}
               onGenerarOC={abrirNuevaOC}
               onVerOC={abrirOC}
+              ocCompleta={ocCompleta}
               puedeVerPrecios={puedeVerPrecios}
             />
           )}
@@ -1619,8 +1655,9 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
             <label className="text-xs text-gray-500 block mb-1">N° de factura (opcional)</label>
             <input type="text" value={numeroFacturaCierre} onChange={(e) => setNumeroFacturaCierre(e.target.value)}
               placeholder="F00X-XXXX" className={`${INP} mb-4`} />
+            {errorCierre && <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">{errorCierre}</p>}
             <div className="flex justify-end gap-3">
-              <button onClick={() => setModalCerrarCadenaOpen(false)} disabled={cerrandoCadena}
+              <button onClick={() => { setModalCerrarCadenaOpen(false); setErrorCierre(""); }} disabled={cerrandoCadena}
                 className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition disabled:opacity-50">
                 Cancelar
               </button>

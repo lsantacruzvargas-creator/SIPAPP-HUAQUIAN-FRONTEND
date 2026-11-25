@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { fetchAuth, getUsuario } from "../utils/fetchAuth";
+import { fetchAuth, getUsuario, mensajeError } from "../utils/fetchAuth";
 import { formatearFecha, aInputFecha } from "../utils/fecha";
 import { estadoComprobanteClase } from "../utils/catalogosSunat";
 import ModalOrdenCompra from "./ModalOrdenCompra";
@@ -19,7 +19,7 @@ import ConfirmacionAccion from "./ConfirmacionAccion";
 import { exportarInformeTecnicoExcel, exportarInformesTecnicosExcelCombinado } from "../utils/informeTecnicoExcel";
 import {
   FlujoNegocio, TarjetaRelacion, Chip, ParteConsolidada,
-  badgePago, badgeGeneral, money, BotonAnular, BotonCerrarCadena, BotonDesanular, BannerAnulado, bloqueadoPorCadenaCerrada,
+  badgePago, badgeGeneral, money, BotonAnular, BotonCerrarCadena, BotonDesanular, BannerAnulado, bloqueadoPorCadenaCerrada, MensajeError,
 } from "./detalleShared";
 
 const INP = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 w-full transition";
@@ -270,19 +270,24 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
     if (!body.categorizacionTaller) delete body.categorizacionTaller;
     body.cantidad = body.cantidad === "" ? null : Number(body.cantidad);
 
-    const res = await fetchAuth(`/ordenes-trabajo/${ot._id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (res.ok) {
-      const actualizada = await res.json();
-      setOt(actualizada);
-      onGuardada?.(actualizada);
-    } else {
-      setError("Error al guardar los cambios.");
+    try {
+      const res = await fetchAuth(`/ordenes-trabajo/${ot._id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        const actualizada = await res.json();
+        setOt(actualizada);
+        onGuardada?.(actualizada);
+      } else {
+        setError(await mensajeError(res, "Error al guardar los cambios."));
+      }
+    } catch {
+      setError("No se pudo conectar con el servidor. Tus cambios siguen en pantalla: inténtalo de nuevo.");
+    } finally {
+      setGuardando(false);
     }
-    setGuardando(false);
   };
 
   // Cambian de inmediato (sin pasar por "Guardar cambios", que técnico no
@@ -335,7 +340,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
       setOt(actualizada);
       onGuardada?.(actualizada);
     } else {
-      setError("Error al anular el documento.");
+      return mensajeError(res, "Error al anular el documento.");
     }
   };
 
@@ -346,7 +351,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
       setOt(actualizada);
       onGuardada?.(actualizada);
     } else {
-      setError("Error al desanular el documento.");
+      return mensajeError(res, "Error al desanular el documento.");
     }
   };
 
@@ -361,7 +366,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
       setOt(actualizada);
       onGuardada?.(actualizada);
     } else {
-      setError("Error al cerrar/abrir la cadena.");
+      return mensajeError(res, "Error al cerrar/abrir la cadena.");
     }
   };
 
@@ -833,7 +838,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
                 rows={3} className={`${INP} resize-none`} />
             </div>
 
-            {error && <p className="text-xs text-red-500">{error}</p>}
+            <MensajeError mensaje={error} />
           </fieldset>
 
           {/* Relaciones */}
@@ -966,7 +971,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
               <TarjetaRelacion tipo="factura" codigo={factura?.codigo} numero={factura?.numeroFactura} vacio={!factura}
                 onClick={factura ? () => onNavegar?.({ tipo: "factura", data: factura }) : undefined}>
                 {puedeVerPrecios && (factura?.totalAPagar || factura?.total) > 0 && (
-                  <p className="text-xs text-gray-500">{money(factura.totalAPagar ?? factura.total, cot?.moneda)}</p>
+                  <p className="text-xs text-gray-500">{money(factura.totalAPagar ?? factura.total, factura.moneda ?? cot?.moneda)}</p>
                 )}
                 {factura?.estadoPago && <Chip className={badgePago(factura.estadoPago)}>{factura.estadoPago}</Chip>}
                 {factura && <ParteConsolidada oc={oc} cotizacionId={cot?._id} moneda={cot?.moneda} verPrecios={puedeVerPrecios} />}

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { MensajeError } from "../components/detalleShared";
 import { useLocation, useNavigate } from "react-router-dom";
 import { fetchAuth } from "../utils/fetchAuth";
 import { fechaHoyLima, formatearFecha } from "../utils/fecha";
@@ -398,7 +399,7 @@ export default function EmitirComprobante() {
   // SUNAT exige igualdad exacta al céntimo (3319) — sin tolerancia de ±0.01.
   const cuotasCuadran = Math.abs(sumaCuotas - montoNetoPendiente) < 0.005;
 
-  const ro = !!resultado?.ok;
+  const ro = !!resultado?.ok || resultado?.estado === "ERROR";
 
   const ordenesCompraFiltradas = ordenesCompra.filter((o) => {
     if (!filtroOC.trim()) return true;
@@ -602,15 +603,17 @@ export default function EmitirComprobante() {
       const res  = await fetchAuth(endpoint, { method: "POST", body: JSON.stringify(body) });
       const data = await res.json();
       setResultado(data);
-      if (!data.ok && /^\[HTTP\]/i.test(data.mensaje || "")) {
-        setError(`SUNAT no respondió (${data.mensaje}). El comprobante ${data.serie || ""} quedó en ERROR, no rechazado: no lo vuelvas a emitir — revísalo en Facturación Electrónica (Consultar estado / Adjuntar XML/CDR).`);
+      // ERROR = el correlativo ya se consumió y no se sabe si llegó a SUNAT (no solo "[HTTP]":
+      // también timeouts o caídas del hub) — reemitir podría duplicar la venta.
+      if (data.estado === "ERROR") {
+        setError(`No se obtuvo respuesta de SUNAT${data.mensaje ? ` (${data.mensaje})` : ""}. El comprobante ${data.serie || ""} quedó en ERROR, no rechazado: no lo vuelvas a emitir — revísalo en Facturación Electrónica (Consultar estado / Adjuntar XML/CDR).`);
       } else if (!data.ok) {
         setError(data.mensaje || data.error || "El comprobante fue rechazado por SUNAT.");
       } else if (ocOrigen) {
         await crearFacturaInterna(data);
       }
     } catch {
-      setError("Error de conexión");
+      setError("No se pudo confirmar la respuesta del servidor. Antes de volver a emitir, revisa en Facturación Electrónica si el comprobante quedó registrado: emitirlo otra vez podría duplicarlo.");
     } finally {
       setCargando(false);
     }
@@ -624,6 +627,7 @@ export default function EmitirComprobante() {
       numeroFactura:      dataCpe.serie,
       fechaEmision:       fechaHoyLima(),
       subtotal:           totales.base,
+      moneda,
       descripcion:        ocOrigen.descripcion || ocOrigen.titulo || "",
       encargado:          ocOrigen.encargado || "",
       planta:             ocOrigen.planta || "",
@@ -690,7 +694,7 @@ export default function EmitirComprobante() {
     <div className="p-6 max-w-7xl mx-auto">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold text-gray-800">Emitir Comprobante</h2>
-        {resultado?.ok && <span className="font-mono text-sm text-gray-400">{resultado.serie}</span>}
+        {ro && <span className="font-mono text-sm text-gray-400">{resultado.serie}</span>}
       </div>
 
       {resultado?.estado === "ACEPTADO" && (
@@ -718,11 +722,7 @@ export default function EmitirComprobante() {
           </button>
         </div>
       )}
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 mb-5 whitespace-pre-wrap">
-          {error}
-        </div>
-      )}
+      <MensajeError mensaje={error} className="mb-5" />
 
       <form onSubmit={(e) => e.preventDefault()}>
         {/* Selector tipo doc */}

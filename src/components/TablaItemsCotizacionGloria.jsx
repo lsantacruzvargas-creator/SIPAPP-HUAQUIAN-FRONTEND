@@ -31,7 +31,7 @@ const ACENTOS = {
 export default function TablaItemsCotizacionGloria({
   items, onItemsChange, puedeEditar, disabled, puedeVerPrecios = true,
   seleccionables = false, seleccionados = new Set(), onToggleSeleccion, onGenerarOT, generando = false, onVerOT, onQuitarOT, puedeQuitarOT = false,
-  seleccionablesOC = false, seleccionadosOC = new Set(), onToggleSeleccionOC, onGenerarOC, onVerOC,
+  seleccionablesOC = false, seleccionadosOC = new Set(), onToggleSeleccionOC, onGenerarOC, onVerOC, ocCompleta,
 }) {
   const editable = puedeEditar && !disabled;
   // Qué grupo (clave de GRUPOS_GLORIA) recibe lo elegido en el catálogo —
@@ -182,7 +182,7 @@ export default function TablaItemsCotizacionGloria({
                           )}
                           {seleccionablesOC && (
                             <CeldaOCItem item={item} idx={idx} seleccionados={seleccionadosOC} className="px-3 py-2"
-                              onToggle={onToggleSeleccionOC} onVerOC={onVerOC} />
+                              onToggle={onToggleSeleccionOC} onVerOC={onVerOC} ocCompleta={ocCompleta} />
                           )}
                           <td className="px-3 py-2">
                             {editable ? (
@@ -252,8 +252,13 @@ export default function TablaItemsCotizacionGloria({
                           )}
                           {editable && (
                             <td className="px-3 py-2 text-center">
-                              <button type="button" onClick={() => eliminarItem(item._key)}
-                                className="text-red-400 hover:text-red-600">✕</button>
+                              {item.otGenerada || item.ocGenerada ? (
+                                <span title="Tiene OT u OC generada: desvincúlala antes de quitar el ítem"
+                                  className="text-gray-300 cursor-not-allowed">🔒</span>
+                              ) : (
+                                <button type="button" onClick={() => eliminarItem(item._key)} aria-label="Quitar ítem"
+                                  className="text-red-400 hover:text-red-600">✕</button>
+                              )}
                             </td>
                           )}
                         </tr>

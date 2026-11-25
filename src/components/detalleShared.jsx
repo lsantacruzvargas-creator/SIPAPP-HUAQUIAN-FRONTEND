@@ -1,4 +1,4 @@
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { formatearFechaHora } from "../utils/fecha";
 import ConfirmacionAccion from "./ConfirmacionAccion";
 import { r2 } from "../utils/redondeo";
@@ -285,11 +285,44 @@ export function ParteConsolidada({ oc, cotizacionId, moneda, verPrecios }) {
   );
 }
 
+/* ─── Mensaje de error ────────────────────────────────────────────── */
+// Los botones Guardar/Emitir están en el encabezado o al pie de formularios largos: sin el scroll,
+// el error queda fuera de la vista y parece que no pasó nada.
+export function MensajeError({ mensaje, className = "" }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (mensaje) ref.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [mensaje]);
+  if (!mensaje) return null;
+  return (
+    <div ref={ref} role="alert"
+      className={`bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 whitespace-pre-wrap ${className}`}>
+      {mensaje}
+    </div>
+  );
+}
+
 /* ─── Anulación de documentos ────────────────────────────────────── */
+// Las acciones de anular/desanular/cerrar cadena devuelven el mensaje de error (o nada si salió
+// bien): el error se muestra dentro del propio modal — pintado en la página quedaría detrás del
+// overlay y el usuario solo vería que el botón vuelve a habilitarse.
+const ejecutar = async (accion, setError) => {
+  setError("");
+  try {
+    const err = await accion();
+    if (err) setError(err);
+    return !err;
+  } catch {
+    setError("No se pudo conectar con el servidor. Inténtalo de nuevo.");
+    return false;
+  }
+};
+
 export function BotonAnular({ onAnular }) {
   const [abierto, setAbierto]   = useState(false);
   const [motivo, setMotivo]     = useState("");
   const [enviando, setEnviando] = useState(false);
+  const [error, setError]       = useState("");
 
   if (!abierto) {
     return (
@@ -303,7 +336,7 @@ export function BotonAnular({ onAnular }) {
   const confirmar = async () => {
     if (!motivo.trim()) return;
     setEnviando(true);
-    await onAnular(motivo.trim());
+    await ejecutar(() => onAnular(motivo.trim()), setError);
     setEnviando(false);
   };
 
@@ -312,13 +345,14 @@ export function BotonAnular({ onAnular }) {
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
         <h4 className="font-semibold text-gray-800">Anular documento</h4>
         <p className="text-sm text-gray-500">
-          Esta acción es permanente y no se puede deshacer. Indica el motivo:
+          Solo un administrador puede revertir la anulación. Indica el motivo:
         </p>
+        {error && <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
         <textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} rows={3} autoFocus
           placeholder="Motivo de la anulación…"
           className="w-full bg-white text-gray-800 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300 resize-none" />
         <div className="flex gap-3 justify-end">
-          <button onClick={() => { setAbierto(false); setMotivo(""); }} disabled={enviando}
+          <button onClick={() => { setAbierto(false); setMotivo(""); setError(""); }} disabled={enviando}
             className="text-sm border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 transition disabled:opacity-50">
             Cancelar
           </button>
@@ -339,11 +373,12 @@ export function BotonAnular({ onAnular }) {
 export function BotonCerrarCadena({ cerrado, onToggle }) {
   const [enviando, setEnviando] = useState(false);
   const [confirmando, setConfirmando] = useState(false);
+  const [error, setError] = useState("");
   const confirmar = async () => {
     setEnviando(true);
-    await onToggle(!cerrado);
+    const ok = await ejecutar(() => onToggle(!cerrado), setError);
     setEnviando(false);
-    setConfirmando(false);
+    if (ok) setConfirmando(false);
   };
   return (
     <>
@@ -356,9 +391,10 @@ export function BotonCerrarCadena({ cerrado, onToggle }) {
           mensaje={cerrado
             ? "¿Reabrir a mano toda la cadena de este documento (Cotización, OT, OC, Informes y Factura relacionados)?"
             : "¿Cerrar a mano toda la cadena de este documento (Cotización, OT, OC, Informes y Factura relacionados)?"}
-          onCancelar={() => setConfirmando(false)}
+          onCancelar={() => { setConfirmando(false); setError(""); }}
           onConfirmar={confirmar}
           procesando={enviando}
+          error={error}
           textoConfirmar={cerrado ? "Reabrir cadena" : "Cerrar cadena"}
         />
       )}
@@ -371,11 +407,12 @@ export function BotonCerrarCadena({ cerrado, onToggle }) {
 export function BotonDesanular({ onDesanular }) {
   const [enviando, setEnviando] = useState(false);
   const [confirmando, setConfirmando] = useState(false);
+  const [error, setError] = useState("");
   const confirmar = async () => {
     setEnviando(true);
-    await onDesanular();
+    const ok = await ejecutar(onDesanular, setError);
     setEnviando(false);
-    setConfirmando(false);
+    if (ok) setConfirmando(false);
   };
   return (
     <>
@@ -386,9 +423,10 @@ export function BotonDesanular({ onDesanular }) {
       {confirmando && (
         <ConfirmacionAccion
           mensaje="¿Revertir la anulación de este documento?"
-          onCancelar={() => setConfirmando(false)}
+          onCancelar={() => { setConfirmando(false); setError(""); }}
           onConfirmar={confirmar}
           procesando={enviando}
+          error={error}
           textoConfirmar="Desanular"
         />
       )}
@@ -416,14 +454,17 @@ export function BannerAnulado({ motivo, por, fecha }) {
 // Un ítem está cubierto si su OC existe y no fue anulada.
 const itemConOC = (item) => !!item.ocGenerada && !item.ocGenerada.anulado;
 
-export function CeldaOCItem({ item, idx, seleccionados, onToggle, onVerOC, deshabilitado, className = "px-3 py-3" }) {
+// `ocCompleta`: OC vigente que cubre la cotización entera (creada con «OC completa» o consolidada);
+// no marca `ocGenerada` en los ítems, pero los cubre a todos.
+export function CeldaOCItem({ item, idx, seleccionados, onToggle, onVerOC, deshabilitado, ocCompleta, className = "px-3 py-3" }) {
+  const oc = itemConOC(item) ? item.ocGenerada : ocCompleta;
   return (
     <td className={`${className} text-center`}>
-      {itemConOC(item) ? (
-        <button type="button" onClick={() => onVerOC?.(item.ocGenerada)}
-          title="Orden de compra que cubre este ítem"
+      {oc ? (
+        <button type="button" onClick={() => onVerOC?.(oc)}
+          title={oc === ocCompleta ? "Cubierto por la orden de compra completa de la cotización" : "Orden de compra que cubre este ítem"}
           className="text-[11px] font-mono font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 hover:bg-amber-100 transition whitespace-nowrap">
-          {item.ocGenerada.numeroOrden || item.ocGenerada.codigo}
+          {oc.numeroOrden || oc.codigo}
         </button>
       ) : (
         <input type="checkbox" checked={seleccionados.has(idx)}

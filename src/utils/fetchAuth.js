@@ -78,3 +78,10 @@ export const fetchAuth = async (endpoint, options = {}) => {
   }
   return res;
 };
+
+// El backend explica la causa en `mensaje` (cadena cerrada, sin permiso, anulado…): mostrarla en
+// vez de un genérico.
+export const mensajeError = async (res, porDefecto) => {
+  const d = await res.json().catch(() => ({}));
+  return d.mensaje || d.error || porDefecto;
+};

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { MensajeError } from "../components/detalleShared";
 import { useLocation } from "react-router-dom";
 import { fetchAuth } from "../utils/fetchAuth";
 import { fechaHoyLima } from "../utils/fecha";
@@ -279,7 +280,7 @@ export default function EmitirGuia() {
   const agregarDocRelacionado = () => setDocumentosRelacionados([...documentosRelacionados, docRelacionadoVacio()]);
   const eliminarDocRelacionado = (key) => setDocumentosRelacionados(documentosRelacionados.filter((d) => d._key !== key));
 
-  const ro = !!resultado?.ok;
+  const ro = !!resultado?.ok || resultado?.estado === "ERROR";
 
   const validar = () => {
     if (!rucEmisor) return "Selecciona la empresa emisora.";
@@ -450,9 +451,14 @@ export default function EmitirGuia() {
       const res  = await fetchAuth("/guias", { method: "POST", body: JSON.stringify(body) });
       const data = await res.json();
       setResultado(data);
-      if (!data.ok) setError(data.mensaje || data.error || "La guía fue rechazada por SUNAT.");
+      // ERROR = el correlativo ya se consumió y no se sabe si llegó a SUNAT — reemitir duplicaría la guía.
+      if (data.estado === "ERROR") {
+        setError(`No se obtuvo respuesta de SUNAT${data.mensaje ? ` (${data.mensaje})` : ""}. La guía ${data.nombre || ""} quedó en ERROR, no rechazada: no la vuelvas a emitir — revisa ese número en el panel de SmartPSE antes de hacer cualquier otra cosa.`);
+      } else if (!data.ok) {
+        setError(data.mensaje || data.error || "La guía fue rechazada por SUNAT.");
+      }
     } catch {
-      setError("Error de conexión");
+      setError("No se pudo confirmar la respuesta del servidor. Antes de volver a emitir, revisa en Guías si la guía quedó registrada: emitirla otra vez podría duplicarla.");
     } finally {
       setCargando(false);
     }
@@ -519,7 +525,7 @@ export default function EmitirGuia() {
     <div className="p-6 max-w-7xl mx-auto">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold text-gray-800">Emitir Guía de Remisión</h2>
-        {resultado?.ok && <span className="font-mono text-sm text-gray-400">{resultado.nombre}</span>}
+        {ro && <span className="font-mono text-sm text-gray-400">{resultado.nombre}</span>}
       </div>
 
       {prellenado && !resultado && (
@@ -544,11 +550,7 @@ export default function EmitirGuia() {
           </button>
         </div>
       )}
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 mb-5 whitespace-pre-wrap">
-          {error}
-        </div>
-      )}
+      <MensajeError mensaje={error} className="mb-5" />
 
       <form onSubmit={(e) => e.preventDefault()}>
         {/* Tipo de guía */}

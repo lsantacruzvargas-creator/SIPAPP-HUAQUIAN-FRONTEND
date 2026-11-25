@@ -7,11 +7,12 @@
 // la app de escritorio, nunca en el navegador normal. Este panel vive dentro
 // de la misma página, sin esa capa nativa. z-[200]: por encima de cualquier
 // modal/selector conocido de la app (el más alto hoy es z-[100]).
-export default function ConfirmacionAccion({ mensaje, onCancelar, onConfirmar, procesando, textoConfirmar = "Confirmar" }) {
+export default function ConfirmacionAccion({ mensaje, onCancelar, onConfirmar, procesando, textoConfirmar = "Confirmar", error }) {
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4">
       <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm">
         <p className="text-sm text-gray-700 mb-6">{mensaje}</p>
+        {error && <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 -mt-3 mb-5">{error}</p>}
         <div className="flex justify-end gap-3">
           <button onClick={onCancelar} disabled={procesando}
             className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition disabled:opacity-50">
@@ -19,7 +20,7 @@ export default function ConfirmacionAccion({ mensaje, onCancelar, onConfirmar, p
           </button>
           <button onClick={onConfirmar} disabled={procesando}
             className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-700 transition disabled:opacity-50">
-            {procesando ? "Guardando…" : textoConfirmar}
+            {procesando ? "Procesando…" : textoConfirmar}
           </button>
         </div>
       </div>

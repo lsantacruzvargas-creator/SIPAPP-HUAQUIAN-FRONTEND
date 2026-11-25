@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { fetchAuth, getUsuario } from "../utils/fetchAuth";
+import { fetchAuth, getUsuario, mensajeError } from "../utils/fetchAuth";
 import { formatearFecha, aInputFecha } from "../utils/fecha";
 import { estadoComprobanteClase } from "../utils/catalogosSunat";
 import ModalDetalleGuia from "./ModalDetalleGuia";
 import ConfirmacionAccion from "./ConfirmacionAccion";
 import {
   FlujoNegocio, TarjetaRelacion, Chip,
-  badgePago, badgeGeneral, money, totalSinIgv, BotonAnular, BotonCerrarCadena, BotonDesanular, BannerAnulado, bloqueadoPorCadenaCerrada,
+  badgePago, badgeGeneral, money, totalSinIgv, BotonAnular, BotonCerrarCadena, BotonDesanular, BannerAnulado, bloqueadoPorCadenaCerrada, MensajeError,
 } from "./detalleShared";
 import { r2, r0 } from "../utils/redondeo";
 
@@ -308,14 +308,19 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
         .forEach((k) => delete payload[k]);
     }
 
-    const res = await fetchAuth(`/ordenes-compra/${orden._id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (res.ok) { onGuardada(await res.json()); }
-    else { setError("Error al guardar los cambios."); }
-    setGuardando(false);
+    try {
+      const res = await fetchAuth(`/ordenes-compra/${orden._id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) { onGuardada(await res.json()); }
+      else { setError(await mensajeError(res, "Error al guardar los cambios.")); }
+    } catch {
+      setError("No se pudo conectar con el servidor. Tus cambios siguen en pantalla: inténtalo de nuevo.");
+    } finally {
+      setGuardando(false);
+    }
   };
 
   const anular = async (motivo) => {
@@ -325,13 +330,13 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
       body: JSON.stringify({ motivo }),
     });
     if (res.ok) { onGuardada(await res.json()); }
-    else { setError((await res.json().catch(() => ({}))).mensaje || "Error al anular el documento."); }
+    else { return mensajeError(res, "Error al anular el documento."); }
   };
 
   const desanular = async () => {
     const res = await fetchAuth(`/ordenes-compra/${orden._id}/desanular`, { method: "PATCH" });
     if (res.ok) { onGuardada(await res.json()); }
-    else { setError("Error al desanular el documento."); }
+    else { return mensajeError(res, "Error al desanular el documento."); }
   };
 
   const toggleCerrarCadena = async (cerrado) => {
@@ -341,7 +346,7 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
       body: JSON.stringify({ cerrado }),
     });
     if (res.ok) { onGuardada(await res.json()); }
-    else { setError("Error al cerrar/abrir la cadena."); }
+    else { return mensajeError(res, "Error al cerrar/abrir la cadena."); }
   };
 
   const cot     = orden.cotizacion;
@@ -607,7 +612,7 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
               </div>
             )}
 
-            {error && <p className="text-xs text-red-500">{error}</p>}
+            <MensajeError mensaje={error} />
           </fieldset>
 
           {/* Relaciones */}
@@ -681,7 +686,7 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
               onClick={factura ? abrirFactura : undefined} cargando={cargandoFactura || cargandoCrearFactura}
               onCrear={!factura && !orden.anulado && puedeCrearFacturaRol ? crearFacturaDesdeOC : undefined} crearLabel="Factura">
               {puedeVerPrecios && (factura?.totalAPagar || factura?.total) > 0 && (
-                <p className="text-xs text-gray-500">{money(factura.totalAPagar ?? factura.total, cot?.moneda)}</p>
+                <p className="text-xs text-gray-500">{money(factura.totalAPagar ?? factura.total, factura.moneda ?? cot?.moneda)}</p>
               )}
               {factura?.estadoPago && <Chip className={badgePago(factura.estadoPago)}>{factura.estadoPago}</Chip>}
               {factura && !orden.anulado && puedeCrearFacturaRol && (

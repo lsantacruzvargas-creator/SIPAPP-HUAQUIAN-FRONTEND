@@ -40,20 +40,31 @@ function PanelSalida({ requerimientoId, item, onClose, onListo }) {
   const seleccionarLote = (l) => { setLote(l.lote); setPrecioAuto(l.precioUnitario); };
 
   const confirmar = async () => {
-    if (!lote || !cantidad || cantidad <= 0) { setError("Selecciona el lote e ingresa la cantidad."); return; }
-    setGuardando(true);
-    const r = await fetchAuth(`/requerimientos/${requerimientoId}/items/${item._id}/salida`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lote, cantidad: Number(cantidad), precioUnitario: precioAuto }),
-    });
-    if (r.ok) {
-      onListo(await r.json());
-    } else {
-      const d = await r.json();
-      setError(d.mensaje || "Error al registrar la salida");
+    if (!lote || !cantidad) { setError("Selecciona el lote e ingresa la cantidad."); return; }
+    if (!(Number(cantidad) > 0)) { setError("La cantidad debe ser un número mayor a 0 (usa punto para los decimales)."); return; }
+    const loteSel = lotes.find((l) => l.lote === lote);
+    if (loteSel && Number(cantidad) > Number(loteSel.cantidadDisponible)) {
+      setError(`El lote ${lote} solo tiene ${loteSel.cantidadDisponible} disponible(s).`);
+      return;
     }
-    setGuardando(false);
+    setGuardando(true);
+    try {
+      const r = await fetchAuth(`/requerimientos/${requerimientoId}/items/${item._id}/salida`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lote, cantidad: Number(cantidad), precioUnitario: precioAuto }),
+      });
+      if (r.ok) {
+        onListo(await r.json());
+      } else {
+        const d = await r.json().catch(() => ({}));
+        setError(d.mensaje || "Error al registrar la salida");
+      }
+    } catch {
+      setError("No se pudo conectar con el servidor. Revisa el requerimiento antes de reintentar.");
+    } finally {
+      setGuardando(false);
+    }
   };
 
   return (

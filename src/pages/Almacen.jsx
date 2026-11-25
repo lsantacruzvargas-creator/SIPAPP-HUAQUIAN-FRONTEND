@@ -918,6 +918,13 @@ function SeccionComponentes() {
 // a cada fila recién al guardar (ver guardarMasa).
 const filaIngresoVacia = () => ({ _key: Date.now() + Math.random(), material: "", busqueda: "", cantidad: "", precioUnitario: "" });
 
+const esPositivo = (v) => Number(v) > 0;
+const MSJ_NO_POSITIVO = "debe ser un número mayor a 0 (usa punto para los decimales, sin separador de miles).";
+// Precio 0 es válido (material sin costo: donación, garantía, devolución del cliente).
+const precioValido = (v) => v !== "" && v != null && Number(v) >= 0;
+const MSJ_PRECIO = "El precio unitario debe ser un número mayor o igual a 0 (usa punto para los decimales, sin separador de miles).";
+const soles = (v) => `S/ ${Number(v || 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
 function ModalIngreso({ materialInicial, onClose, onGuardado }) {
   const [form, setForm] = useState({
     material: materialInicial?._id || "",
@@ -990,10 +997,12 @@ function ModalIngreso({ materialInicial, onClose, onGuardado }) {
   }, [form.material]);
 
   const intentarGuardar = () => {
-    if (!form.material || !form.cantidad || !form.precioUnitario) {
+    if (!form.material || !form.cantidad || form.precioUnitario === "" || form.precioUnitario == null) {
       setError("Material, cantidad y precio son obligatorios.");
       return;
     }
+    if (!esPositivo(form.cantidad)) { setError(`La cantidad ${MSJ_NO_POSITIVO}`); return; }
+    if (!precioValido(form.precioUnitario)) { setError(MSJ_PRECIO); return; }
     setError("");
     setConfirmando(true);
   };
@@ -1001,27 +1010,32 @@ function ModalIngreso({ materialInicial, onClose, onGuardado }) {
   const guardar = async () => {
     setConfirmando(false);
     setGuardando(true);
-    // `fecha` NO se manda — el input está deshabilitado (siempre "hoy"), así
-    // que se deja que el backend use su propio `Date.now` (instante real,
-    // sin el bug de mandar un "YYYY-MM-DD" suelto que Mongoose interpreta
-    // como medianoche UTC — eso sí puede caer en el día anterior en hora Lima).
-    const r = await fetchAuth("/movimientos-almacen", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        material: form.material, cantidad: form.cantidad, precioUnitario: form.precioUnitario,
-        lote: form.lote, guiaProveedor: form.guiaProveedor, ordenCompra: form.ordenCompra,
-        proveedor: form.proveedor, notas: form.notas, tipo: "ingreso",
-      }),
-    });
-    if (r.ok) {
-      const movimiento = await r.json();
-      onGuardado(movimiento);
-    } else {
-      const d = await r.json();
-      setError(d.mensaje || "Error al guardar");
+    try {
+      // `fecha` NO se manda — el input está deshabilitado (siempre "hoy"), así
+      // que se deja que el backend use su propio `Date.now` (instante real,
+      // sin el bug de mandar un "YYYY-MM-DD" suelto que Mongoose interpreta
+      // como medianoche UTC — eso sí puede caer en el día anterior en hora Lima).
+      const r = await fetchAuth("/movimientos-almacen", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          material: form.material, cantidad: form.cantidad, precioUnitario: form.precioUnitario,
+          lote: form.lote, guiaProveedor: form.guiaProveedor, ordenCompra: form.ordenCompra,
+          proveedor: form.proveedor, notas: form.notas, tipo: "ingreso",
+        }),
+      });
+      if (r.ok) {
+        const movimiento = await r.json();
+        onGuardado(movimiento);
+      } else {
+        const d = await r.json().catch(() => ({}));
+        setError(d.mensaje || "Error al guardar");
+      }
+    } catch {
+      setError("No se pudo conectar con el servidor. Revisa en Movimientos si el ingreso quedó registrado antes de reintentar.");
+    } finally {
+      setGuardando(false);
     }
-    setGuardando(false);
   };
 
   // Un POST /movimientos-almacen por fila, en secuencia (no Promise.all) —
@@ -1031,7 +1045,7 @@ function ModalIngreso({ materialInicial, onClose, onGuardado }) {
   // el `codigo` auto-generado del movimiento (su pre-save hook busca "el
   // último código" antes de guardar — en paralelo, dos filas podrían leer el
   // mismo "último" y terminar con el mismo código).
-  const filasCompletasMasa = filasMasa.filter((f) => f.material && f.cantidad && f.precioUnitario);
+  const filasCompletasMasa = filasMasa.filter((f) => f.material && f.cantidad && f.precioUnitario !== "" && f.precioUnitario != null);
 
   const intentarGuardarMasa = () => {
     if (filasCompletasMasa.length === 0) {
@@ -1042,34 +1056,48 @@ function ModalIngreso({ materialInicial, onClose, onGuardado }) {
       setError("Hay filas sin completar (material, cantidad o precio) — complétalas o quítalas antes de guardar.");
       return;
     }
+    const cantidadMala = filasCompletasMasa.find((f) => !esPositivo(f.cantidad));
+    if (cantidadMala) { setError(`"${cantidadMala.busqueda}": la cantidad ${MSJ_NO_POSITIVO}`); return; }
+    const precioMalo = filasCompletasMasa.find((f) => !precioValido(f.precioUnitario));
+    if (precioMalo) { setError(`"${precioMalo.busqueda}": ${MSJ_PRECIO}`); return; }
     setError("");
     setConfirmando(true);
   };
+
+  const totalMasa = filasCompletasMasa.reduce((s, f) => s + Number(f.cantidad) * Number(f.precioUnitario), 0);
 
   const guardarMasa = async () => {
     setConfirmando(false);
     setGuardando(true);
     setError("");
     const filasCompletas = filasCompletasMasa;
-    for (const f of filasCompletas) {
-      const r = await fetchAuth("/movimientos-almacen", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          material: f.material, cantidad: f.cantidad, precioUnitario: f.precioUnitario,
-          lote: form.lote, guiaProveedor: form.guiaProveedor, ordenCompra: form.ordenCompra,
-          proveedor: form.proveedor, notas: form.notas, tipo: "ingreso",
-        }),
-      });
-      if (!r.ok) {
-        const d = await r.json().catch(() => ({}));
-        setError(`"${f.busqueda}": ${d.mensaje || "Error al guardar"}`);
-        setGuardando(false);
-        return;
+    let guardadas = 0;
+    try {
+      for (const f of filasCompletas) {
+        const r = await fetchAuth("/movimientos-almacen", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            material: f.material, cantidad: f.cantidad, precioUnitario: f.precioUnitario,
+            lote: form.lote, guiaProveedor: form.guiaProveedor, ordenCompra: form.ordenCompra,
+            proveedor: form.proveedor, notas: form.notas, tipo: "ingreso",
+          }),
+        });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          setError(`Se registraron ${guardadas} de ${filasCompletas.length} ingresos (ya se quitaron de la lista). Falló "${f.busqueda}": ${d.mensaje || "Error al guardar"}`);
+          return;
+        }
+        guardadas++;
+        // Se quita apenas se guarda: si una fila posterior falla, el reintento no debe volver a ingresarla.
+        setFilasMasa((prev) => prev.filter((x) => x._key !== f._key));
       }
+      onGuardado();
+    } catch {
+      setError(`Se perdió la conexión: se registraron ${guardadas} de ${filasCompletas.length} ingresos (ya se quitaron de la lista). Revisa en Movimientos si el siguiente quedó registrado antes de reintentar.`);
+    } finally {
+      setGuardando(false);
     }
-    setGuardando(false);
-    onGuardado();
   };
 
   return (
@@ -1207,8 +1235,8 @@ function ModalIngreso({ materialInicial, onClose, onGuardado }) {
       {confirmando && (
         <ConfirmacionAccion
           mensaje={modoMasa
-            ? `¿Confirmas el ingreso de ${filasCompletasMasa.length} SKU(s)?`
-            : `¿Confirmas el ingreso de ${form.cantidad} ${materialSel?.unidad || ""} de "${materialSel?.nombre || "este material"}"?`}
+            ? `¿Confirmas el ingreso de ${filasCompletasMasa.length} SKU(s) por un total de ${soles(totalMasa)}?`
+            : `¿Confirmas el ingreso de ${form.cantidad} ${materialSel?.unidad || ""} de "${materialSel?.nombre || "este material"}" por ${soles(Number(form.cantidad) * Number(form.precioUnitario))}?`}
           onCancelar={() => setConfirmando(false)}
           onConfirmar={modoMasa ? guardarMasa : guardar}
           procesando={guardando}
@@ -1251,7 +1279,8 @@ function ModalEgreso({ onClose, onGuardado }) {
   }, [form.material]);
 
   const seleccionarMaterial = (m) => {
-    setForm((prev) => ({ ...prev, material: m._id }));
+    setForm((prev) => ({ ...prev, material: m._id, loteOrigen: "" }));
+    setPrecioAuto(0);
     setMaterialSel(m);
     setBusquedaMaterial(`${m.sku} — ${m.nombre}`);
   };
@@ -1269,9 +1298,18 @@ function ModalEgreso({ onClose, onGuardado }) {
     setPrecioAuto(lote.precioUnitario);
   };
 
+  const loteSel = lotes.find((l) => l.lote === form.loteOrigen);
+
   const intentarGuardar = () => {
     if (!form.material || !form.cantidad) {
       setError("Material y cantidad son obligatorios.");
+      return;
+    }
+    if (!esPositivo(form.cantidad)) { setError(`La cantidad ${MSJ_NO_POSITIVO}`); return; }
+    // Sin lote el egreso se valorizaría a S/ 0 y no descontaría de ningún lote.
+    if (lotes.length > 0 && !loteSel) { setError("Selecciona el lote del que sale el material."); return; }
+    if (loteSel && Number(form.cantidad) > Number(loteSel.cantidadDisponible)) {
+      setError(`El lote ${loteSel.lote} solo tiene ${loteSel.cantidadDisponible} disponible(s).`);
       return;
     }
     setError("");
@@ -1281,25 +1319,30 @@ function ModalEgreso({ onClose, onGuardado }) {
   const guardar = async () => {
     setConfirmando(false);
     setGuardando(true);
-    // `fecha` NO se manda — el input está deshabilitado (siempre "hoy"), así
-    // que se deja que el backend use su propio `Date.now` (instante real,
-    // sin el bug de mandar un "YYYY-MM-DD" suelto que Mongoose interpreta
-    // como medianoche UTC — eso sí puede caer en el día anterior en hora Lima).
-    const r = await fetchAuth("/movimientos-almacen", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        material: form.material, cantidad: form.cantidad, loteOrigen: form.loteOrigen, notas: form.notas,
-        tipo: "egreso", precioUnitario: precioAuto,
-      }),
-    });
-    if (r.ok) {
-      onGuardado(await r.json());
-    } else {
-      const d = await r.json();
-      setError(d.mensaje || "Error al guardar");
+    try {
+      // `fecha` NO se manda — el input está deshabilitado (siempre "hoy"), así
+      // que se deja que el backend use su propio `Date.now` (instante real,
+      // sin el bug de mandar un "YYYY-MM-DD" suelto que Mongoose interpreta
+      // como medianoche UTC — eso sí puede caer en el día anterior en hora Lima).
+      const r = await fetchAuth("/movimientos-almacen", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          material: form.material, cantidad: form.cantidad, loteOrigen: form.loteOrigen, notas: form.notas,
+          tipo: "egreso", precioUnitario: precioAuto,
+        }),
+      });
+      if (r.ok) {
+        onGuardado(await r.json());
+      } else {
+        const d = await r.json().catch(() => ({}));
+        setError(d.mensaje || "Error al guardar");
+      }
+    } catch {
+      setError("No se pudo conectar con el servidor. Revisa en Movimientos si el egreso quedó registrado antes de reintentar.");
+    } finally {
+      setGuardando(false);
     }
-    setGuardando(false);
   };
 
   return (
@@ -1389,7 +1432,7 @@ function ModalEgreso({ onClose, onGuardado }) {
 
       {confirmando && (
         <ConfirmacionAccion
-          mensaje={`¿Confirmas el egreso de ${form.cantidad} ${materialSel?.unidad || ""} de "${materialSel?.nombre || "este material"}"?`}
+          mensaje={`¿Confirmas el egreso de ${form.cantidad} ${materialSel?.unidad || ""} de "${materialSel?.nombre || "este material"}"${loteSel ? ` (lote ${loteSel.lote}, ${soles(Number(form.cantidad) * Number(precioAuto))})` : ""}?`}
           onCancelar={() => setConfirmando(false)}
           onConfirmar={guardar}
           procesando={guardando}

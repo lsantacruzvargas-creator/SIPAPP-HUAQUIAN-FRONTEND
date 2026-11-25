@@ -20,7 +20,7 @@ export default function TablaItemsCotizacion({
   items, onItemsChange,
   tipo, puedeEditar, disabled, intentoGuardar, totalesMostrados,
   seleccionables = false, seleccionados = new Set(), onToggleSeleccion, onGenerarOT, generando = false, onVerOT, onQuitarOT, puedeQuitarOT = false,
-  seleccionablesOC = false, seleccionadosOC = new Set(), onToggleSeleccionOC, onGenerarOC, onVerOC,
+  seleccionablesOC = false, seleccionadosOC = new Set(), onToggleSeleccionOC, onGenerarOC, onVerOC, ocCompleta,
   puedeVerPrecios = true,
 }) {
   const [catalogoOpen, setCatalogoOpen] = useState(false);
@@ -190,7 +190,7 @@ export default function TablaItemsCotizacion({
                   )}
                   {seleccionablesOC && (
                     <CeldaOCItem item={item} idx={idx} seleccionados={seleccionadosOC}
-                      onToggle={onToggleSeleccionOC} onVerOC={onVerOC} />
+                      onToggle={onToggleSeleccionOC} onVerOC={onVerOC} ocCompleta={ocCompleta} />
                   )}
                   <td className="px-3 py-3 text-center text-gray-400">{idx + 1}</td>
                   <td className="px-3 py-3">
@@ -245,10 +245,13 @@ export default function TablaItemsCotizacion({
                   )}
                   {puedeEditar && (
                     <td className="px-3 py-3 text-center">
-                      {editable && (
-                        <button type="button" onClick={() => eliminarItem(item._key)}
+                      {editable && (item.otGenerada || item.ocGenerada ? (
+                        <span title="Tiene OT u OC generada: desvincúlala antes de quitar el ítem"
+                          className="text-gray-300 cursor-not-allowed">🔒</span>
+                      ) : (
+                        <button type="button" onClick={() => eliminarItem(item._key)} aria-label="Quitar ítem"
                           className="text-red-400 hover:text-red-600">✕</button>
-                      )}
+                      ))}
                     </td>
                   )}
                 </tr>
