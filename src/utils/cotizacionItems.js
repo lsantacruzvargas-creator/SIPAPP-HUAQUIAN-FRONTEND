@@ -154,6 +154,17 @@ export function lineasConsolidadas(oc) {
   return porCot.size > 1 ? [...porCot.values()] : [];
 }
 
+// OC parcial: una sola partida que no cubre todos los ítems de su cotización (mismo criterio que
+// `heredarTituloCotizacion` en el backend); su título es propio y no sigue al de la cotización.
+export function ocEsParcial(oc, cotizacion) {
+  const partidas = oc?.partidas || [];
+  if (partidas.length !== 1 || !cotizacion) return false;
+  const [unica] = partidas;
+  if (String(unica.cotizacion?._id || unica.cotizacion) !== String(cotizacion._id)) return false;
+  const cubiertos = (cotizacion.items || []).filter((i) => String(i.partidaOC) === String(unica._id)).length;
+  return cubiertos < (cotizacion.items || []).length;
+}
+
 // Posiciones de los ítems de la cotización que aún no están en una OC vigente
 // (los ítems no tienen `_id`: la OC los identifica por índice).
 export const indicesLibresOC = (cotizacion) =>

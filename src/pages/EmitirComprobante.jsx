@@ -22,7 +22,7 @@ import {
   formatearGuiaRemision,
   parsearGuiaRemision,
 } from "../utils/catalogosSunat";
-import { RUC_GLORIA, esFormatoAlicorp } from "../utils/cotizacionItems";
+import { RUC_GLORIA, esFormatoAlicorp, ocEsParcial } from "../utils/cotizacionItems";
 import { r2, r0 } from "../utils/redondeo";
 
 const RECEPTOR_VACIO = { schemeID: "6", numDoc: "", nombre: "" };
@@ -206,7 +206,7 @@ export default function EmitirComprobante() {
     const itemsCuadranConOC = !(montoOC > 0) || Math.abs(baseItems - montoOC) <= 0.01 * itemsValidos.length;
     const formatoEspecial = emp?.ruc === RUC_GLORIA || esFormatoAlicorp(emp?.ruc);
     if (formatoEspecial && montoOC > 0) {
-      lineaUnica((oc.desdeItemsCotizacion && oc.titulo) || itemsValidos[0]?.descripcion || oc.descripcion || oc.titulo || "");
+      lineaUnica((ocEsParcial(oc, cotizacion) && oc.titulo) || itemsValidos[0]?.descripcion || oc.descripcion || oc.titulo || "");
     } else if (itemsValidos.length && itemsCuadranConOC) {
       setItems(itemsValidos.map((i) => ({
         _key: Date.now() + Math.random(),

@@ -60,6 +60,7 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
   const [guardandoConfirmacion, setGuardandoConfirmacion] = useState("");
   const [todasOTs, setTodasOTs] = useState([]);
   const [cotizacionesPartidas, setCotizacionesPartidas] = useState({});
+  const [errorCotizaciones, setErrorCotizaciones] = useState(false);
   const [partidaExpandida, setPartidaExpandida] = useState(null);
   const [partidaADesvincular, setPartidaADesvincular] = useState(null);
   const [desvinculando, setDesvinculando] = useState(false);
@@ -190,9 +191,10 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
     const idsCot = new Set((orden.partidas || []).map(p => p.cotizacion?._id || p.cotizacion));
     Promise.all([
       fetchAuth("/empresas").then(r => r.ok ? r.json() : []),
-      idsCot.size ? fetchAuth("/cotizaciones").then(r => r.ok ? r.json() : []) : [],
+      idsCot.size ? fetchAuth("/cotizaciones").then(r => r.ok ? r.json() : null).catch(() => null) : [],
     ]).then(([emps, cots]) => {
       setEmpresas(emps || []);
+      if (!cots) return setErrorCotizaciones(true);
       setCotizacionesPartidas(Object.fromEntries(cots.filter(c => idsCot.has(c._id)).map(c => [c._id, c])));
     });
     cargarOTeInformes();
@@ -697,7 +699,9 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
                               <td />
                               <td colSpan={4 + (puedeVerPrecios ? 1 : 0) + (hayColumnaDesvincular ? 1 : 0)} className="px-3 py-3">
                                 {!cotP ? (
-                                  <p className="text-xs text-gray-400">Cargando ítems…</p>
+                                  <p className={`text-xs ${errorCotizaciones ? "text-red-500" : "text-gray-400"}`}>
+                                    {errorCotizaciones ? "No se pudieron cargar los ítems." : "Cargando ítems…"}
+                                  </p>
                                 ) : itemsP.length === 0 ? (
                                   <p className="text-xs text-gray-500">La partida cubre la cotización completa (no tiene ítems individuales).</p>
                                 ) : (

@@ -8,7 +8,7 @@ import { exportarCotizacionGloriaPdf } from "../utils/cotizacionGloriaPdf";
 import { exportarCotizacionAlicorpPdf } from "../utils/cotizacionAlicorpPdf";
 import {
   calcSubtotalGloria, calcularGloria, calcSubtotal, calcularAlicorp,
-  itemDesdeDb, itemInvalido, indicesLibresOC, RUC_GLORIA, esFormatoAlicorp,
+  itemDesdeDb, itemInvalido, indicesLibresOC, ocEsParcial, RUC_GLORIA, esFormatoAlicorp,
 } from "../utils/cotizacionItems";
 import { estadoComprobanteClase } from "../utils/catalogosSunat";
 import ModalGenerarOC from "./ModalOrdenCompra";
@@ -1393,7 +1393,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
             ) : (
               ocs.map(o => (
                 <TarjetaRelacion key={o._id} tipo="oc" codigo={o.codigo} numero={o.numeroOrden} onClick={() => abrirOC(o)}>
-                  {o.desdeItemsCotizacion && <p className="text-sm text-gray-600 line-clamp-2">{o.titulo}</p>}
+                  {ocEsParcial(o, cot) && <p className="text-sm text-gray-600 line-clamp-2">{o.titulo}</p>}
                   {puedeVerPrecios && o.monto > 0 && <p className="text-xs text-gray-500">{money(o.monto, cot.moneda)}</p>}
                   {o.anulado && <Chip className="bg-red-100 text-red-600">Anulada</Chip>}
                   <ParteConsolidada oc={o} cotizacionId={cot._id} moneda={cot.moneda} verPrecios={puedeVerPrecios} />

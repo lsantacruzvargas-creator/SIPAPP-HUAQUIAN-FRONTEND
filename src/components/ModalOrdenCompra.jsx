@@ -28,6 +28,7 @@ export default function ModalGenerarOC({ cotizacion, indices, onClose, onCreada 
     ordenCompra: "",
   }));
   const [destinos, setDestinos] = useState(null);
+  const [errorDestinos, setErrorDestinos] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
 
@@ -35,8 +36,13 @@ export default function ModalGenerarOC({ cotizacion, indices, onClose, onCreada 
 
   useEffect(() => {
     fetchAuth(`/ordenes-compra/destinos-anexo?cotizacion=${cotizacion._id}`)
-      .then(async (r) => (r.ok ? r.json() : []))
-      .then(setDestinos);
+      .then(async (r) => {
+        if (r.ok) return setDestinos(await r.json());
+        const data = await r.json().catch(() => ({}));
+        setErrorDestinos(data.mensaje || "No se pudo cargar la lista de OC.");
+        setDestinos([]);
+      })
+      .catch(() => { setErrorDestinos("No se pudo conectar con el servidor."); setDestinos([]); });
   }, [cotizacion._id]);
 
   const guardar = async () => {
@@ -124,7 +130,8 @@ export default function ModalGenerarOC({ cotizacion, indices, onClose, onCreada 
             <div className="space-y-1.5">
               <p className="text-xs text-gray-500">OC de la misma empresa y moneda, vigentes y sin pagar</p>
               {destinos === null && <p className="text-sm text-gray-400 py-4 text-center">Cargando…</p>}
-              {destinos?.length === 0 && (
+              {errorDestinos && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{errorDestinos}</p>}
+              {destinos?.length === 0 && !errorDestinos && (
                 <p className="text-sm text-gray-400 py-4 text-center">No hay OC a las que se pueda anexar esta cotización.</p>
               )}
               {(destinos || []).map((d) => (
