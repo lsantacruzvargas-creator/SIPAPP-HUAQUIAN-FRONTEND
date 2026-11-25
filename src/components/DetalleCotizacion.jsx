@@ -551,6 +551,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
           // El backend los usa para que el vínculo siga a su ítem (no a su posición).
           otGenerada: i.otGenerada?._id ?? i.otGenerada ?? null,
           ocGenerada: i.ocGenerada?._id ?? i.ocGenerada ?? null,
+          partidaOC: i.partidaOC ?? null,
         };
         if (i.fechaEntrega) it.fechaEntrega = i.fechaEntrega;
         if (i.subItems?.length > 0) it.subItems = i.subItems.map(s => s.texto).filter(Boolean);
