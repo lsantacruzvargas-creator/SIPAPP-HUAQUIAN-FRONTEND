@@ -566,6 +566,7 @@ export default function FormInformeTecnico({ ordenTrabajo, tipo, informeExistent
               La OT de este informe ya está pagada — de solo lectura. Solo Jefatura puede editarlo.
             </p>
           )}
+          <fieldset disabled={bloqueado} className="contents">
           {gruposSecciones.map((grupo, i) => grupo.length === 2 ? (
             <div key={i} className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
               {grupo.map((seccion, j) => renderSeccion(seccion, j))}
@@ -588,6 +589,7 @@ export default function FormInformeTecnico({ ordenTrabajo, tipo, informeExistent
               </div>
             </div>
           </Seccion>
+          </fieldset>
 
           {error && <p className="text-xs text-red-500">{error}</p>}
         </div>

@@ -57,6 +57,7 @@ export const itemDesdeDb = (item) => ({
   otGenerada: item.otGenerada || null,
   ocGenerada: item.ocGenerada || null,
   partidaOC: item.partidaOC || null,
+  descuento: item.descuento,
   // Formato Gloria (ver GRUPOS_GLORIA abajo) — un ítem del flujo genérico no
   // trae `grupo`, así que estos quedan undefined y no afectan nada.
   grupo: item.grupo,

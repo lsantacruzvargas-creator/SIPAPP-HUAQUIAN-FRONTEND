@@ -22,7 +22,7 @@ export default function TablaItemsCotizacion({
   seleccionables = false, seleccionados = new Set(), onToggleSeleccion, onGenerarOT, generando = false, onVerOT, onQuitarOT, puedeQuitarOT = false,
   seleccionablesOC = false, seleccionadosOC = new Set(), onToggleSeleccionOC, onGenerarOC, onVerOC,
   puedeVerPrecios = true,
-  esFacturado = () => false, ocBloqueada = false,
+  esFacturado = () => false, ocBloqueada = false, sinAgregar = false,
 }) {
   const [catalogoOpen, setCatalogoOpen] = useState(false);
   const [catalogoTarget, setCatalogoTarget] = useState(null); // null = "+ Agregar ítem de plantilla" (fusiona/crea fila); _key = agregar descripción a esa fila puntual
@@ -34,7 +34,7 @@ export default function TablaItemsCotizacion({
   // ambos — antes solo revisaban `puedeEditar`, así que una cotización
   // "enviada" seguía siendo editable ítem por ítem pese al `disabled`.
   const editable = puedeEditar && !disabled;
-  const puedeAgregar = editable;
+  const puedeAgregar = editable && !sinAgregar;
   // Lo facturado no cambia de monto ni de descripción, ni para Jefatura (el backend responde 400).
   const editableItem = (item) => editable && !esFacturado(item);
 

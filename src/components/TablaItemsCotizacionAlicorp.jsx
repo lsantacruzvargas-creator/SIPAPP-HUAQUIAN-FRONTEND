@@ -29,11 +29,12 @@ export default function TablaItemsCotizacionAlicorp({
   items, onItemsChange, puedeEditar, disabled, puedeVerPrecios = true,
   seleccionables = false, seleccionados = new Set(), onToggleSeleccion, onGenerarOT, generando = false, onVerOT, onQuitarOT, puedeQuitarOT = false,
   seleccionablesOC = false, seleccionadosOC = new Set(), onToggleSeleccionOC, onGenerarOC, onVerOC,
-  esFacturado = () => false, ocBloqueada = false,
+  esFacturado = () => false, ocBloqueada = false, sinAgregar = false,
 }) {
   const editable = puedeEditar && !disabled;
   // Lo facturado no cambia de monto ni de descripción, ni para Jefatura (el backend responde 400).
   const editableItem = (item) => editable && !esFacturado(item);
+  const puedeAgregar = editable && !sinAgregar;
   // Qué grupo (clave de GRUPOS_ALICORP) recibe lo elegido en el catálogo —
   // "grupo" acá es el de la cotización (Materiales, Servicios, etc.), no el
   // "grupo" propio del catálogo de servicios (categorías de texto libre, ver
@@ -108,7 +109,7 @@ export default function TablaItemsCotizacionAlicorp({
                     {grupo.numero}. {grupo.label}
                   </h3>
                 </div>
-                {editable && (
+                {puedeAgregar && (
                   <div className="flex items-center gap-2">
                     <button type="button" onClick={() => agregarItem(grupo.clave)}
                       className="border border-sky-200 text-sky-700 text-xs px-3 py-1.5 rounded-lg hover:bg-sky-50 transition font-medium">
@@ -140,7 +141,7 @@ export default function TablaItemsCotizacionAlicorp({
                     {itemsGrupo.length === 0 ? (
                       <tr>
                         <td colSpan={(seleccionables ? 1 : 0) + (seleccionablesOC ? 1 : 0) + 3 + (puedeVerPrecios ? 2 : 0) + (editable ? 1 : 0)} className="px-3 py-4 text-center text-gray-400 text-xs">
-                          Sin ítems{editable ? " — usa “+ Agregar” para sumar uno." : "."}
+                          Sin ítems{puedeAgregar ? " — usa “+ Agregar” para sumar uno." : "."}
                         </td>
                       </tr>
                     ) : (

@@ -180,10 +180,13 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
     .map(i => cot.items?.[i]?.partidaOC).filter(Boolean).map(String));
   const esFacturado = (item) => !!item.partidaOC && partidasFacturadas.has(String(item.partidaOC));
   const montosBloqueados = partidasFacturadas.size > 0 || !!cot.bloqueo?.facturada;
+  // Sin ítems, la partida cubre la cotización entera: agregar uno cambiaría el monto facturado.
+  const sinAgregarItems = !!cot.bloqueo?.facturada && (cot.items || []).length === 0;
 
-  // Las respuestas de aprobar/enviar/anular/generar-ot/quitar-ot no traen el bloqueo.
-  const aplicarRespuesta = (actualizada, notificar = true) => {
-    const fusionada = fusionarBloqueo(cot, actualizada);
+  // Las respuestas de aprobar/enviar/anular/generar-ot/quitar-ot no traen el bloqueo. `base` es la
+  // última versión con bloqueo: tras un PUT previo en el mismo flujo, el `cot` de esta closure es viejo.
+  const aplicarRespuesta = (actualizada, { notificar = true, base = cot } = {}) => {
+    const fusionada = fusionarBloqueo(base, actualizada);
     setCot(fusionada);
     if (notificar) onGuardada?.(fusionada);
     return fusionada;
@@ -420,7 +423,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
     if (fallidas.length) {
       setError(`Se generaron ${indices.length - fallidas.length} de ${indices.length} OT. Fallaron — ${fallidas.join("; ")}`);
     }
-    aplicarRespuesta(ultimaCot, false);
+    aplicarRespuesta(ultimaCot, { notificar: false, base: guardada });
     setItems((ultimaCot.items || []).map(itemDesdeDb));
     setSeleccionados(new Set());
     setGenerandoOT(false);
@@ -433,7 +436,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
     const res = await fetchAuth(`/cotizaciones/${cot._id}/items/${idx}/quitar-ot`, { method: "PATCH" });
     if (res.ok) {
       const actualizada = await res.json();
-      aplicarRespuesta(actualizada, false);
+      aplicarRespuesta(actualizada, { notificar: false });
       setItems((actualizada.items || []).map(itemDesdeDb));
       cargarRelaciones();
     } else {
@@ -573,6 +576,8 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
           ocGenerada: i.ocGenerada?._id ?? i.ocGenerada ?? null,
           partidaOC: i.partidaOC ?? null,
         };
+        // Sin UI propia, pero entra en la firma de un ítem facturado: omitirlo lo pondría en 0 (400).
+        if (i.descuento != null) it.descuento = i.descuento;
         if (i.fechaEntrega) it.fechaEntrega = i.fechaEntrega;
         if (i.subItems?.length > 0) it.subItems = i.subItems.map(s => s.texto).filter(Boolean);
         if (i.grupo) { it.grupo = i.grupo; it.personas = i.personas; it.horas = i.horas; it.tarifaHora = i.tarifaHora; }
@@ -935,6 +940,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
                         type="text"
                         value={busquedaEmpresa}
                         onChange={cambiarBusquedaEmpresa}
+                        disabled={montosBloqueados}
                         onFocus={() => setListaEmpresaAbierta(true)}
                         onBlur={() => setListaEmpresaAbierta(false)}
                         placeholder="Escribe el nombre de la empresa…"
@@ -953,7 +959,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
                         </div>
                       )}
                     </div>
-                    <button type="button" onClick={() => setEmpresasOpen(true)}
+                    <button type="button" onClick={() => setEmpresasOpen(true)} disabled={montosBloqueados}
                       className="shrink-0 text-xs border border-gray-300 px-3 rounded-lg hover:bg-gray-50 transition">
                       Empresas
                     </button>
@@ -1430,6 +1436,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
               puedeEditar={puedeEditar}
               disabled={cot.anulado || cot.enviado || bloqueada}
               esFacturado={esFacturado}
+              sinAgregar={sinAgregarItems}
               ocBloqueada={ocBloqueada}
               puedeVerPrecios={puedeVerPrecios}
               seleccionables={puedeGenerarOT && !cot.anulado}
@@ -1453,6 +1460,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
               puedeEditar={puedeEditar}
               disabled={cot.anulado || cot.enviado || bloqueada}
               esFacturado={esFacturado}
+              sinAgregar={sinAgregarItems}
               ocBloqueada={ocBloqueada}
               puedeVerPrecios={puedeVerPrecios}
               seleccionables={puedeGenerarOT && !cot.anulado}
@@ -1477,6 +1485,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
               puedeEditar={puedeEditar}
               disabled={cot.anulado || cot.enviado || bloqueada}
               esFacturado={esFacturado}
+              sinAgregar={sinAgregarItems}
               ocBloqueada={ocBloqueada}
               intentoGuardar={intentoGuardar}
               totalesMostrados={totalesMostrados}
