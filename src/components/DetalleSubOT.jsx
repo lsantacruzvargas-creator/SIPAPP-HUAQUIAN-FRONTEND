@@ -8,7 +8,8 @@ import ModalRequerimiento from "./ModalRequerimiento";
 import TablaServiciosExternos from "./TablaServiciosExternos";
 import TarjetaDatosAdjuntos from "./TarjetaDatosAdjuntos";
 import TablaScroll from "./TablaScroll";
-import { Chip, badgeGeneral, BotonAnular, BotonCerrarCadena, BotonDesanular, BannerAnulado, bloqueadoPorCadenaCerrada, MensajeError } from "./detalleShared";
+import { Chip, badgeGeneral, BotonAnular, BotonDesanular, BannerAnulado, bloqueadoPorPago, MensajeError } from "./detalleShared";
+import { fusionarBloqueo } from "../utils/bloqueoPago";
 
 const CATEGORIAS_SERVICIO = ["SOPORTE", "DEVOLUCION", "DIAGNOSTICO", "GARANTIA", "MANTENIMIENTO", "REPARACION", "PRESTAMO", "SUMINISTRO", "MANTENIMIENTO EN PLANTA"];
 
@@ -76,7 +77,11 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
   const puedeEditarInformeAprobado = false;
   // Tabla de Servicios Externos: la ven todos los roles menos técnico.
   const puedeVerServicios = !esTecnico;
-  const cadenaCerrada = bloqueadoPorCadenaCerrada(ot.estadoCadena, rolActual);
+  const bloqueada = bloqueadoPorPago(ot, rolActual);
+  // Con la OT o el informe pagados solo Jefatura lo corrige, aunque esté aprobado (backend: PUT /informes-tecnicos/:id).
+  const puedeModificarInforme = (inf) => !inf.anulado && ((inf.bloqueadoPorPago ?? ot.bloqueadoPorPago)
+    ? rolActual === "jefatura"
+    : (inf.aprobado ? puedeEditarInformeAprobado : puedeEditarInformeNoAprobado));
   // Estado (Encargado Intervención) y Progreso (Encargado Prueba) — mismo
   // criterio que DetalleOrdenTrabajo.jsx: cards independientes del fieldset,
   // editables por el técnico cuyo nombre coincide con encargado/encargado2.
@@ -169,7 +174,7 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
     });
     if (res.ok) {
       const actualizada = await res.json();
-      setOt(actualizada);
+      setOt((prev) => fusionarBloqueo(prev, actualizada));
       setForm((f) => ({ ...f, estado: actualizada.estado }));
     }
   };
@@ -180,7 +185,10 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ estadoPrueba: nuevo }),
     });
-    if (res.ok) setOt(await res.json());
+    if (res.ok) {
+      const actualizada = await res.json();
+      setOt((prev) => fusionarBloqueo(prev, actualizada));
+    }
   };
 
   const cambiarEncargado = async (campo, nombre) => {
@@ -191,7 +199,7 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
     });
     if (res.ok) {
       const actualizada = await res.json();
-      setOt(actualizada);
+      setOt((prev) => fusionarBloqueo(prev, actualizada));
       setForm((f) => ({ ...f, [campo]: actualizada[campo] }));
     }
   };
@@ -203,7 +211,7 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
       body: JSON.stringify({ motivo }),
     });
     if (res.ok) {
-      const actualizada = await res.json();
+      const actualizada = fusionarBloqueo(ot, await res.json());
       setOt(actualizada);
       onGuardada?.(actualizada);
     } else {
@@ -214,26 +222,11 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
   const desanular = async () => {
     const res = await fetchAuth(`/ordenes-trabajo/${ot._id}/desanular`, { method: "PATCH" });
     if (res.ok) {
-      const actualizada = await res.json();
+      const actualizada = fusionarBloqueo(ot, await res.json());
       setOt(actualizada);
       onGuardada?.(actualizada);
     } else {
       return mensajeError(res, "Error al desanular el documento.");
-    }
-  };
-
-  const toggleCerrarCadena = async (cerrado) => {
-    const res = await fetchAuth(`/ordenes-trabajo/${ot._id}/cerrar-cadena`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cerrado }),
-    });
-    if (res.ok) {
-      const actualizada = await res.json();
-      setOt(actualizada);
-      onGuardada?.(actualizada);
-    } else {
-      return mensajeError(res, "Error al cerrar/abrir la cadena.");
     }
   };
 
@@ -294,10 +287,9 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
               )}
               {ot.irreparable && <Chip className="mt-1 bg-red-500/40 text-white block">Irreparable</Chip>}
             </div>
-            {!ot.anulado && !cadenaCerrada && puedeAnular && <BotonAnular onAnular={anular} />}
+            {!ot.anulado && !bloqueada && puedeAnular && <BotonAnular onAnular={anular} />}
             {esAdmin && ot.anulado && <BotonDesanular onDesanular={desanular} />}
-            {esAdmin && <BotonCerrarCadena cerrado={cadenaCerrada} onToggle={toggleCerrarCadena} />}
-            {!ot.anulado && !cadenaCerrada && puedeEditarCampos && (
+            {!ot.anulado && !bloqueada && puedeEditarCampos && (
               <button onClick={guardar} disabled={guardando}
                 className="bg-white text-violet-700 text-sm px-5 py-2 rounded-lg hover:bg-violet-50 disabled:opacity-60 transition font-semibold shadow-sm shrink-0">
                 {guardando ? "Guardando…" : "Guardar cambios"}
@@ -324,7 +316,7 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
               cards independientes del fieldset principal. */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-2">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Progreso — Encargado Prueba</p>
-            <select value={ot.encargado || ""} disabled={!puedeEditarEncargados}
+            <select value={ot.encargado || ""} disabled={bloqueada || !puedeEditarEncargados}
               onChange={(e) => cambiarEncargado("encargado", e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm disabled:bg-gray-50 disabled:text-gray-500">
               <option value="">Sin asignar</option>
@@ -334,7 +326,7 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
             </select>
             <div className="flex gap-2">
               {ESTADOS.map(e => (
-                <button key={e} type="button" disabled={!puedeEditarEstadoPrueba}
+                <button key={e} type="button" disabled={bloqueada || !puedeEditarEstadoPrueba}
                   onClick={() => cambiarEstadoPrueba(e)}
                   className={`flex-1 py-1.5 rounded-lg text-xs font-medium capitalize transition disabled:opacity-60 disabled:cursor-not-allowed ${colorEstado(e, ot.estadoPrueba === e)}`}>
                   {e}
@@ -345,7 +337,7 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
 
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-2">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Estado — Encargado Intervención</p>
-            <select value={ot.encargado2 || ""} disabled={!puedeEditarEncargados}
+            <select value={ot.encargado2 || ""} disabled={bloqueada || !puedeEditarEncargados}
               onChange={(e) => cambiarEncargado("encargado2", e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm disabled:bg-gray-50 disabled:text-gray-500">
               <option value="">Sin asignar</option>
@@ -355,7 +347,7 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
             </select>
             <div className="flex gap-2">
               {ESTADOS.map(e => (
-                <button key={e} type="button" disabled={!puedeEditarEstado}
+                <button key={e} type="button" disabled={bloqueada || !puedeEditarEstado}
                   onClick={() => cambiarEstado(e)}
                   className={`flex-1 py-1.5 rounded-lg text-xs font-medium capitalize transition disabled:opacity-60 disabled:cursor-not-allowed ${colorEstado(e, ot.estado === e)}`}>
                   {e}
@@ -368,7 +360,7 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
         <div className="max-w-6xl mx-auto px-8 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
 
           {/* Datos editables — solo lo propio de la sub-tarea */}
-          <fieldset disabled={ot.anulado || cadenaCerrada || !puedeEditarCampos} className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5 self-start">
+          <fieldset disabled={ot.anulado || bloqueada || !puedeEditarCampos} className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5 self-start">
             <div className="flex items-center gap-2">
               <span className="w-1.5 h-5 rounded-full bg-violet-500" />
               <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Datos de la sub-orden</h2>
@@ -378,9 +370,9 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
               <BannerAnulado motivo={ot.motivoAnulacion} por={ot.anuladoPor} fecha={ot.fechaAnulacion} />
             )}
 
-            {!ot.anulado && cadenaCerrada && (
+            {!ot.anulado && bloqueada && (
               <p className="text-xs text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-                La cadena de este documento está cerrada (factura pagada) — de solo lectura. Solo Jefatura puede editarlo.
+                Sub-OT pagada — de solo lectura. Solo Jefatura puede editarla.
               </p>
             )}
 
@@ -532,7 +524,7 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
                 <p className="text-xs text-gray-400 mb-2">Sin informes</p>
               </div>
             )}
-            {!ot.anulado && puedeEditarInformeNoAprobado && (
+            {!ot.anulado && !bloqueada && puedeEditarInformeNoAprobado && (
               <button type="button" onClick={() => setSeleccionarTipoOpen(true)}
                 className="text-xs text-blue-600 hover:text-blue-800 underline">
                 + Crear informe
@@ -611,7 +603,7 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
         )}
 
         <TarjetaDatosAdjuntos ordenId={ot._id} archivos={ot.archivos || []}
-          soloLectura={ot.anulado || cadenaCerrada} onCambio={setOt} />
+          soloLectura={ot.anulado || bloqueada} onCambio={(o) => setOt((prev) => fusionarBloqueo(prev, o))} />
       </div>
 
       {crearRequerimientoOpen && (
@@ -644,7 +636,7 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
           ordenTrabajo={ot}
           onClose={() => setVerInforme(null)}
           onModificar={
-            (verInforme.aprobado ? puedeEditarInformeAprobado : puedeEditarInformeNoAprobado) && !verInforme.anulado
+            puedeModificarInforme(verInforme)
               ? () => { setEditandoInforme(verInforme); setVerInforme(null); }
               : undefined
           }
@@ -657,7 +649,7 @@ export default function DetalleSubOT({ orden: inicial, onClose, onGuardada, onNa
           tipo={editandoInforme.tipo}
           informeExistente={editandoInforme}
           onClose={() => setEditandoInforme(null)}
-          onGuardado={(informe) => { setEditandoInforme(null); cargarRelaciones(); setVerInforme(informe); }}
+          onGuardado={(informe) => { setVerInforme(fusionarBloqueo(editandoInforme, informe)); setEditandoInforme(null); cargarRelaciones(); }}
         />
       )}
     </div>

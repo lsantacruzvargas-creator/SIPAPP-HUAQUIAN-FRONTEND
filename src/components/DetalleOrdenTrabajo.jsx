@@ -20,8 +20,10 @@ import ConfirmacionAccion from "./ConfirmacionAccion";
 import { exportarInformeTecnicoExcel, exportarInformesTecnicosExcelCombinado } from "../utils/informeTecnicoExcel";
 import {
   FlujoNegocio, TarjetaRelacion, Chip, ParteConsolidada,
-  badgePago, badgeGeneral, money, BotonAnular, BotonCerrarCadena, BotonDesanular, BannerAnulado, bloqueadoPorCadenaCerrada, MensajeError,
+  badgePago, badgeGeneral, money, BotonAnular, BotonDesanular, BannerAnulado, bloqueadoPorPago, MensajeError,
 } from "./detalleShared";
+import { fusionarBloqueo } from "../utils/bloqueoPago";
+import AvisoAccion from "./AvisoAccion";
 
 const INP = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 w-full transition";
 const RO = "bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 text-sm text-gray-600 w-full";
@@ -95,7 +97,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
   // Mismo criterio que DetalleCotizacion.jsx/ModalNuevaCotizacion.jsx —
   // Planner puede ver el card de Cotización (ver más abajo) pero nunca su monto.
   const puedeVerPrecios = ["admin", "facturacion", "jefatura"].includes(rolActual);
-  const cadenaCerrada = bloqueadoPorCadenaCerrada(ot.estadoCadena, rolActual);
+  const bloqueada = bloqueadoPorPago(ot, rolActual);
   // Estado (Encargado Intervención) y Progreso (Encargado Prueba) son cards
   // independientes del fieldset principal — un técnico no edita el resto de
   // la OT, solo la tarjeta que le corresponde según si su nombre de usuario
@@ -121,6 +123,10 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
   // Un informe ya aprobado no lo edita nadie — hay que desaprobarlo primero
   // (checkbox de arriba) para poder corregirlo.
   const puedeEditarInformeAprobado = false;
+  // Con la OT o el informe pagados solo Jefatura lo corrige, aunque esté aprobado (backend: PUT /informes-tecnicos/:id).
+  const puedeModificarInforme = (inf) => !inf.anulado && ((inf.bloqueadoPorPago ?? ot.bloqueadoPorPago)
+    ? rolActual === "jefatura"
+    : (inf.aprobado ? puedeEditarInformeAprobado : puedeEditarInformeNoAprobado));
   // Mismo set de roles que ya tiene acceso a /facturacion-electronica/guias —
   // técnico (y cualquier otro rol sin acceso a esa ruta) no ve este card.
   const puedeGenerarGRE = ["admin", "asistente", "facturacion", "almacenero", "jefatura", "planner", "coordinadora"].includes(rolActual);
@@ -130,6 +136,8 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
   const [cot, setCot] = useState(ot.cotizacion || null);
   const [oc, setOc] = useState(null);
   const [factura, setFactura] = useState(null);
+  // POST /ordenes-compra/partidas responde 400 con la cotización pagada (o cerrada en lo histórico).
+  const ocBloqueada = rolActual !== "jefatura" && (!!cot?.bloqueadoPorPago || cot?.estadoCadena === "cerrado");
   const [informes, setInformes] = useState([]);
   const [subOTs, setSubOTs] = useState([]);
   const [greMap, setGreMap] = useState({});
@@ -303,7 +311,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
     });
     if (res.ok) {
       const actualizada = await res.json();
-      setOt(actualizada);
+      setOt((prev) => fusionarBloqueo(prev, actualizada));
       setForm((f) => ({ ...f, estado: actualizada.estado }));
     }
   };
@@ -314,7 +322,10 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ estadoPrueba: nuevo }),
     });
-    if (res.ok) setOt(await res.json());
+    if (res.ok) {
+      const actualizada = await res.json();
+      setOt((prev) => fusionarBloqueo(prev, actualizada));
+    }
   };
 
   const cambiarEncargado = async (campo, nombre) => {
@@ -325,7 +336,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
     });
     if (res.ok) {
       const actualizada = await res.json();
-      setOt(actualizada);
+      setOt((prev) => fusionarBloqueo(prev, actualizada));
       setForm((f) => ({ ...f, [campo]: actualizada[campo] }));
     }
   };
@@ -337,7 +348,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
       body: JSON.stringify({ motivo }),
     });
     if (res.ok) {
-      const actualizada = await res.json();
+      const actualizada = fusionarBloqueo(ot, await res.json());
       setOt(actualizada);
       onGuardada?.(actualizada);
     } else {
@@ -348,26 +359,11 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
   const desanular = async () => {
     const res = await fetchAuth(`/ordenes-trabajo/${ot._id}/desanular`, { method: "PATCH" });
     if (res.ok) {
-      const actualizada = await res.json();
+      const actualizada = fusionarBloqueo(ot, await res.json());
       setOt(actualizada);
       onGuardada?.(actualizada);
     } else {
       return mensajeError(res, "Error al desanular el documento.");
-    }
-  };
-
-  const toggleCerrarCadena = async (cerrado) => {
-    const res = await fetchAuth(`/ordenes-trabajo/${ot._id}/cerrar-cadena`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cerrado }),
-    });
-    if (res.ok) {
-      const actualizada = await res.json();
-      setOt(actualizada);
-      onGuardada?.(actualizada);
-    } else {
-      return mensajeError(res, "Error al cerrar/abrir la cadena.");
     }
   };
 
@@ -377,6 +373,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
   // el detalle de la cotización, vía ítems) era trabajo duplicado.
   const [confirmandoCrearCotizacion, setConfirmandoCrearCotizacion] = useState(false);
   const [creandoCotizacion, setCreandoCotizacion] = useState(false);
+  const [aviso, setAviso] = useState("");
   const [confirmandoDuplicar, setConfirmandoDuplicar] = useState(false);
   const [duplicando, setDuplicando] = useState(false);
 
@@ -399,6 +396,17 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
 
   const crearCotizacion = async () => {
     setCreandoCotizacion(true);
+    try {
+      await crearYVincularCotizacion();
+    } catch {
+      setAviso("No se pudo conectar con el servidor. Revisa en Cotizaciones si la cotización llegó a crearse antes de intentarlo de nuevo.");
+    } finally {
+      setCreandoCotizacion(false);
+      setConfirmandoCrearCotizacion(false);
+    }
+  };
+
+  const crearYVincularCotizacion = async () => {
     const numRes = await fetchAuth("/cotizaciones/siguiente-numero-cotizacion");
     const { siguiente } = numRes.ok ? await numRes.json() : { siguiente: "" };
 
@@ -434,15 +442,19 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    if (!res.ok) { setError("Error al crear la cotización."); setCreandoCotizacion(false); setConfirmandoCrearCotizacion(false); return; }
+    if (!res.ok) { setAviso(await mensajeError(res, "Error al crear la cotización.")); return; }
     const nueva = await res.json();
-    await fetchAuth(`/ordenes-trabajo/${ot._id}/vincular-cotizacion`, {
+    const resVinculo = await fetchAuth(`/ordenes-trabajo/${ot._id}/vincular-cotizacion`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ cotizacion: nueva._id }),
     });
-    setCreandoCotizacion(false);
-    setConfirmandoCrearCotizacion(false);
+    // Sin el vínculo la cotización queda suelta: se avisa con su número para ubicarla en la lista.
+    if (!resVinculo.ok) {
+      const motivo = await mensajeError(resVinculo, "error al vincularla");
+      setAviso(`Se creó la cotización ${nueva.numeroCotizacion || nueva.codigo}, pero no quedó vinculada a esta OT: ${motivo}`);
+      return;
+    }
     onNavegar?.({ tipo: "cotizacion", data: nueva });
   };
 
@@ -565,10 +577,9 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
                 Duplicar
               </button>
             )}
-            {!ot.anulado && !cadenaCerrada && puedeAnular && <BotonAnular onAnular={anular} />}
+            {!ot.anulado && !bloqueada && puedeAnular && <BotonAnular onAnular={anular} />}
             {esAdmin && ot.anulado && <BotonDesanular onDesanular={desanular} />}
-            {esAdmin && <BotonCerrarCadena cerrado={cadenaCerrada} onToggle={toggleCerrarCadena} />}
-            {!ot.anulado && !cadenaCerrada && puedeEditarCampos && (
+            {!ot.anulado && !bloqueada && puedeEditarCampos && (
               <button onClick={guardar} disabled={guardando}
                 className="bg-white text-indigo-700 text-sm px-5 py-2 rounded-lg hover:bg-indigo-50 disabled:opacity-60 transition font-semibold shadow-sm shrink-0">
                 {guardando ? "Guardando…" : "Guardar cambios"}
@@ -593,7 +604,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
               edita la que le corresponde según encargado/encargado2. */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-2">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Progreso — Encargado Prueba</p>
-            <select value={ot.encargado || ""} disabled={ot.anulado || cadenaCerrada || !puedeEditarEncargados}
+            <select value={ot.encargado || ""} disabled={ot.anulado || bloqueada || !puedeEditarEncargados}
               onChange={(e) => cambiarEncargado("encargado", e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm disabled:bg-gray-50 disabled:text-gray-500">
               <option value="">Sin asignar</option>
@@ -603,7 +614,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
             </select>
             <div className="flex gap-2">
               {ESTADOS.map(e => (
-                <button key={e} type="button" disabled={hayHijasSanas || !puedeEditarEstadoPrueba}
+                <button key={e} type="button" disabled={hayHijasSanas || bloqueada || !puedeEditarEstadoPrueba}
                   onClick={() => cambiarEstadoPrueba(e)}
                   className={`flex-1 py-1.5 rounded-lg text-xs font-medium capitalize transition disabled:opacity-60 disabled:cursor-not-allowed ${colorEstado(e, ot.estadoPrueba === e)}`}>
                   {e}
@@ -615,7 +626,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
 
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-2">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Estado — Encargado Intervención</p>
-            <select value={ot.encargado2 || ""} disabled={ot.anulado || cadenaCerrada || !puedeEditarEncargados}
+            <select value={ot.encargado2 || ""} disabled={ot.anulado || bloqueada || !puedeEditarEncargados}
               onChange={(e) => cambiarEncargado("encargado2", e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm disabled:bg-gray-50 disabled:text-gray-500">
               <option value="">Sin asignar</option>
@@ -625,7 +636,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
             </select>
             <div className="flex gap-2">
               {ESTADOS.map(e => (
-                <button key={e} type="button" disabled={hayHijasSanas || !puedeEditarEstado}
+                <button key={e} type="button" disabled={hayHijasSanas || bloqueada || !puedeEditarEstado}
                   onClick={() => cambiarEstado(e)}
                   className={`flex-1 py-1.5 rounded-lg text-xs font-medium capitalize transition disabled:opacity-60 disabled:cursor-not-allowed ${colorEstado(e, ot.estado === e)}`}>
                   {e}
@@ -639,7 +650,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
         <div className="max-w-6xl mx-auto px-8 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
 
           {/* Datos editables */}
-          <fieldset disabled={ot.anulado || cadenaCerrada || !puedeEditarCampos} className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5 self-start">
+          <fieldset disabled={ot.anulado || bloqueada || !puedeEditarCampos} className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5 self-start">
             <div className="flex items-center gap-2">
               <span className="w-1.5 h-5 rounded-full bg-indigo-500" />
               <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Datos de la orden de trabajo</h2>
@@ -649,9 +660,9 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
               <BannerAnulado motivo={ot.motivoAnulacion} por={ot.anuladoPor} fecha={ot.fechaAnulacion} />
             )}
 
-            {!ot.anulado && cadenaCerrada && (
+            {!ot.anulado && bloqueada && (
               <p className="text-xs text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-                La cadena de este documento está cerrada (factura pagada) — de solo lectura. Solo Jefatura puede editarlo.
+                OT pagada — de solo lectura. Solo Jefatura puede editarla.
               </p>
             )}
 
@@ -852,7 +863,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
             {(!esVistaLimitada || rolActual === "planner") && (
               <TarjetaRelacion tipo="cotizacion" codigo={cot?.codigo} numero={cot?.numeroCotizacion} vacio={!cot}
                 onClick={cot ? () => onNavegar?.({ tipo: "cotizacion", data: cot }) : undefined}
-                onCrear={!cot && !ot.anulado ? () => setConfirmandoCrearCotizacion(true) : undefined} crearLabel="Cotización">
+                onCrear={!cot && !ot.anulado && !bloqueada ? () => setConfirmandoCrearCotizacion(true) : undefined} crearLabel="Cotización">
                 <p className="text-sm text-gray-700 line-clamp-2">{cot?.titulo}</p>
                 {puedeVerPrecios && cot?.total > 0 && <p className="text-xs text-gray-500">{money(cot.total, cot.moneda)}</p>}
               </TarjetaRelacion>
@@ -870,7 +881,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
                   Sub-Órdenes ({subOTs.length})
                 </p>
-                {!ot.anulado && !cadenaCerrada && !esTecnico && (
+                {!ot.anulado && !bloqueada && !esTecnico && (
                   <button type="button" onClick={() => setCrearSubOTOpen(true)}
                     className="text-xs text-blue-600 hover:text-blue-800 underline">
                     + Crear Sub-OT
@@ -916,7 +927,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
               numero={informes.length > 1 ? `${informes.length} informes` : undefined}
               vacio={informes.length === 0}
               onClick={!subOTs.length && ultimo ? () => setVerInforme(ultimo) : undefined}
-              onCrear={!subOTs.length && !ot.anulado && puedeEditarInformeNoAprobado ? () => setSeleccionarTipoOpen(true) : undefined}
+              onCrear={!subOTs.length && !ot.anulado && !bloqueada && puedeEditarInformeNoAprobado ? () => setSeleccionarTipoOpen(true) : undefined}
               crearLabel="informe">
               {subOTs.length > 0 ? (
                 <p className="text-xs text-gray-400">Ver informes por sub-OT (tabla abajo o en cada sub-OT)</p>
@@ -962,7 +973,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
             {!esVistaLimitada && (
               <TarjetaRelacion tipo="oc" codigo={oc?.codigo} numero={oc?.numeroOrden} vacio={!oc}
                 onClick={oc ? () => onNavegar?.({ tipo: "oc", data: oc, extra: factura }) : undefined}
-                onCrear={!oc && cot && !ot.anulado ? () => setCrearOCOpen(true) : undefined} crearLabel="OC">
+                onCrear={!oc && cot && !ot.anulado && !ocBloqueada ? () => setCrearOCOpen(true) : undefined} crearLabel="OC">
                 {puedeVerPrecios && oc?.monto > 0 && <p className="text-xs text-gray-500">{money(oc.monto, cot?.moneda)}</p>}
                 <ParteConsolidada oc={oc} cotizacionId={cot?._id} moneda={cot?.moneda} verPrecios={puedeVerPrecios} />
               </TarjetaRelacion>
@@ -992,7 +1003,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
                   </h2>
                 </div>
                 <div className="flex items-center gap-2">
-                {!subOTs.length && !ot.anulado && puedeEditarInformeNoAprobado && (
+                {!subOTs.length && !ot.anulado && !bloqueada && puedeEditarInformeNoAprobado && (
                   <button type="button" onClick={() => setSeleccionarTipoOpen(true)}
                     className="text-sm border border-teal-600 text-teal-700 px-4 py-2 rounded-lg hover:bg-teal-50 transition font-medium">
                     + Nuevo informe
@@ -1145,7 +1156,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
         )}
 
         <TarjetaDatosAdjuntos ordenId={ot._id} archivos={ot.archivos || []}
-          soloLectura={ot.anulado || cadenaCerrada} onCambio={setOt} />
+          soloLectura={ot.anulado || bloqueada} onCambio={(o) => setOt((prev) => fusionarBloqueo(prev, o))} />
       </div>
 
       {crearRequerimientoOpen && (
@@ -1227,7 +1238,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
           ordenTrabajo={ot}
           onClose={() => setVerInforme(null)}
           onModificar={
-            (verInforme.aprobado ? puedeEditarInformeAprobado : puedeEditarInformeNoAprobado) && !verInforme.anulado
+            puedeModificarInforme(verInforme)
               ? () => { setEditandoInforme(verInforme); setVerInforme(null); }
               : undefined
           }
@@ -1240,9 +1251,11 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
           tipo={editandoInforme.tipo}
           informeExistente={editandoInforme}
           onClose={() => setEditandoInforme(null)}
-          onGuardado={(informe) => { setEditandoInforme(null); cargarRelaciones(); setVerInforme(informe); }}
+          onGuardado={(informe) => { setVerInforme(fusionarBloqueo(editandoInforme, informe)); setEditandoInforme(null); cargarRelaciones(); }}
         />
       )}
+
+      {aviso && <AvisoAccion mensaje={aviso} onCerrar={() => setAviso("")} />}
 
       {empresasOpen && (
         <SelectorEmpresas

@@ -32,8 +32,11 @@ export default function TablaItemsCotizacionGloria({
   items, onItemsChange, puedeEditar, disabled, puedeVerPrecios = true,
   seleccionables = false, seleccionados = new Set(), onToggleSeleccion, onGenerarOT, generando = false, onVerOT, onQuitarOT, puedeQuitarOT = false,
   seleccionablesOC = false, seleccionadosOC = new Set(), onToggleSeleccionOC, onGenerarOC, onVerOC,
+  esFacturado = () => false, ocBloqueada = false,
 }) {
   const editable = puedeEditar && !disabled;
+  // Lo facturado no cambia de monto ni de descripción, ni para Jefatura (el backend responde 400).
+  const editableItem = (item) => editable && !esFacturado(item);
   // Qué grupo (clave de GRUPOS_GLORIA) recibe lo elegido en el catálogo —
   // "grupo" acá es el de la cotización (Materiales, Mano de Obra, etc.), no
   // el "grupo" propio del catálogo de servicios (categorías de texto libre,
@@ -79,7 +82,7 @@ export default function TablaItemsCotizacionGloria({
       <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
         <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Ítems (formato Gloria)</h2>
         <div className="flex items-center gap-2">
-          {seleccionablesOC && <BotonGenerarOC cantidad={seleccionadosOC.size} onClick={onGenerarOC} />}
+          {seleccionablesOC && !ocBloqueada && <BotonGenerarOC cantidad={seleccionadosOC.size} onClick={onGenerarOC} />}
           {seleccionables && seleccionados.size > 0 && (
             <button type="button" onClick={onGenerarOT} disabled={generando}
               className="bg-emerald-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-emerald-700 disabled:opacity-60 transition font-medium">
@@ -182,16 +185,20 @@ export default function TablaItemsCotizacionGloria({
                           )}
                           {seleccionablesOC && (
                             <CeldaOCItem item={item} idx={idx} seleccionados={seleccionadosOC} className="px-3 py-2"
-                              onToggle={onToggleSeleccionOC} onVerOC={onVerOC} />
+                              onToggle={onToggleSeleccionOC} onVerOC={onVerOC} deshabilitado={ocBloqueada} />
                           )}
                           <td className="px-3 py-2">
-                            {editable ? (
+                            {editableItem(item) ? (
                               <input value={item.descripcion}
                                 onChange={(e) => handleItem(item._key, "descripcion", e.target.value)}
                                 placeholder="Descripción"
                                 className={`w-full border border-transparent rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-sky-300 focus:border-sky-300 ${descripcionInvalida(item) ? "border-red-200" : ""}`} />
                             ) : (
-                              <p className="text-gray-700">{item.descripcion}</p>
+                              <p className="text-gray-700">
+                                {item.descripcion}
+                                {esFacturado(item) && <span title="Ítem en una partida facturada: su descripción y montos no se pueden cambiar"
+                                className="ml-2 text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-full px-1.5 py-0.5">Facturado</span>}
+                              </p>
                             )}
                             <ListaSubItems subItems={item.subItems} editable={editable}
                               onChange={(subs) => setSubItems(item._key, subs)} />
@@ -205,20 +212,20 @@ export default function TablaItemsCotizacionGloria({
                           {esManoObra ? (
                             <>
                               <td className="px-3 py-2">
-                                <input type="number" min="0" step="1" value={item.personas} disabled={!editable}
+                                <input type="number" min="0" step="1" value={item.personas} disabled={!editableItem(item)}
                                   onChange={(e) => handleItem(item._key, "personas", parseFloat(e.target.value) || 0)}
-                                  className={`w-full text-center ${editable ? INP : INP_RO}`} />
+                                  className={`w-full text-center ${editableItem(item) ? INP : INP_RO}`} />
                               </td>
                               <td className="px-3 py-2">
-                                <input type="number" min="0" step="0.5" value={item.horas} disabled={!editable}
+                                <input type="number" min="0" step="0.5" value={item.horas} disabled={!editableItem(item)}
                                   onChange={(e) => handleItem(item._key, "horas", parseFloat(e.target.value) || 0)}
-                                  className={`w-full text-center ${editable ? INP : INP_RO}`} />
+                                  className={`w-full text-center ${editableItem(item) ? INP : INP_RO}`} />
                               </td>
                               {puedeVerPrecios && (
                                 <td className="px-3 py-2">
-                                  <input type="number" min="0" step="0.01" value={item.tarifaHora} disabled={!editable}
+                                  <input type="number" min="0" step="0.01" value={item.tarifaHora} disabled={!editableItem(item)}
                                     onChange={(e) => handleItem(item._key, "tarifaHora", parseFloat(e.target.value) || 0)}
-                                    className={`w-full text-right ${editable ? INP : INP_RO}`} />
+                                    className={`w-full text-right ${editableItem(item) ? INP : INP_RO}`} />
                                 </td>
                               )}
                             </>
@@ -232,15 +239,15 @@ export default function TablaItemsCotizacionGloria({
                                 </select>
                               </td>
                               <td className="px-3 py-2">
-                                <input type="number" min="0" step="1" value={item.cantidad} disabled={!editable}
+                                <input type="number" min="0" step="1" value={item.cantidad} disabled={!editableItem(item)}
                                   onChange={(e) => handleItem(item._key, "cantidad", parseFloat(e.target.value) || 0)}
-                                  className={`w-full text-center ${editable ? INP : INP_RO}`} />
+                                  className={`w-full text-center ${editableItem(item) ? INP : INP_RO}`} />
                               </td>
                               {puedeVerPrecios && (
                                 <td className="px-3 py-2">
-                                  <input type="number" min="0" step="0.01" value={item.precio} disabled={!editable}
+                                  <input type="number" min="0" step="0.01" value={item.precio} disabled={!editableItem(item)}
                                     onChange={(e) => handleItem(item._key, "precio", parseFloat(e.target.value) || 0)}
-                                    className={`w-full text-right ${editable ? INP : INP_RO}`} />
+                                    className={`w-full text-right ${editableItem(item) ? INP : INP_RO}`} />
                                 </td>
                               )}
                             </>
@@ -252,7 +259,9 @@ export default function TablaItemsCotizacionGloria({
                           )}
                           {editable && (
                             <td className="px-3 py-2 text-center">
-                              {item.otGenerada || item.ocGenerada ? (
+                              {esFacturado(item) ? (
+                                <span title="Ítem facturado: no se puede quitar" className="text-gray-300 cursor-not-allowed">🔒</span>
+                              ) : item.otGenerada || item.ocGenerada ? (
                                 <span title="Tiene OT u OC generada: desvincúlala antes de quitar el ítem"
                                   className="text-gray-300 cursor-not-allowed">🔒</span>
                               ) : (

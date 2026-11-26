@@ -22,6 +22,7 @@ export default function TablaItemsCotizacion({
   seleccionables = false, seleccionados = new Set(), onToggleSeleccion, onGenerarOT, generando = false, onVerOT, onQuitarOT, puedeQuitarOT = false,
   seleccionablesOC = false, seleccionadosOC = new Set(), onToggleSeleccionOC, onGenerarOC, onVerOC,
   puedeVerPrecios = true,
+  esFacturado = () => false, ocBloqueada = false,
 }) {
   const [catalogoOpen, setCatalogoOpen] = useState(false);
   const [catalogoTarget, setCatalogoTarget] = useState(null); // null = "+ Agregar ítem de plantilla" (fusiona/crea fila); _key = agregar descripción a esa fila puntual
@@ -34,6 +35,8 @@ export default function TablaItemsCotizacion({
   // "enviada" seguía siendo editable ítem por ítem pese al `disabled`.
   const editable = puedeEditar && !disabled;
   const puedeAgregar = editable;
+  // Lo facturado no cambia de monto ni de descripción, ni para Jefatura (el backend responde 400).
+  const editableItem = (item) => editable && !esFacturado(item);
 
   const handleItem = (key, campo, valor) =>
     onItemsChange(items.map(i => (i._key === key ? { ...i, [campo]: valor } : i)));
@@ -108,7 +111,7 @@ export default function TablaItemsCotizacion({
           </h2>
         </div>
         <div className="flex items-center gap-2">
-          {seleccionablesOC && <BotonGenerarOC cantidad={seleccionadosOC.size} onClick={onGenerarOC} />}
+          {seleccionablesOC && !ocBloqueada && <BotonGenerarOC cantidad={seleccionadosOC.size} onClick={onGenerarOC} />}
           {seleccionables && seleccionados.size > 0 && (
             <button type="button" onClick={onGenerarOT} disabled={generando}
               className="bg-emerald-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-emerald-700 disabled:opacity-60 transition font-medium">
@@ -190,17 +193,21 @@ export default function TablaItemsCotizacion({
                   )}
                   {seleccionablesOC && (
                     <CeldaOCItem item={item} idx={idx} seleccionados={seleccionadosOC}
-                      onToggle={onToggleSeleccionOC} onVerOC={onVerOC} />
+                      onToggle={onToggleSeleccionOC} onVerOC={onVerOC} deshabilitado={ocBloqueada} />
                   )}
                   <td className="px-3 py-3 text-center text-gray-400">{idx + 1}</td>
                   <td className="px-3 py-3">
-                    {editable ? (
+                    {editableItem(item) ? (
                       <input value={item.descripcion}
                         onChange={(e) => handleItem(item._key, "descripcion", e.target.value)}
                         placeholder="Descripción del ítem"
                         className={`w-full font-semibold text-gray-800 text-xs uppercase tracking-wide border border-transparent rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-sky-300 focus:border-sky-300 ${intentoGuardar && descripcionInvalida(item) ? "border-red-400 ring-1 ring-red-300" : ""}`} />
                     ) : (
-                      <p className="font-semibold text-gray-800 text-xs uppercase tracking-wide">{item.descripcion}</p>
+                      <p className="font-semibold text-gray-800 text-xs uppercase tracking-wide">
+                        {item.descripcion}
+                        {esFacturado(item) && <span title="Ítem en una partida facturada: su descripción y montos no se pueden cambiar"
+                        className="ml-2 text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-full px-1.5 py-0.5 normal-case tracking-normal">Facturado</span>}
+                      </p>
                     )}
                     <ListaSubItems subItems={item.subItems} editable={editable}
                       onChange={(subs) => setSubItems(item._key, subs)} />
@@ -227,15 +234,15 @@ export default function TablaItemsCotizacion({
                     </select>
                   </td>
                   <td className="px-3 py-3">
-                    <input type="number" min="0" step="1" value={item.cantidad} disabled={!editable}
+                    <input type="number" min="0" step="1" value={item.cantidad} disabled={!editableItem(item)}
                       onChange={(e) => handleItem(item._key, "cantidad", parseFloat(e.target.value) || 0)}
-                      className={`w-full text-center ${editable ? INP : "bg-transparent border-transparent text-sm px-2 py-1"} ${intentoGuardar && cantidadInvalida(item) ? "border-red-400 ring-1 ring-red-300" : ""}`} />
+                      className={`w-full text-center ${editableItem(item) ? INP : "bg-transparent border-transparent text-sm px-2 py-1"} ${intentoGuardar && cantidadInvalida(item) ? "border-red-400 ring-1 ring-red-300" : ""}`} />
                   </td>
                   {puedeVerPrecios && (
                     <td className="px-3 py-3">
-                      <input type="number" min="0" step="0.01" value={item.precio} disabled={!editable}
+                      <input type="number" min="0" step="0.01" value={item.precio} disabled={!editableItem(item)}
                         onChange={(e) => handleItem(item._key, "precio", parseFloat(e.target.value) || 0)}
-                        className={`w-full text-right ${editable ? INP : "bg-transparent border-transparent text-sm px-2 py-1"} ${intentoGuardar && precioInvalido(item) ? "border-red-400 ring-1 ring-red-300" : ""}`} />
+                        className={`w-full text-right ${editableItem(item) ? INP : "bg-transparent border-transparent text-sm px-2 py-1"} ${intentoGuardar && precioInvalido(item) ? "border-red-400 ring-1 ring-red-300" : ""}`} />
                     </td>
                   )}
                   {puedeVerPrecios && (
@@ -245,7 +252,9 @@ export default function TablaItemsCotizacion({
                   )}
                   {puedeEditar && (
                     <td className="px-3 py-3 text-center">
-                      {editable && (item.otGenerada || item.ocGenerada ? (
+                      {editable && (esFacturado(item) ? (
+                        <span title="Ítem facturado: no se puede quitar" className="text-gray-300 cursor-not-allowed">🔒</span>
+                      ) : item.otGenerada || item.ocGenerada ? (
                         <span title="Tiene OT u OC generada: desvincúlala antes de quitar el ítem"
                           className="text-gray-300 cursor-not-allowed">🔒</span>
                       ) : (

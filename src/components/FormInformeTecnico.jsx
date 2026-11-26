@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { fetchAuth, uploadAuth, getUsuario } from "../utils/fetchAuth";
+import { fetchAuth, uploadAuth, getUsuario, mensajeError } from "../utils/fetchAuth";
+import { bloqueadoPorPago } from "./detalleShared";
 import { formatearFecha, fechaHoyLima, aInputFecha } from "../utils/fecha";
 import { tipoInformePorValor, claveChecklist } from "../utils/informesTecnicos";
 import ImagenProtegida from "./ImagenProtegida";
@@ -401,6 +402,11 @@ function SeccionEvidencias({ seccion, campos, onCampos }) {
 export default function FormInformeTecnico({ ordenTrabajo, tipo, informeExistente, onClose, onGuardado }) {
   const def = tipoInformePorValor(tipo);
   const esEdicion = !!informeExistente;
+  // Un informe nuevo hereda el bloqueo de su OT; las respuestas de POST/PUT no traen el flag.
+  const bloqueado = bloqueadoPorPago(
+    { bloqueadoPorPago: informeExistente?.bloqueadoPorPago ?? ordenTrabajo?.bloqueadoPorPago },
+    getUsuario()?.rol,
+  );
   // Cabecera "Datos generales" (CAMPOS_HEADER_SERVICIO/CAMPOS_HEADER_SOPORTE
   // en informesTecnicos.js) se repite igual en las 13 plantillas — se
   // autocompleta desde la OT para no volver a escribirla en cada informe.
@@ -492,21 +498,26 @@ export default function FormInformeTecnico({ ordenTrabajo, tipo, informeExistent
     const payload = esEdicion
       ? { campos, hechoPor, vB, fecha: fecha || null }
       : { ordenTrabajo: ordenTrabajo._id, tipo, campos, hechoPor, vB, fecha: fecha || null };
-    const res = await fetchAuth(
-      esEdicion ? `/informes-tecnicos/${informeExistente._id}` : "/informes-tecnicos",
-      {
-        method: esEdicion ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+    try {
+      const res = await fetchAuth(
+        esEdicion ? `/informes-tecnicos/${informeExistente._id}` : "/informes-tecnicos",
+        {
+          method: esEdicion ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        onGuardado(data);
+      } else {
+        setError(await mensajeError(res, "Error al guardar el informe."));
       }
-    );
-    if (res.ok) {
-      const data = await res.json();
-      onGuardado(data);
-    } else {
-      setError("Error al guardar el informe.");
+    } catch {
+      setError("No se pudo conectar con el servidor. Tus cambios siguen en pantalla: inténtalo de nuevo.");
+    } finally {
+      setGuardando(false);
     }
-    setGuardando(false);
   };
 
   if (!def) return null;
@@ -550,6 +561,11 @@ export default function FormInformeTecnico({ ordenTrabajo, tipo, informeExistent
 
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-4xl mx-auto px-8 py-8 space-y-5">
+          {bloqueado && (
+            <p className="text-xs text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+              La OT de este informe ya está pagada — de solo lectura. Solo Jefatura puede editarlo.
+            </p>
+          )}
           {gruposSecciones.map((grupo, i) => grupo.length === 2 ? (
             <div key={i} className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
               {grupo.map((seccion, j) => renderSeccion(seccion, j))}
@@ -581,7 +597,7 @@ export default function FormInformeTecnico({ ordenTrabajo, tipo, informeExistent
         <button type="button" onClick={onClose} className="text-sm border border-gray-300 px-5 py-2.5 rounded-lg hover:bg-gray-50 transition">
           Cancelar
         </button>
-        <button type="button" onClick={guardar} disabled={guardando}
+        <button type="button" onClick={guardar} disabled={guardando || bloqueado}
           className="text-sm bg-amber-500 text-white px-5 py-2.5 rounded-lg hover:bg-amber-600 disabled:opacity-50 transition font-medium">
           {guardando ? "Guardando…" : esEdicion ? "Guardar cambios" : "Guardar informe"}
         </button>

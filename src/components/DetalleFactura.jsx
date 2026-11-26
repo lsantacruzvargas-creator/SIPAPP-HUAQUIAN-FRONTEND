@@ -6,9 +6,10 @@ import { generarFacturaPdf } from "../utils/facturaPdf";
 import { lineasConsolidadas } from "../utils/cotizacionItems";
 import {
   FlujoNegocio, TarjetaRelacion, Chip,
-  badgeGeneral, badgePago, money, BotonAnular, BannerAnulado, bloqueadoPorCadenaCerrada, MensajeError,
+  badgeGeneral, badgePago, money, BotonAnular, BannerAnulado, bloqueadoPorPago, MensajeError,
 } from "./detalleShared";
 import { r2, r0 } from "../utils/redondeo";
+import { fusionarBloqueo } from "../utils/bloqueoPago";
 
 const INP    = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 w-full transition";
 const INP_RO = "border border-gray-100 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500 w-full cursor-not-allowed";
@@ -107,7 +108,7 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
   // el resto de vistas de detalle (ver DetalleOrdenTrabajo/DetalleCotizacion/
   // DetalleOrdenCompra.jsx).
   const puedeVerPrecios = ["admin", "facturacion", "jefatura"].includes(rolActual);
-  const cadenaCerrada = bloqueadoPorCadenaCerrada(inicial.estadoCadena, rolActual);
+  const bloqueada = bloqueadoPorPago(inicial, rolActual);
   const cpeAceptado = !!inicial.comprobanteEmitido;
 
   const abrirOC = async () => {
@@ -229,8 +230,6 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
       codigoSap:          form.codigoSap,
       conformidad:        form.conformidad,
       fechaSalida:        form.fechaSalida || null,
-      montoPagado:        inicial.montoPagado,
-      estadoPago:         inicial.estadoPago,
       ordenCompra:        ocVinculada?._id || null,
     };
     if (form.fechaCancelacion) payload.fechaCancelacion = form.fechaCancelacion;
@@ -317,7 +316,7 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ motivo }),
     });
-    if (res.ok) { onGuardada(await res.json()); }
+    if (res.ok) { onGuardada(fusionarBloqueo(inicial, await res.json())); }
     else { return mensajeError(res, "Error al anular el documento."); }
   };
 
@@ -367,7 +366,7 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
                 className="border border-white/40 text-white text-sm px-4 py-2 rounded-lg hover:bg-white/10 disabled:opacity-60 transition font-semibold shrink-0">
                 {imprimiendo ? "Generando…" : "Imprimir PDF"}
               </button>
-              {!inicial.anulado && !cadenaCerrada && puedeEditar && (cpeAceptado ? (
+              {!inicial.anulado && !bloqueada && puedeEditar && (cpeAceptado ? (
                 <button onClick={emitirNotaCredito}
                   className="text-xs text-white/70 hover:text-white underline transition">
                   Emitir nota de crédito
@@ -375,7 +374,7 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
               ) : (
                 <BotonAnular onAnular={anular} />
               ))}
-              {!inicial.anulado && !cadenaCerrada && puedeEditar && (
+              {!inicial.anulado && !bloqueada && puedeEditar && (
                 <button onClick={guardar} disabled={guardando}
                   className="bg-white text-emerald-700 text-sm px-5 py-2 rounded-lg hover:bg-emerald-50 disabled:opacity-60 transition font-semibold shadow-sm shrink-0">
                   {guardando ? "Guardando…" : "Guardar cambios"}
@@ -397,7 +396,7 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
         <div className="max-w-6xl mx-auto px-8 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
 
           {/* Datos editables */}
-          <fieldset disabled={inicial.anulado || cadenaCerrada || !puedeEditar} className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5 self-start">
+          <fieldset disabled={inicial.anulado || bloqueada || !puedeEditar} className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5 self-start">
             <div className="flex items-center gap-2">
               <span className="w-1.5 h-5 rounded-full bg-emerald-500" />
               <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Datos de la factura</h2>
@@ -407,9 +406,9 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
               <BannerAnulado motivo={inicial.motivoAnulacion} por={inicial.anuladoPor} fecha={inicial.fechaAnulacion} />
             )}
 
-            {!inicial.anulado && cadenaCerrada && (
+            {!inicial.anulado && bloqueada && (
               <p className="text-xs text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-                La cadena de este documento está cerrada (factura pagada) — de solo lectura. Solo Jefatura puede editarlo.
+                Factura pagada — de solo lectura. Solo Jefatura puede editarla.
               </p>
             )}
 
