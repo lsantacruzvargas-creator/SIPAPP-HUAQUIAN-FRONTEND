@@ -276,9 +276,12 @@ function TablaOC({
               const otPadre = grupoOT?.parent || null;
               const { pen, usd } = totalesDuales(o.monto, o.cotizacion?.moneda, tipoCambio);
               const partidas = o.partidas || [];
-              const conPartidas = partidas.length > 0;
+              // Una sola partida: una única fila con los datos de la OC y los estados de esa partida.
+              const unica = partidas.length === 1 ? partidas[0] : null;
+              const conPartidas = partidas.length > 1;
               const estadoFact = o.estadoFacturacion;
               const abierta = conPartidas && !colapsadas.includes(o._id);
+              const otsUnica = unica ? otsCot[idCotDe(unica)] || [] : [];
               const seleccionables = puedeFacturarOC(o)
                 ? partidas.filter((p) => estadoDePartida(o, p)?.estado === "sin facturar").map((p) => p._id)
                 : [];
@@ -288,7 +291,7 @@ function TablaOC({
                 ? `Ya hay partidas seleccionadas de ${seleccion.oc.numeroOrden || seleccion.oc.codigo}: se factura una sola OC a la vez.`
                 : undefined;
 
-              // Con partidas, los estados de cotización/servicio/informes/GRE y la facturación son de
+              // Con varias partidas, los estados de cotización/servicio/informes/GRE y la facturación son de
               // cada partida (sub-filas); la fila de la OC solo lleva sus datos propios y el avance k/N.
               const filaPrincipal = (
                 <tr key={o._id}
@@ -305,7 +308,12 @@ function TablaOC({
                   </td>
                   {hayCheck && (
                     <td className="px-2 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
-                      {seleccionables.length > 0 && (
+                      {unica ? seleccionables.length > 0 && (
+                        <input type="checkbox" aria-label={`Seleccionar la partida sin facturar de ${o.numeroOrden || o.codigo}`}
+                          title={avisoOtraOC} checked={deEstaOC && seleccion.partidas.includes(unica._id)} disabled={otraOC}
+                          onChange={() => onTogglePartida(o, unica._id)}
+                          className="w-4 h-4 disabled:cursor-not-allowed" />
+                      ) : seleccionables.length > 0 && (
                         <CheckOC marcadas={deEstaOC ? seleccion.partidas.length : 0} total={seleccionables.length}
                           disabled={otraOC} title={avisoOtraOC}
                           label={`Seleccionar las partidas sin facturar de ${o.numeroOrden || o.codigo}`}
@@ -315,11 +323,15 @@ function TablaOC({
                   )}
                   <td className="px-4 py-3.5 font-semibold text-gray-800 whitespace-nowrap">
                     {conPartidas
-                      ? <span className="text-xs font-normal text-gray-500">{partidas.length} partida{partidas.length !== 1 ? "s" : ""}</span>
-                      : o.cotizacion?.numeroCotizacion || <span className="text-gray-300">—</span>}
+                      ? <span className="text-xs font-normal text-gray-500">{partidas.length} partidas</span>
+                      : unica
+                        ? unica.cotizacion?.numeroCotizacion || unica.cotizacion?.codigo || <span className="text-gray-300">—</span>
+                        : o.cotizacion?.numeroCotizacion || <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-4 py-3.5 font-semibold text-gray-800 whitespace-nowrap">
-                    {conPartidas ? null : otPadre?.numeroOT || <span className="text-gray-300 font-sans">Sin OT</span>}
+                    {conPartidas ? null : unica
+                      ? otsUnica.map(numeroOTDe).join(", ") || <span className="text-gray-300 font-sans">Sin OT</span>
+                      : otPadre?.numeroOT || <span className="text-gray-300 font-sans">Sin OT</span>}
                   </td>
                   <td className="px-4 py-3.5 font-semibold text-gray-800 max-w-[220px]">
                     <div className="flex items-center gap-1.5 flex-wrap break-words">
@@ -346,7 +358,8 @@ function TablaOC({
                       <span className="text-xs text-gray-500 tabular-nums" title={`${facturadasDe(o)} de ${partidas.length} partidas facturadas`}>
                         {facturadasDe(o)}/{partidas.length} facturadas
                       </span>
-                    ) : estadoFact?.estado ? (
+                    ) : unica ? <CeldaFacturacionPartida estado={estadoDePartida(o, unica)} />
+                    : estadoFact?.estado ? (
                       <span className="flex items-center gap-1.5">
                         <Chip className={BADGE_FACTURACION[estadoFact.estado] || "bg-gray-100 text-gray-500"}>{estadoFact.estado}</Chip>
                         {estadoFact.reservada && (
@@ -358,10 +371,21 @@ function TablaOC({
                     ) : <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-4 py-3.5 text-gray-700">{o.empresa?.razonSocial || "—"}</td>
-                  {columnaTitulo && <td className="px-4 py-3.5 text-gray-600">{mostrarTitulo && o.titulo}</td>}
+                  {columnaTitulo && (
+                    <td className="px-4 py-3.5 text-gray-600">
+                      {mostrarTitulo ? o.titulo : unica && (unica.titulo || unica.cotizacion?.titulo)}
+                    </td>
+                  )}
                   {puedeVerPrecios && <td className="px-4 py-3.5 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap">{celdaMonto(pen)}</td>}
                   {puedeVerPrecios && <td className="px-4 py-3.5 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap">{celdaMonto(usd)}</td>}
-                  {conPartidas ? celdasVacias(4, "e") : (
+                  {conPartidas ? celdasVacias(4, "e") : unica ? (
+                    <>
+                      <td className="px-4 py-3.5 text-center"><ChipsCotizacion cot={unica.cotizacion} /></td>
+                      <td className="px-4 py-3.5 text-center"><EstadosPorOT ots={otsUnica} render={chipServicio} vacio="Sin OT" /></td>
+                      <td className="px-4 py-3.5 text-center"><EstadosPorOT ots={otsUnica} render={chipInformes} vacio="—" /></td>
+                      <td className="px-4 py-3.5 text-center"><EstadosPorOT ots={otsUnica} render={(ot) => chipGRE(greMap[ot._id])} vacio="Sin GRE" /></td>
+                    </>
+                  ) : (
                     <>
                       <td className="px-4 py-3.5 text-center"><ChipsCotizacion cot={o.cotizacion} /></td>
                       <td className="px-4 py-3.5 text-center">
@@ -465,9 +489,10 @@ function TablaOC({
               });
 
               // Legado (sin partidas): las sub-OTs se agrupan por el numeroDocumento de la OC.
-              const filasSub = conPartidas ? [] : (grupoOT?.subs || []).map((s) => filaSub(o, s, s._id));
+              const filasSub = partidas.length ? [] : (grupoOT?.subs || []).map((s) => filaSub(o, s, s._id));
+              const filasSubUnica = otsUnica.flatMap((ot) => subsOT[ot._id] || []).map((s) => filaSub(o, s, `${o._id}-${s._id}`));
 
-              return [filaPrincipal, ...filasPartida, ...filasSub];
+              return [filaPrincipal, ...filasPartida, ...filasSub, ...filasSubUnica];
             })}
           </tbody>
         </table>
