@@ -13,6 +13,7 @@ import ModalNuevaSubOT from "./ModalNuevaSubOT";
 import ModalRequerimiento from "./ModalRequerimiento";
 import TablaServiciosExternos from "./TablaServiciosExternos";
 import TarjetaDatosAdjuntos from "./TarjetaDatosAdjuntos";
+import TarjetaObservaciones from "./TarjetaObservaciones";
 import TablaScroll from "./TablaScroll";
 import ModalGenerarGRE from "./ModalGenerarGRE";
 import ModalDetalleGuia from "./ModalDetalleGuia";
@@ -598,7 +599,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-6xl mx-auto px-8 pt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="max-w-6xl xl:max-w-[96rem] mx-auto px-8 pt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Progreso (Encargado Prueba) y Estado (Encargado Intervención) —
               cards independientes del fieldset principal: un técnico solo
               edita la que le corresponde según encargado/encargado2. */}
@@ -647,7 +648,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
           </div>
         </div>
 
-        <div className="max-w-6xl mx-auto px-8 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="max-w-6xl xl:max-w-[96rem] mx-auto px-8 py-8 grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-8">
 
           {/* Datos editables */}
           <fieldset disabled={ot.anulado || bloqueada || !puedeEditarCampos} className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5 self-start">
@@ -854,7 +855,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
           </fieldset>
 
           {/* Relaciones */}
-          <section className="space-y-4">
+          <section className="space-y-4 xl:order-last">
             <div className="flex items-center gap-2">
               <span className="w-1.5 h-5 rounded-full bg-violet-500" />
               <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Relaciones</h2>
@@ -990,10 +991,14 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
               </TarjetaRelacion>
             )}
           </section>
+
+          <div className="lg:col-span-3 xl:col-span-1">
+            <TarjetaObservaciones endpoint={`/ordenes-trabajo/${ot._id}/notas`} />
+          </div>
         </div>
 
         {informes.length > 0 && (
-          <div className="max-w-6xl mx-auto px-8 pb-8">
+          <div className="max-w-6xl xl:max-w-[96rem] mx-auto px-8 pb-8">
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -1080,7 +1085,7 @@ export default function DetalleOrdenTrabajo({ orden: inicial, onClose, onGuardad
           </div>
         )}
 
-        <div className="max-w-6xl mx-auto px-8 pb-8">
+        <div className="max-w-6xl xl:max-w-[96rem] mx-auto px-8 pb-8">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">

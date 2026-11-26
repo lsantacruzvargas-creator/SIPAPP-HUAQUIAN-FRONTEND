@@ -90,7 +90,7 @@ export default function TarjetaDatosAdjuntos({ ordenId, archivos = [], soloLectu
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-8 pb-8">
+    <div className="max-w-6xl xl:max-w-[96rem] mx-auto px-8 pb-8">
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">

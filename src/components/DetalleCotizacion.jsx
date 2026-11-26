@@ -26,6 +26,7 @@ import {
 } from "./detalleShared";
 import { fusionarBloqueo } from "../utils/bloqueoPago";
 import { r2 } from "../utils/redondeo";
+import TarjetaObservaciones from "./TarjetaObservaciones";
 
 const INP = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 w-full transition";
 const codigoDeGuia = (g) => `${g.serie}-${String(g.correlativo).padStart(4, "0")}`;
@@ -848,7 +849,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-6xl mx-auto px-8 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="max-w-6xl xl:max-w-[96rem] mx-auto px-8 py-8 grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-8">
 
           {/* Datos editables */}
           <div className="lg:col-span-2 space-y-6 self-start">
@@ -1297,7 +1298,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
           </div>
 
           {/* Relaciones */}
-          <section className="space-y-4">
+          <section className="space-y-4 xl:order-last">
             <div className="flex items-center gap-2">
               <span className="w-1.5 h-5 rounded-full bg-indigo-500" />
               <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Relaciones</h2>
@@ -1433,10 +1434,14 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
               </TarjetaRelacion>
             )}
           </section>
+
+          <div className="lg:col-span-3 xl:col-span-1">
+            <TarjetaObservaciones endpoint={`/cotizaciones/${cot._id}/notas`} />
+          </div>
         </div>
 
         {/* Ítems — ancho completo, debajo de Datos + Relaciones */}
-        <div className="max-w-6xl mx-auto px-8 pb-8">
+        <div className="max-w-6xl xl:max-w-[96rem] mx-auto px-8 pb-8">
           {esGloria ? (
             <TablaItemsCotizacionGloria
               items={items}
