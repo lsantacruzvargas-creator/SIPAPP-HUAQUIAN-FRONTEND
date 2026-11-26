@@ -6,7 +6,7 @@ import { estadoComprobanteClase } from "../utils/catalogosSunat";
 import ModalDetalleGuia from "./ModalDetalleGuia";
 import ConfirmacionAccion from "./ConfirmacionAccion";
 import {
-  FlujoNegocio, TarjetaRelacion, Chip,
+  FlujoNegocio, TarjetaRelacion, Chip, CeldaFacturaPartida,
   badgePago, badgeGeneral, money, totalSinIgv, BotonAnular, BotonDesanular, BannerAnulado, bloqueadoPorPago, MensajeError,
 } from "./detalleShared";
 import { r2, r0 } from "../utils/redondeo";
@@ -23,27 +23,6 @@ function calcular(sub) {
   // depósito se hace en números enteros (sin decimales).
   const detraccion = total >= 701 ? r0(total * 0.12) : 0;
   return { igv, total, detraccion, totalAPagar: r2((total - detraccion)) };
-}
-
-// Estado de facturación de una partida (estadoFacturacion.partidas[i], derivado en el backend).
-function CeldaFacturaPartida({ estado }) {
-  if (!estado) return <span className="text-gray-300">—</span>;
-  if (estado.factura) {
-    // Una partida "pagada" sin que su factura lo esté es una OC marcada como pagada a mano.
-    const pago = estado.estado === "pagada" ? "pagado" : estado.factura.estadoPago || "sin pago";
-    return (
-      <span className="flex flex-wrap items-center gap-1.5">
-        <span className="font-mono text-xs text-gray-700 whitespace-nowrap">{estado.factura.numeroFactura || estado.factura.codigo}</span>
-        <Chip className={badgePago(pago)}>{pago}</Chip>
-      </span>
-    );
-  }
-  if (estado.estado === "reservada") {
-    return <span title="Un comprobante en emisión incluye esta partida."><Chip className="bg-amber-100 text-amber-700">Reservada</Chip></span>;
-  }
-  if (estado.estado === "pagada") return <Chip className={badgePago("pagado")}>pagada</Chip>;
-  if (estado.estado === "facturada") return <span className="text-xs text-gray-500">Facturada</span>;
-  return <span className="text-gray-300">—</span>;
 }
 
 export default function DetalleOrdenCompra({ orden, onClose, onGuardada, facturaVinculada, onNavegar }) {

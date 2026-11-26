@@ -1,10 +1,13 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import DosLineas from "../components/DosLineas";
 import { fetchAuth, uploadAuth, abrirArchivoProtegido, getUsuario } from "../utils/fetchAuth";
 import { formatearFecha, anioLima, mesLima } from "../utils/fecha";
 import DetalleDocumento from "../components/DetalleDocumento";
 import ModalImportarExcel, { COLS_OC, COLS_CADENA } from "../components/ModalImportarExcel";
-import { DotChip, badgeGeneral, dotGeneral, badgeInformes, dotInformes, ESTADOS_SERVICIO, bloqueadoPorPago } from "../components/detalleShared";
+import {
+  Chip, DotChip, CeldaFacturaPartida, badgeGeneral, dotGeneral, badgeInformes, dotInformes, ESTADOS_SERVICIO, bloqueadoPorPago,
+} from "../components/detalleShared";
 import TablaScroll from "../components/TablaScroll";
 import Paginacion from "../components/Paginacion";
 import { usePaginacion } from "../utils/usePaginacion";
@@ -20,10 +23,44 @@ const TH = "px-3 py-3 font-semibold text-gray-500 whitespace-nowrap align-bottom
 const VISTAS = [
   { valor: "todasLasOC",  label: "Todas las Órdenes de Compra" },
   { valor: "todas",       label: "Todas las tablas" },
-  { valor: "sinFactura",  label: "Sin factura" },
-  { valor: "conFactura",  label: "Con factura" },
-  { valor: "cerradas",    label: "Cerradas" },
+  { valor: "sin facturar",      label: "Sin facturar" },
+  { valor: "facturada parcial", label: "Facturada parcial" },
+  { valor: "facturada",         label: "Facturada" },
+  { valor: "pagada",            label: "Pagada" },
 ];
+
+// Tablas por estado de facturación derivado (estadoFacturacion.estado del backend).
+const TABLAS_ESTADO = [
+  { estado: "sin facturar",      titulo: "Órdenes de Compra sin facturar",      hoja: "Sin facturar",      acento: "bg-amber-500",   vacio: "Sin órdenes de compra sin facturar" },
+  { estado: "facturada parcial", titulo: "Órdenes de Compra facturadas parcialmente", hoja: "Facturada parcial", acento: "bg-sky-500",     vacio: "Sin órdenes de compra facturadas parcialmente" },
+  { estado: "facturada",         titulo: "Órdenes de Compra facturadas",        hoja: "Facturada",         acento: "bg-emerald-500", vacio: "Sin órdenes de compra facturadas" },
+  { estado: "pagada",            titulo: "Órdenes de Compra pagadas",           hoja: "Pagada",            acento: "bg-gray-500",    vacio: "Sin órdenes de compra pagadas" },
+];
+
+const BADGE_FACTURACION = {
+  "sin facturar":      "bg-gray-100 text-gray-500",
+  "facturada parcial": "bg-sky-100 text-sky-700",
+  "facturada":         "bg-emerald-100 text-emerald-700",
+  "pagada":            "bg-green-100 text-green-700",
+};
+
+const SELECCION_VACIA = { oc: null, partidas: [], cargando: false, error: "" };
+
+const estadoDePartida = (o, p) => o.estadoFacturacion?.partidas?.find((e) => String(e._id) === String(p._id));
+const facturadasDe = (o) => (o.estadoFacturacion?.partidas || []).filter((e) => e.estado === "facturada" || e.estado === "pagada").length;
+const numerosFacturaDe = (o) => (o.estadoFacturacion?.numerosFactura || "").split(/\s*,\s*/).filter(Boolean);
+const idCotDe = (p) => p.cotizacion?._id || p.cotizacion;
+
+// OT padre de cada cotización (mismo criterio que la tabla de partidas de DetalleOrdenCompra.jsx).
+const otsPorCotizacion = (ots) => {
+  const map = {};
+  ots.forEach((ot) => {
+    const cotId = ot.cotizacion?._id || ot.cotizacion;
+    if (ot.ordenPadre || !cotId) return;
+    (map[cotId] ||= []).push(ot.numeroOT || ot.codigo);
+  });
+  return map;
+};
 
 const SORTS = [
   { valor: "fecha",             label: "Más reciente" },
@@ -63,12 +100,27 @@ function PillSiNo({ si }) {
   );
 }
 
+// Checkbox con estado "indeterminado" (algunas partidas de la OC marcadas, no todas).
+function CheckOC({ marcadas, total, disabled, title, onChange, label }) {
+  return (
+    <input type="checkbox" aria-label={label} title={title}
+      ref={(el) => { if (el) el.indeterminate = marcadas > 0 && marcadas < total; }}
+      checked={total > 0 && marcadas === total} disabled={disabled} onChange={onChange}
+      className="w-4 h-4 disabled:cursor-not-allowed" />
+  );
+}
+
+const celdaMonto = (v) => (v != null ? v.toLocaleString("es-PE", { minimumFractionDigits: 2 }) : "—");
+
 function TablaOC({
-  titulo, acento, ordenes, otGroupMap, greMap, tipoCambio, onSelect, subirDocumento,
+  titulo, acento, ordenes, otGroupMap, otsCot, greMap, tipoCambio, onSelect, subirDocumento,
   mostrarFactura = true, mostrarTitulo = true, mostrarDocumento = true, mostrarHesActa = false,
   puedeVerPrecios = true, vacioMsg,
+  puedeFacturarOC, seleccion, onTogglePartida, onToggleOC, expandidas, onToggleExpandir,
 }) {
-  const totalColumnas = 9
+  const hayCheck = ordenes.some(puedeFacturarOC);
+  const totalColumnas = 11
+    + (hayCheck ? 1 : 0)
     + (puedeVerPrecios ? 2 : 0)
     + (mostrarFactura ? 1 : 0) + (mostrarTitulo ? 1 : 0)
     + (mostrarHesActa ? 2 : 0) + (mostrarDocumento ? 1 : 0);
@@ -85,11 +137,14 @@ function TablaOC({
         <table className="w-full text-sm" style={{ minWidth: `${totalColumnas * 85}px` }}>
           <thead className="bg-gray-50 text-xs uppercase tracking-wide border-b-2 border-gray-200">
             <tr>
+              <th className={`${TH} w-8`}><span className="sr-only">Partidas</span></th>
+              {hayCheck && <th className={`${TH} w-8`}><span className="sr-only">Seleccionar</span></th>}
               <th className={`${TH} text-left`}><DosLineas>Cotización</DosLineas></th>
               <th className={`${TH} text-left`}><DosLineas>N° OT</DosLineas></th>
               <th className={`${TH} text-left`}><DosLineas>N° Orden de Compra</DosLineas></th>
               <th className={`${TH} text-left`}><DosLineas>Fecha de creación</DosLineas></th>
               {mostrarFactura && <th className={`${TH} text-left`}><DosLineas>N° Factura</DosLineas></th>}
+              <th className={`${TH} text-left`}><DosLineas>Facturación</DosLineas></th>
               <th className={`${TH} text-left min-w-[13rem]`}><DosLineas>Empresa</DosLineas></th>
               {mostrarTitulo && <th className={`${TH} text-left min-w-[13rem]`}><DosLineas>Título</DosLineas></th>}
               {puedeVerPrecios && <th className={`${TH} text-right`}><DosLineas>Total (S/)</DosLineas></th>}
@@ -111,11 +166,41 @@ function TablaOC({
               const otPadre = grupoOT?.parent || null;
               const subs = grupoOT?.subs || [];
               const { pen, usd } = totalesDuales(o.monto, o.cotizacion?.moneda, tipoCambio);
+              const partidas = o.partidas || [];
+              const estadoFact = o.estadoFacturacion;
+              const abierta = expandidas.includes(o._id);
+              const seleccionables = puedeFacturarOC(o)
+                ? partidas.filter((p) => estadoDePartida(o, p)?.estado === "sin facturar").map((p) => p._id)
+                : [];
+              const deEstaOC = seleccion.oc?._id === o._id;
+              const otraOC = !!seleccion.oc && !deEstaOC;
+              const avisoOtraOC = otraOC
+                ? `Ya hay partidas seleccionadas de ${seleccion.oc.numeroOrden || seleccion.oc.codigo}: se factura una sola OC a la vez.`
+                : undefined;
 
               const filaPrincipal = (
                 <tr key={o._id}
-                  className={`hover:bg-gray-50 cursor-pointer transition-colors ${o.anulado ? "opacity-50" : ""}`}
+                  className={`hover:bg-gray-50 cursor-pointer transition-colors ${o.anulado ? "opacity-50" : ""} ${deEstaOC ? "bg-blue-50/40" : ""}`}
                   onClick={() => onSelect(o)}>
+                  <td className="pl-3 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
+                    {partidas.length > 0 && (
+                      <button type="button" onClick={() => onToggleExpandir(o._id)} aria-expanded={abierta}
+                        aria-label={abierta ? "Ocultar partidas" : "Ver partidas"} title={abierta ? "Ocultar partidas" : "Ver partidas"}
+                        className="text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded text-base leading-none w-6 h-6">
+                        {abierta ? "▾" : "▸"}
+                      </button>
+                    )}
+                  </td>
+                  {hayCheck && (
+                    <td className="px-2 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
+                      {seleccionables.length > 0 && (
+                        <CheckOC marcadas={deEstaOC ? seleccion.partidas.length : 0} total={seleccionables.length}
+                          disabled={otraOC} title={avisoOtraOC}
+                          label={`Seleccionar las partidas sin facturar de ${o.numeroOrden || o.codigo}`}
+                          onChange={() => onToggleOC(o, seleccionables)} />
+                      )}
+                    </td>
+                  )}
                   <td className="px-4 py-3.5 font-semibold text-gray-800 whitespace-nowrap">{o.cotizacion?.numeroCotizacion || <span className="text-gray-300">—</span>}</td>
                   <td className="px-4 py-3.5 font-semibold text-gray-800 whitespace-nowrap">{otPadre?.numeroOT || <span className="text-gray-300 font-sans">Sin OT</span>}</td>
                   <td className="px-4 py-3.5 font-semibold text-gray-800 max-w-[220px]">
@@ -132,20 +217,33 @@ function TablaOC({
                     {o.createdAt ? formatearFecha(o.createdAt) : <span className="text-gray-300">—</span>}
                   </td>
                   {mostrarFactura && (
-                    <td className="px-4 py-3.5 text-gray-600 whitespace-nowrap">{o.numeroFactura?.trim() || <span className="text-gray-300">—</span>}</td>
+                    <td className="px-4 py-3.5 text-gray-600 font-mono text-xs">
+                      {numerosFacturaDe(o).length
+                        ? numerosFacturaDe(o).map((n) => <div key={n} className="whitespace-nowrap">{n}</div>)
+                        : <span className="text-gray-300 font-sans">—</span>}
+                    </td>
                   )}
+                  <td className="px-4 py-3.5 whitespace-nowrap">
+                    {estadoFact?.estado ? (
+                      <span className="flex items-center gap-1.5">
+                        <Chip className={BADGE_FACTURACION[estadoFact.estado] || "bg-gray-100 text-gray-500"}>{estadoFact.estado}</Chip>
+                        {partidas.length > 0 && (
+                          <span className="text-xs text-gray-500 tabular-nums" title={`${facturadasDe(o)} de ${partidas.length} partidas facturadas`}>
+                            {facturadasDe(o)}/{partidas.length}
+                          </span>
+                        )}
+                        {estadoFact.reservada && (
+                          <span title="Un comprobante en emisión incluye partidas de esta OC.">
+                            <Chip className="bg-amber-100 text-amber-700">En emisión</Chip>
+                          </span>
+                        )}
+                      </span>
+                    ) : <span className="text-gray-300">—</span>}
+                  </td>
                   <td className="px-4 py-3.5 text-gray-700">{o.empresa?.razonSocial || "—"}</td>
                   {mostrarTitulo && <td className="px-4 py-3.5 text-gray-600">{o.titulo}</td>}
-                  {puedeVerPrecios && (
-                    <td className="px-4 py-3.5 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap">
-                      {pen != null ? pen.toLocaleString("es-PE", { minimumFractionDigits: 2 }) : "—"}
-                    </td>
-                  )}
-                  {puedeVerPrecios && (
-                    <td className="px-4 py-3.5 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap">
-                      {usd != null ? usd.toLocaleString("es-PE", { minimumFractionDigits: 2 }) : "—"}
-                    </td>
-                  )}
+                  {puedeVerPrecios && <td className="px-4 py-3.5 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap">{celdaMonto(pen)}</td>}
+                  {puedeVerPrecios && <td className="px-4 py-3.5 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap">{celdaMonto(usd)}</td>}
                   <td className="px-4 py-3.5 text-center">
                     <div className="flex flex-col items-center gap-1">
                       <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full uppercase tracking-wide whitespace-nowrap ${o.cotizacion?.aprobado ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
@@ -224,15 +322,66 @@ function TablaOC({
                 </tr>
               );
 
+              const filasPartida = !abierta ? [] : partidas.map((p, idx) => {
+                const marcada = deEstaOC && seleccion.partidas.includes(p._id);
+                const totales = totalesDuales(p.subtotal, o.cotizacion?.moneda, tipoCambio);
+                const tituloPartida = (
+                  <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">{p.titulo || p.cotizacion?.titulo}</span>
+                );
+                return (
+                  <tr key={`${o._id}-${p._id}`}
+                    className={`hover:bg-gray-50 cursor-pointer transition-colors ${marcada ? "bg-blue-50/60" : "bg-sky-50/30"} ${o.anulado ? "opacity-50" : ""}`}
+                    onClick={() => onSelect(o)}>
+                    <td className="py-3" />
+                    {hayCheck && (
+                      <td className="px-2 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                        {seleccionables.includes(p._id) && (
+                          <input type="checkbox" aria-label={`Seleccionar partida ${idx + 1} de ${o.numeroOrden || o.codigo}`}
+                            title={avisoOtraOC} checked={marcada} disabled={otraOC}
+                            onChange={() => onTogglePartida(o, p._id)}
+                            className="w-4 h-4 disabled:cursor-not-allowed" />
+                        )}
+                      </td>
+                    )}
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="font-mono text-xs text-gray-400 mr-2">{idx + 1}/{partidas.length}</span>
+                      <span className="font-mono text-sm text-sky-700">{p.cotizacion?.numeroCotizacion || p.cotizacion?.codigo || "—"}</span>
+                    </td>
+                    <td className="px-4 py-3 font-mono text-sm text-gray-600 whitespace-nowrap">
+                      {otsCot[idCotDe(p)]?.join(", ") || <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="px-4 py-3" />
+                    <td className="px-4 py-3" />
+                    {mostrarFactura && <td className="px-4 py-3" />}
+                    <td className="px-4 py-3"><CeldaFacturaPartida estado={estadoDePartida(o, p)} /></td>
+                    {/* Sin columna Título (vista Sin facturar), el título de la partida va en la de Empresa. */}
+                    <td className="px-4 py-3">{!mostrarTitulo && tituloPartida}</td>
+                    {mostrarTitulo && <td className="px-4 py-3">{tituloPartida}</td>}
+                    {puedeVerPrecios && <td className="px-4 py-3 text-right text-gray-700 tabular-nums whitespace-nowrap">{celdaMonto(totales.pen)}</td>}
+                    {puedeVerPrecios && <td className="px-4 py-3 text-right text-gray-700 tabular-nums whitespace-nowrap">{celdaMonto(totales.usd)}</td>}
+                    <td className="px-4 py-3" />
+                    <td className="px-4 py-3" />
+                    <td className="px-4 py-3" />
+                    <td className="px-4 py-3" />
+                    {mostrarHesActa && <td className="px-4 py-3" />}
+                    {mostrarHesActa && <td className="px-4 py-3" />}
+                    {mostrarDocumento && <td className="px-4 py-3" />}
+                  </tr>
+                );
+              });
+
               const filasSub = subs.map((s) => (
                 <tr key={s._id}
                   className={`hover:bg-gray-50 cursor-pointer transition-colors bg-indigo-50/30 ${s.anulado ? "opacity-50" : ""}`}
                   onClick={() => onSelect(o)}>
+                  <td className="py-3" />
+                  {hayCheck && <td className="py-3" />}
                   <td className="px-4 py-3" />
                   <td className="px-4 py-3 font-semibold text-indigo-700 whitespace-nowrap pl-8">↳ {s.numeroOT}</td>
                   <td className="px-4 py-3" />
                   <td className="px-4 py-3" />
                   {mostrarFactura && <td className="px-4 py-3" />}
+                  <td className="px-4 py-3" />
                   <td className="px-4 py-3" />
                   {mostrarTitulo && <td className="px-4 py-3" />}
                   {puedeVerPrecios && <td className="px-4 py-3" />}
@@ -259,7 +408,7 @@ function TablaOC({
                 </tr>
               ));
 
-              return [filaPrincipal, ...filasSub];
+              return [filaPrincipal, ...filasPartida, ...filasSub];
             })}
           </tbody>
         </table>
@@ -271,18 +420,23 @@ function TablaOC({
 }
 
 export default function ListaOrdenesCompra() {
+  const rol = getUsuario()?.rol;
   // Administración ve la vista de OC pero no montos/costos — mismo criterio
   // que Cotizaciones (Fase 16).
-  const puedeVerPrecios = ["admin", "facturacion", "jefatura"].includes(getUsuario()?.rol);
+  const puedeVerPrecios = ["admin", "facturacion", "jefatura"].includes(rol);
+  // Mismo gate que "Facturar seleccionadas" en DetalleOrdenCompra.jsx (POST /facturas puedeCrear).
+  const puedeFacturarRol = ["admin", "facturacion", "jefatura"].includes(rol);
+  const navigate = useNavigate();
   const [ordenes, setOrdenes]       = useState([]);
   const [otGroupMap, setOtGroupMap] = useState({});
-  const [factMap, setFactMap]       = useState({});
-  const [factByOCMap, setFactByOCMap] = useState({});
+  const [otsCot, setOtsCot]         = useState({});
   const [greMap, setGreMap]         = useState({});
   const [tipoCambio, setTipoCambio] = useState(null);
   const [sortBy, setSortBy]         = useState("fecha");
   const [vista, setVista]           = useState("todasLasOC");
-  const [ordenSeleccionada, setOrdenSeleccionada] = useState(null);
+  const [detalle, setDetalle]       = useState(null);
+  const [seleccion, setSeleccion]   = useState(SELECCION_VACIA);
+  const [expandidas, setExpandidas] = useState([]);
   const [importarOpen, setImportarOpen] = useState(false);
   const [importarCadenaOpen, setImportarCadenaOpen] = useState(false);
   const [busqueda, setBusqueda] = useState("");
@@ -299,10 +453,10 @@ export default function ListaOrdenesCompra() {
     Promise.all([
       fetchAuth("/ordenes-compra").then((r) => r.ok ? r.json() : []),
       fetchAuth("/ordenes-trabajo").then((r) => r.ok ? r.json() : []),
-      fetchAuth("/facturas").then((r) => r.ok ? r.json() : []),
       fetchAuth("/tipo-cambio").then((r) => r.ok ? r.json() : null),
-    ]).then(([ocs, ots, facts, tc]) => {
+    ]).then(([ocs, ots, tc]) => {
       setOrdenes(ocs);
+      setSeleccion(SELECCION_VACIA);
       setTipoCambio(tc?.valor ?? null);
       // Agrupa por numeroDocumento (compartido por toda la cadena): la OT
       // padre + sus sub-OTs quedan bajo la misma OC/Cotización/Factura. Una
@@ -316,6 +470,7 @@ export default function ListaOrdenesCompra() {
         else otG[ot.numeroDocumento].parent = ot;
       });
       setOtGroupMap(otG);
+      setOtsCot(otsPorCotizacion(ots));
 
       // GRE generadas por OT/sub-OT (mismo mecanismo que el badge de
       // DetalleOrdenTrabajo.jsx) — solo cuentan las ACEPTADAS por SUNAT.
@@ -338,30 +493,56 @@ export default function ListaOrdenesCompra() {
       } else {
         setGreMap({});
       }
-
-      const ocNumDoc = {};
-      ocs.forEach((oc) => { ocNumDoc[oc._id] = oc.numeroDocumento; });
-      const factM = {};
-      const factByOCM = {};
-      facts.forEach((f) => {
-        const cotId = f.cotizacion?._id || f.cotizacion;
-        const ocId = f.ordenCompra?._id || f.ordenCompra;
-        // Respaldo por cotización solo para facturas sin OC: con varias OCs por
-        // cotización, una factura de otra OC no debe aparecer como la de esta.
-        if (cotId && !ocId && !factM[cotId]) factM[cotId] = f;
-        if (ocId) {
-          // Preferir la factura cuyo numeroDocumento coincide con el de la OC;
-          // solo se cae a la primera vista si ninguna coincide.
-          const coincide = f.numeroDocumento != null && f.numeroDocumento === ocNumDoc[ocId];
-          const previaCoincide = factByOCM[ocId]?.numeroDocumento === ocNumDoc[ocId];
-          if (!factByOCM[ocId] || (coincide && !previaCoincide)) factByOCM[ocId] = f;
-        }
-      });
-      setFactMap(factM);
-      setFactByOCMap(factByOCM);
     });
 
   useEffect(() => { cargar(); }, []);
+
+  // Una OC sin partidas (legado) no trae el detalle de su factura en estadoFacturacion: el detalle
+  // la recibe aparte, buscada entre las facturas cuyo número ya figura en numerosFactura.
+  const abrirOrden = async (o) => {
+    const numeros = numerosFacturaDe(o);
+    if (o.partidas?.length || !numeros.length) return setDetalle({ orden: o, extra: null });
+    const facturas = await fetchAuth("/facturas").then((r) => r.ok ? r.json() : []).catch(() => []);
+    const extra = facturas.find((f) => {
+      const ocId = f.ordenCompra?._id || f.ordenCompra;
+      const deLaOC = ocId ? ocId === o._id : f.numeroDocumento != null && f.numeroDocumento === o.numeroDocumento;
+      return deLaOC && !f.anulado && (numeros.includes(f.numeroFactura) || numeros.includes(f.codigo));
+    }) || null;
+    setDetalle({ orden: o, extra });
+  };
+
+  const puedeFacturarOC = (o) => puedeFacturarRol && !o.anulado && !bloqueadoPorPago(o, rol);
+
+  // Solo se marcan partidas de una OC a la vez: marcar una de otra OC está deshabilitado en la tabla.
+  const togglePartida = (oc, id) => setSeleccion((prev) => {
+    const base = prev.oc?._id === oc._id ? prev.partidas : [];
+    const partidas = base.includes(id) ? base.filter((x) => x !== id) : [...base, id];
+    return partidas.length ? { ...SELECCION_VACIA, oc, partidas } : SELECCION_VACIA;
+  });
+  const toggleOC = (oc, ids) => {
+    setExpandidas((exp) => exp.includes(oc._id) ? exp : [...exp, oc._id]);
+    setSeleccion((prev) => {
+      const todas = prev.oc?._id === oc._id && ids.every((id) => prev.partidas.includes(id));
+      return todas ? SELECCION_VACIA : { ...SELECCION_VACIA, oc, partidas: ids };
+    });
+  };
+  const toggleExpandir = (id) => setExpandidas((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+
+  // Mismo contrato que DetalleOrdenCompra.jsx: `cotizaciones` son las cotizaciones completas
+  // (con ítems) de las partidas elegidas, indexadas por _id.
+  const facturarSeleccionadas = async () => {
+    const { oc, partidas: ids } = seleccion;
+    setSeleccion((prev) => ({ ...prev, cargando: true, error: "" }));
+    const idsCot = new Set((oc.partidas || []).filter((p) => ids.includes(p._id)).map(idCotDe));
+    const cots = await fetchAuth("/cotizaciones").then((r) => r.ok ? r.json() : null).catch(() => null);
+    if (!cots) {
+      return setSeleccion((prev) => ({ ...prev, cargando: false, error: "No se pudieron cargar las cotizaciones de las partidas. Inténtalo de nuevo." }));
+    }
+    const cotizaciones = Object.fromEntries(cots.filter((c) => idsCot.has(c._id)).map((c) => [c._id, c]));
+    navigate("/facturacion-electronica/emitir", {
+      state: { prellenarDesdeOC: { oc, partidas: ids, cotizaciones } },
+    });
+  };
 
   const anios = [...new Set(ordenes.map((o) => anioLima(o.fecha)))].sort((a, b) => b - a);
 
@@ -384,17 +565,23 @@ export default function ListaOrdenesCompra() {
     const matchAnio  = !anio || anioLima(fecha) === Number(anio);
     const matchMes   = !mes || mesLima(fecha) === Number(mes);
     const txt = busqueda.toLowerCase();
-    const factura = factByOCMap[o._id] || factMap[o.cotizacion?._id || o.cotizacion];
     const grupoOT = otGroupMap[o.numeroDocumento];
     const numerosOT = grupoOT ? [grupoOT.parent, ...grupoOT.subs].filter(Boolean).map((ot) => ot.numeroOT) : [];
+    const partidas = o.partidas || [];
+    const numerosCot = [
+      o.cotizacion?.numeroCotizacion,
+      ...partidas.flatMap((p) => [p.cotizacion?.numeroCotizacion, p.cotizacion?.codigo]),
+    ];
+    const otsPartidas = partidas.flatMap((p) => otsCot[idCotDe(p)] || []);
+    const coincide = (v) => v?.toLowerCase().includes(txt);
     const matchBusq  = !txt
-      || o.numeroOrden?.toLowerCase().includes(txt)
-      || o.titulo?.toLowerCase().includes(txt)
-      || o.numeroFactura?.toLowerCase().includes(txt)
-      || factura?.numeroFactura?.toLowerCase().includes(txt)
-      || numerosOT.some((n) => n?.toLowerCase().includes(txt))
-      || o.cotizacion?.numeroCotizacion?.toLowerCase().includes(txt)
-      || o.empresa?.razonSocial?.toLowerCase().includes(txt)
+      || coincide(o.numeroOrden)
+      || coincide(o.titulo)
+      || numerosFacturaDe(o).some(coincide)
+      || numerosOT.some(coincide)
+      || otsPartidas.some(coincide)
+      || numerosCot.some(coincide)
+      || coincide(o.empresa?.razonSocial)
       || o.empresa?.ruc?.includes(txt);
     const estadoActual = grupoOT?.parent?.estadoGeneral;
     const matchEstado = !estadoOT || estadoActual === estadoOT;
@@ -415,25 +602,23 @@ export default function ListaOrdenesCompra() {
   // ListaCotizaciones.jsx.
   const vistaEfectiva = busqueda ? "todasLasOC" : vista;
 
-  // Solo cuenta el campo "N° de factura" de la OC, no si se generó una
-  // Factura desde el detalle (pedido del usuario, 2026-11-18).
-  const tieneFactura = (o) => !!o.numeroFactura?.trim();
-  const cerradas   = filtradas.filter((o) => o.estadoCadena === "cerrado");
-  const abiertas   = filtradas.filter((o) => o.estadoCadena !== "cerrado");
-  const sinFactura = abiertas.filter((o) => !tieneFactura(o));
-  const conFactura = abiertas.filter((o) => tieneFactura(o));
+  const porEstado = (estado) => filtradas.filter((o) => (o.estadoFacturacion?.estado || "sin facturar") === estado);
 
-  // Mismas columnas que TablaOC (sin "Documento", no aplica a una hoja de cálculo).
-  const filaOC = (o) => {
+  // Una fila por partida con las columnas de la OC repetidas; una OC sin partidas (legado) va en
+  // una sola fila. Mismas columnas que TablaOC (sin "Documento", no aplica a una hoja de cálculo).
+  const filasOC = (o) => {
     const grupoOT = otGroupMap[o.numeroDocumento];
     const { pen, usd } = totalesDuales(o.monto, o.cotizacion?.moneda, tipoCambio);
-    return {
+    const partidas = o.partidas || [];
+    const base = {
       "Cotización":         o.cotizacion?.numeroCotizacion || "—",
       "N° Orden de Compra": o.numeroOrden || "—",
       "Fecha de creación":  o.createdAt ? formatearFecha(o.createdAt) : "—",
       "N° OT":              grupoOT?.parent?.numeroOT || "—",
       "Sub-OTs":            grupoOT?.subs?.map((s) => s.numeroOT).join(", ") || "—",
-      "N° Factura":         o.numeroFactura?.trim() || "—",
+      "N° Factura":         o.estadoFacturacion?.numerosFactura || "—",
+      "Estado facturación": o.estadoFacturacion?.estado || "—",
+      "Partidas facturadas": partidas.length ? `${facturadasDe(o)}/${partidas.length}` : "—",
       "Empresa":            o.empresa?.razonSocial || "—",
       "Título":             o.titulo || "—",
       ...(puedeVerPrecios ? {
@@ -447,17 +632,31 @@ export default function ListaOrdenesCompra() {
       "Estado Informes":    grupoOT?.parent?.estadoInformes || "—",
       "GRE":                (grupoOT?.parent && greMap[grupoOT.parent._id]) || "Sin GRE",
     };
+    const filaPartida = (p, idx) => {
+      const estado = p && estadoDePartida(o, p);
+      const totales = p ? totalesDuales(p.subtotal, o.cotizacion?.moneda, tipoCambio) : {};
+      return {
+        ...base,
+        "Partida":                  p ? `${idx + 1}/${partidas.length}` : "—",
+        "Cotización de la partida": p ? (p.cotizacion?.numeroCotizacion || p.cotizacion?.codigo || "—") : "—",
+        "OT de la partida":         p ? (otsCot[idCotDe(p)]?.join(", ") || "—") : "—",
+        "Título de la partida":     p ? (p.titulo || p.cotizacion?.titulo || "—") : "—",
+        ...(puedeVerPrecios ? {
+          "Total partida (S/)":     totales.pen != null ? totales.pen.toFixed(2) : "—",
+          "Total partida (US$)":    totales.usd != null ? totales.usd.toFixed(2) : "—",
+        } : {}),
+        "Factura de la partida":    estado?.factura ? (estado.factura.numeroFactura || estado.factura.codigo) : "—",
+        "Estado de la partida":     estado?.estado || "—",
+      };
+    };
+    return partidas.length ? partidas.map(filaPartida) : [filaPartida(null)];
   };
 
   const exportarExcel = () => {
     const wb = XLSX.utils.book_new();
-    [
-      ["Sin factura", sinFactura],
-      ["Con factura", conFactura],
-      ["Cerradas", cerradas],
-    ].forEach(([nombre, lista]) => {
-      const ws = XLSX.utils.json_to_sheet(lista.map(filaOC));
-      XLSX.utils.book_append_sheet(wb, ws, nombre);
+    TABLAS_ESTADO.forEach(({ estado, hoja }) => {
+      const ws = XLSX.utils.json_to_sheet(porEstado(estado).flatMap(filasOC));
+      XLSX.utils.book_append_sheet(wb, ws, hoja);
     });
     XLSX.writeFile(wb, "ordenes-de-compra.xlsx");
   };
@@ -471,6 +670,14 @@ export default function ListaOrdenesCompra() {
       setOrdenes((prev) => prev.map((o) => o._id === id ? { ...o, documento: actualizada.documento } : o));
     }
   };
+
+  const propsTabla = {
+    otGroupMap, otsCot, greMap, tipoCambio, puedeVerPrecios,
+    onSelect: abrirOrden, subirDocumento,
+    puedeFacturarOC, seleccion, onTogglePartida: togglePartida, onToggleOC: toggleOC,
+    expandidas, onToggleExpandir: toggleExpandir,
+  };
+  const vacioFiltro = "Sin resultados para los filtros aplicados";
 
   return (
     <div className="p-6 mx-auto">
@@ -579,67 +786,55 @@ export default function ListaOrdenesCompra() {
         )}
       </div>
 
+      {seleccion.oc && (
+        <div className="sticky top-0 z-10 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 mb-5 flex items-center gap-3 flex-wrap">
+          <p className="text-sm text-blue-900">
+            {seleccion.partidas.length} partida{seleccion.partidas.length !== 1 ? "s" : ""} de{" "}
+            <span className="font-semibold">{seleccion.oc.numeroOrden || seleccion.oc.codigo}</span>
+            {seleccion.oc.empresa?.razonSocial && <span className="text-blue-700"> · {seleccion.oc.empresa.razonSocial}</span>}
+          </p>
+          {seleccion.error && <p className="text-sm text-red-600">{seleccion.error}</p>}
+          <div className="ml-auto flex items-center gap-3">
+            <button type="button" onClick={() => setSeleccion(SELECCION_VACIA)} disabled={seleccion.cargando}
+              className="text-sm text-gray-500 hover:text-gray-800 transition disabled:opacity-50">
+              Quitar selección
+            </button>
+            <button type="button" onClick={facturarSeleccionadas} disabled={seleccion.cargando}
+              className="bg-blue-600 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition font-medium">
+              {seleccion.cargando ? "Preparando…" : `Facturar seleccionadas (${seleccion.partidas.length})`}
+            </button>
+          </div>
+        </div>
+      )}
+
       {vistaEfectiva === "todasLasOC" && (
         <TablaOC
+          {...propsTabla}
           titulo="Todas las Órdenes de Compra"
           acento="bg-blue-500"
           ordenes={filtradas}
-          otGroupMap={otGroupMap} greMap={greMap} tipoCambio={tipoCambio} puedeVerPrecios={puedeVerPrecios}
-          onSelect={setOrdenSeleccionada}
-          subirDocumento={subirDocumento}
-          vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de compra registradas"}
+          vacioMsg={hayFiltro ? vacioFiltro : "Sin órdenes de compra registradas"}
         />
       )}
 
-      {(vistaEfectiva === "todas" || vistaEfectiva === "sinFactura") && (
+      {TABLAS_ESTADO.filter(({ estado }) => vistaEfectiva === "todas" || vistaEfectiva === estado).map(({ estado, titulo, acento, vacio }) => (
         <TablaOC
-          titulo="Órdenes de Compra sin factura"
-          acento="bg-amber-500"
-          ordenes={sinFactura}
-          otGroupMap={otGroupMap} greMap={greMap} tipoCambio={tipoCambio} puedeVerPrecios={puedeVerPrecios}
-          onSelect={setOrdenSeleccionada}
-          subirDocumento={subirDocumento}
-          mostrarFactura={false}
-          mostrarTitulo={false}
-          mostrarDocumento={false}
-          mostrarHesActa
-          vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de compra sin factura"}
+          key={estado}
+          {...propsTabla}
+          titulo={titulo}
+          acento={acento}
+          ordenes={porEstado(estado)}
+          {...(estado === "sin facturar" ? { mostrarFactura: false, mostrarTitulo: false, mostrarDocumento: false, mostrarHesActa: true } : {})}
+          vacioMsg={hayFiltro ? vacioFiltro : vacio}
         />
-      )}
+      ))}
 
-      {(vistaEfectiva === "todas" || vistaEfectiva === "conFactura") && (
-        <TablaOC
-          titulo="Órdenes de Compra con factura"
-          acento="bg-emerald-500"
-          ordenes={conFactura}
-          otGroupMap={otGroupMap} greMap={greMap} tipoCambio={tipoCambio} puedeVerPrecios={puedeVerPrecios}
-          onSelect={setOrdenSeleccionada}
-          subirDocumento={subirDocumento}
-          vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de compra con factura"}
-        />
-      )}
-
-      {(vistaEfectiva === "todas" || vistaEfectiva === "cerradas") && (
-        <TablaOC
-          titulo="Órdenes de Compra cerradas"
-          acento="bg-gray-500"
-          ordenes={cerradas}
-          otGroupMap={otGroupMap} greMap={greMap} tipoCambio={tipoCambio} puedeVerPrecios={puedeVerPrecios}
-          onSelect={setOrdenSeleccionada}
-          subirDocumento={subirDocumento}
-          vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes de compra cerradas"}
-        />
-      )}
-
-      {ordenSeleccionada && (
+      {detalle && (
         <DetalleDocumento
           tipo="oc"
-          data={ordenSeleccionada}
-          extra={
-            factByOCMap[ordenSeleccionada._id] ||
-            factMap[ordenSeleccionada.cotizacion?._id]
-          }
-          onClose={() => { setOrdenSeleccionada(null); cargar(); }}
+          data={detalle.orden}
+          extra={detalle.extra}
+          onClose={() => { setDetalle(null); cargar(); }}
           onGuardadaOC={(actualizada) => {
             setOrdenes((prev) => prev.map((o) => o._id === actualizada._id ? actualizada : o));
           }}

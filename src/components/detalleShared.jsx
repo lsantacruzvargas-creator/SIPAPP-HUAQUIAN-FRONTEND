@@ -190,6 +190,27 @@ export function DotChip({ children, chip, dot }) {
   );
 }
 
+// Estado de facturación de una partida (estadoFacturacion.partidas[i], derivado en el backend).
+export function CeldaFacturaPartida({ estado }) {
+  if (!estado) return <span className="text-gray-300">—</span>;
+  if (estado.factura) {
+    // Una partida "pagada" sin que su factura lo esté es una OC marcada como pagada a mano.
+    const pago = estado.estado === "pagada" ? "pagado" : estado.factura.estadoPago || "sin pago";
+    return (
+      <span className="flex flex-wrap items-center gap-1.5">
+        <span className="font-mono text-xs text-gray-700 whitespace-nowrap">{estado.factura.numeroFactura || estado.factura.codigo}</span>
+        <Chip className={badgePago(pago)}>{pago}</Chip>
+      </span>
+    );
+  }
+  if (estado.estado === "reservada") {
+    return <span title="Un comprobante en emisión incluye esta partida."><Chip className="bg-amber-100 text-amber-700">Reservada</Chip></span>;
+  }
+  if (estado.estado === "pagada") return <Chip className={badgePago("pagado")}>pagada</Chip>;
+  if (estado.estado === "facturada") return <span className="text-xs text-gray-500">Facturada</span>;
+  return <span className="text-gray-300">—</span>;
+}
+
 /* Barra de progreso de pago */
 export function BarraPago({ pagado, total, color = "bg-emerald-500" }) {
   const pct = total > 0 ? Math.min(100, Math.round((Number(pagado) / total) * 100)) : 0;
