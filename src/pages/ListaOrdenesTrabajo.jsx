@@ -269,13 +269,13 @@ export default function ListaOrdenesTrabajo() {
   const [crearOTOpen, setCrearOTOpen] = useState(false);
   const [importarOpen, setImportarOpen] = useState(false);
   // Filtro de grupo: qué bloque de tablas se muestra — Prueba, Intervención,
-  // o ambos. "Cerradas" queda siempre visible, es ortogonal a ambos tracks.
+  // o ambos. "Facturadas" queda siempre visible, es ortogonal a ambos tracks.
   const [grupo, setGrupo] = useState("todos");
   // Solo para la vista simplificada (planner/asistente): qué tabla de las
   // categorías se muestra — el resto de roles no usa este filtro.
   const [filtroEstadoPlanner, setFiltroEstadoPlanner] = useState("todos");
   // Mismo filtro pero para técnico (tecnico/tecnico_prueba/tecnico_intervencion)
-  // — sus tablas van por Pendiente/En progreso/Completada/Entregada/Cerrada,
+  // — sus tablas van por Pendiente/En progreso/Completada/Entregada/Facturada,
   // separadas en Prueba e Intervención, pero el filtro aplica igual a ambas.
   const [filtroEstadoTecnico, setFiltroEstadoTecnico] = useState("todos");
 
@@ -387,15 +387,14 @@ export default function ListaOrdenesTrabajo() {
     return new Date(b.createdAt) - new Date(a.createdAt);
   });
 
-  // "Cerrada" (cadena cerrada, ver cerrarCadena) manda por encima del `estado`
-  // propio de la OT — es la bandeja de archivado final, sin importar en qué
-  // estado de trabajo se haya quedado. Mientras la cadena sigue abierta, la
-  // OT vive en la tabla que corresponde a su `estado` actual (el mismo valor
-  // que arma el filtro "Todo estado" de arriba) — así una OT que pasa a
-  // "terminado" se mueve sola a la tabla de Terminadas sin quedarse
-  // mezclada con las pendientes.
-  const esCerrada = (o) => o.estadoCadena === "cerrado";
-  const abiertas = filtradas.filter((o) => !esCerrada(o));
+  // "Facturado" (estadoGeneral) manda por encima del `estado` propio de la
+  // OT — es la bandeja final, sin importar en qué estado de trabajo se haya
+  // quedado. Mientras no esté facturada, la OT vive en la tabla que
+  // corresponde a su `estado` actual (el mismo valor que arma el filtro
+  // "Todo estado" de arriba) — así una OT que pasa a "terminado" se mueve
+  // sola a la tabla de Terminadas sin quedarse mezclada con las pendientes.
+  const esFacturada = (o) => o.estadoGeneral === "facturado";
+  const abiertas = filtradas.filter((o) => !esFacturada(o));
 
   // Una OT/sub-OT "califica" para un track (Prueba=encargado,
   // Intervención=encargado2) si tiene alguien asignado — tecnico_prueba/
@@ -464,7 +463,7 @@ export default function ListaOrdenesTrabajo() {
     }
   });
 
-  const cerradas = filtradas.filter((o) => esCerrada(o));
+  const facturadas = filtradas.filter((o) => esFacturada(o));
 
   // Vista simplificada del planner: una tabla por estado del servicio en vez
   // del split Prueba/Intervención — agrupa directo por `estadoGeneral`
@@ -473,15 +472,14 @@ export default function ListaOrdenesTrabajo() {
   // además separa las sub-OTs sin asignar).
   const tablasPlanner = ESTADOS_SERVICIO.map((e) => ({
     ...e,
-    ordenes: e.valor === "pendiente" ? noAsignadas : abiertas.filter((o) => o.estadoGeneral === e.valor),
+    ordenes: e.valor === "pendiente" ? noAsignadas : filtradas.filter((o) => o.estadoGeneral === e.valor),
   }));
 
   // Tabla "Todas las Órdenes de Trabajo": una sola lista global (sin separar
   // por track ni por asignación) sobre la que responde el filtro de Estado —
   // misma categorización que las tablas de la vista simplificada.
-  const categoriaGlobal = (o) => (esCerrada(o) ? "cerrada" : o.estadoGeneral);
-  const todasOTs = filtradas.filter(
-    (o) => filtroEstadoPlanner === "todos" || categoriaGlobal(o) === filtroEstadoPlanner
+    const todasOTs = filtradas.filter(
+    (o) => filtroEstadoPlanner === "todos" || o.estadoGeneral === filtroEstadoPlanner
   );
 
   const hayFiltro = Object.values(filtros).some(Boolean);
@@ -527,7 +525,7 @@ export default function ListaOrdenesTrabajo() {
       ["Intervención - En progreso", enProgreso],
       ["Intervención - Terminadas", terminadas],
       ["Intervención - Completadas", completadas],
-      ["Cerradas", cerradas],
+      ["Facturadas", facturadas],
     ].forEach(([nombre, lista]) => {
       const ws = XLSX.utils.json_to_sheet(lista.map(filaOT));
       XLSX.utils.book_append_sheet(wb, ws, nombre);
@@ -584,7 +582,6 @@ export default function ListaOrdenesTrabajo() {
             {ESTADOS_SERVICIO.map(({ valor, label }) => (
               <option key={valor} value={valor}>{label}</option>
             ))}
-            <option value="cerrada">Cerrada</option>
           </select>
         )}
 
@@ -595,7 +592,7 @@ export default function ListaOrdenesTrabajo() {
             <option value="enProgreso">En progreso</option>
             <option value="terminado">Terminado</option>
             <option value="completado">Completado</option>
-            <option value="cerrada">Cerrada</option>
+            <option value="facturada">Facturada</option>
           </select>
         )}
 
@@ -848,15 +845,15 @@ export default function ListaOrdenesTrabajo() {
         </>
       )}
 
-      {mostrarPlanner("cerrada") && mostrarTecnico("cerrada") && (
+      {!esVistaSimplificada && mostrarTecnico("facturada") && (
         <TablaOTs
-          titulo="Órdenes cerradas"
+          titulo="Órdenes facturadas"
           acento="bg-gray-500"
-          ordenes={cerradas}
+          ordenes={facturadas}
           onSelect={setSeleccionada}
           sortBy={sortBy}
           onSortFechaSalida={alternarSortFechaSalida}
-          vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes cerradas"}
+          vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin órdenes facturadas"}
         />
       )}
     </div>

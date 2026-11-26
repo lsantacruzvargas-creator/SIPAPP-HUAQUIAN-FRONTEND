@@ -32,7 +32,7 @@ const VISTAS = [
   { valor: "aprobadas",  label: "Cotizaciones aprobadas" },
   { valor: "noEnviadas", label: "Cotizaciones no enviadas" },
   { valor: "porAprobar", label: "Cotizaciones pendientes de aprobación" },
-  { valor: "cerradas",   label: "Cotizaciones cerradas" },
+  { valor: "facturadas", label: "Cotizaciones facturadas" },
 ];
 
 const TH = "px-3 py-3 font-semibold text-gray-500 whitespace-nowrap align-bottom leading-tight";
@@ -364,7 +364,8 @@ export default function ListaCotizaciones() {
     subtotal: ot.subtotal,
     total: ot.total,
     numeroDocumento: ot.numeroDocumento,
-    estadoCadena: ot.estadoCadena,
+    bloqueadoPorPago: ot.bloqueadoPorPago,
+    bloqueo: { facturada: ot.estadoGeneral === "facturado" },
     anulado: ot.anulado,
     motivoAnulacion: ot.motivoAnulacion,
     createdAt: ot.createdAt,
@@ -431,21 +432,21 @@ export default function ListaCotizaciones() {
     return compararTexto(primerNumeroOT(a), primerNumeroOT(b));
   });
 
-  const esCerrada = (c) => c.estadoCadena === "cerrado";
-  const cerradas = filtradas.filter((c) => esCerrada(c));
+  const esFacturada = (c) => !!(c.bloqueo?.facturada || c.bloqueadoPorPago);
+  const facturadas = filtradas.filter((c) => esFacturada(c));
   // Pendientes de OC: solo cotizaciones reales — las filas pseudo de OT sin
   // cotización (_esOT) no tienen cotización que esperar OC, así que no
   // cuentan como "pendientes" acá aunque tampoco tengan OC.
-  const pendientes = filtradas.filter((c) => !c._esOT && !esCerrada(c) && !tieneOC(c));
-  const conOC = filtradas.filter((c) => !esCerrada(c) && tieneOC(c));
+  const pendientes = filtradas.filter((c) => !c._esOT && !esFacturada(c) && !tieneOC(c));
+  const conOC = filtradas.filter((c) => !esFacturada(c) && tieneOC(c));
   // Cotizaciones (no pseudo-filas de OT) sin ninguna OT relacionada —
-  // "Cerradas" tiene prioridad: una cotización cerrada y sin OT solo debe
+  // "Facturadas" tiene prioridad: una cotización facturada y sin OT solo debe
   // vivir en esa tabla, no duplicarse acá.
-  const sinOT = filtradas.filter((c) => !c._esOT && !esCerrada(c) && !otsPorCot.get(c._id)?.length);
+  const sinOT = filtradas.filter((c) => !c._esOT && !esFacturada(c) && !otsPorCot.get(c._id)?.length);
   const enviadas = filtradas.filter((c) => !c._esOT && c.enviado);
   const aprobadas = filtradas.filter((c) => !c._esOT && c.aprobado);
-  // Pendientes de acción: sin anuladas ni cadenas cerradas.
-  const pendienteDeAccion = (c) => !c._esOT && !c.anulado && !esCerrada(c);
+  // Pendientes de acción: sin anuladas ni facturadas.
+  const pendienteDeAccion = (c) => !c._esOT && !c.anulado && !esFacturada(c);
   const noEnviadas = filtradas.filter((c) => pendienteDeAccion(c) && !c.enviado);
   const porAprobar = filtradas.filter((c) => pendienteDeAccion(c) && !c.aprobado);
   const hayFiltro = Object.values(filtros).some(Boolean);
@@ -482,7 +483,7 @@ export default function ListaCotizaciones() {
     [
       ["Pendientes", pendientes],
       ["Con OC", conOC],
-      ["Cerradas", cerradas],
+      ["Facturadas", facturadas],
       ["Sin OT", sinOT],
       ["Enviadas", enviadas],
       ["Aprobadas", aprobadas],
@@ -736,13 +737,13 @@ export default function ListaCotizaciones() {
         />
       )}
 
-      {(vista === "todas" || vista === "cerradas") && (
+      {(vista === "todas" || vista === "facturadas") && (
         <TablaCotizaciones
-          titulo="Cotizaciones cerradas"
+          titulo="Cotizaciones facturadas"
           acento="bg-gray-500"
-          cotizaciones={cerradas}
+          cotizaciones={facturadas}
           onSelect={seleccionarFila}
-          vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin cotizaciones cerradas"}
+          vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin cotizaciones facturadas"}
           tipoCambio={tipoCambio}
           ocsPorCot={ocsPorCot}
           otsPorCot={otsPorCot}

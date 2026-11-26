@@ -438,16 +438,13 @@ export default function ListaFacturas() {
     if (pago > 0 && pago < totalAPagar) estadoPago = "pago parcial";
     if (totalAPagar > 0 && pago >= totalAPagar) estadoPago = "pagado";
 
-    // Al pagar se cierra toda la cadena (Cotización/OT/Informe/OC/Factura); se
-    // refleja de inmediato en memoria, el backend hace lo mismo en la BD.
-    const estadoCadena = estadoPago === "pagado" ? "cerrado" : "abierto";
     const previo = {
       montoPagado: factura.montoPagado,
       estadoPago: factura.estadoPago,
-      estadoCadena: factura.estadoCadena,
+      bloqueadoPorPago: factura.bloqueadoPorPago,
     };
     setFacturas(prev =>
-      prev.map(f => f._id === id ? { ...f, montoPagado: pago, estadoPago, estadoCadena } : f)
+      prev.map(f => f._id === id ? { ...f, montoPagado: pago, estadoPago } : f)
     );
     try {
       const res = await fetchAuth(`/facturas/${id}/estado-pago`, {
@@ -456,6 +453,8 @@ export default function ListaFacturas() {
         body: JSON.stringify({ montoPagado: pago }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const { bloqueadoPorPago } = await res.json();
+      setFacturas(prev => prev.map(f => f._id === id ? { ...f, bloqueadoPorPago } : f));
     } catch {
       // Revertir el cambio optimista para que la UI no mienta si no se guardó
       setFacturas(prev => prev.map(f => f._id === id ? { ...f, ...previo } : f));
@@ -506,16 +505,15 @@ export default function ListaFacturas() {
     const pagadas = cuotasActualizadas.filter(c => c.pagado).length;
     const montoPagado = cuotasActualizadas.reduce((s, c) => s + (Number(c.montoPagado) || 0), 0);
     const estadoPago = pagadas === 0 ? "sin pago" : pagadas === total ? "pagado" : "pago parcial";
-    const estadoCadena = estadoPago === "pagado" ? "cerrado" : "abierto";
 
     const previo = {
       cuotas: factura.cuotas,
       montoPagado: factura.montoPagado,
       estadoPago: factura.estadoPago,
-      estadoCadena: factura.estadoCadena,
+      bloqueadoPorPago: factura.bloqueadoPorPago,
     };
     setFacturas(prev => prev.map(f =>
-      f._id === facturaId ? { ...f, cuotas: cuotasActualizadas, montoPagado, estadoPago, estadoCadena } : f
+      f._id === facturaId ? { ...f, cuotas: cuotasActualizadas, montoPagado, estadoPago } : f
     ));
 
     try {
@@ -525,6 +523,8 @@ export default function ListaFacturas() {
         body: JSON.stringify({ montoPagado: pago }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const { bloqueadoPorPago } = await res.json();
+      setFacturas(prev => prev.map(f => f._id === facturaId ? { ...f, bloqueadoPorPago } : f));
     } catch {
       setFacturas(prev => prev.map(f => f._id === facturaId ? { ...f, ...previo } : f));
       setAvisoPermiso("No se pudo guardar el estado de pago. Verifica que el servidor esté disponible e intenta de nuevo.");
@@ -589,8 +589,8 @@ export default function ListaFacturas() {
     await ejecutarDetraccionPagoCheck(id, pagada);
   };
 
-  const cerradas = filtradas.filter(f => f.estadoCadena === "cerrado");
-  const abiertas = filtradas.filter(f => f.estadoCadena !== "cerrado");
+  const pagadas = filtradas.filter(f => f.estadoPago === "pagado");
+  const porCobrar = filtradas.filter(f => f.estadoPago !== "pagado");
   const hayFiltro = Object.values(filtros).some(Boolean);
 
   // Mismas columnas que TablaFacturas, agregando Monto pagado (hoy solo visible
@@ -616,8 +616,8 @@ export default function ListaFacturas() {
   const exportarExcel = () => {
     const wb = XLSX.utils.book_new();
     [
-      ["Facturas", abiertas],
-      ["Facturas cerradas", cerradas],
+      ["Por cobrar", porCobrar],
+      ["Pagadas", pagadas],
     ].forEach(([nombre, lista]) => {
       const ws = XLSX.utils.json_to_sheet(lista.map(filaFactura));
       XLSX.utils.book_append_sheet(wb, ws, nombre);
@@ -692,25 +692,25 @@ export default function ListaFacturas() {
       </div>
 
       <TablaFacturas
-        titulo="Facturas"
+        titulo="Por cobrar"
         acento="bg-emerald-500"
-        facturas={abiertas}
+        facturas={porCobrar}
         onSelect={setSeleccionada}
         handlePagoMonto={handlePagoMonto}
         handleCuotaPagoMonto={handleCuotaPagoMonto}
         handleDetraccionPagoCheck={handleDetraccionPagoCheck}
-        vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin facturas registradas"}
+        vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin facturas por cobrar"}
       />
 
       <TablaFacturas
-        titulo="Facturas cerradas"
+        titulo="Pagadas"
         acento="bg-gray-500"
-        facturas={cerradas}
+        facturas={pagadas}
         onSelect={setSeleccionada}
         handlePagoMonto={handlePagoMonto}
         handleCuotaPagoMonto={handleCuotaPagoMonto}
         handleDetraccionPagoCheck={handleDetraccionPagoCheck}
-        vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin facturas cerradas"}
+        vacioMsg={hayFiltro ? "Sin resultados para los filtros aplicados" : "Sin facturas pagadas"}
       />
     </div>
 

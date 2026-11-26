@@ -245,23 +245,22 @@ function porFecha(arr, campoFecha, ano, mes) {
 function DashboardPlanner({ ots, ocs }) {
   // `ots` es el listado plano de OrdenTrabajo (padres + sub-OTs). El KPI debe
   // contar lo mismo que la columna "Servicio" de la vista de OTs, que
-  // categoriza por OT PADRE (ver categoriaGlobal en ListaOrdenesTrabajo.jsx)
+  // categoriza por OT PADRE (ver tablasPlanner en ListaOrdenesTrabajo.jsx)
   // — las sub-OTs se muestran anidadas bajo su padre ahí, no como filas
   // independientes en el conteo. Contar el arreglo plano completo (como
   // antes) duplicaba: una OT con sub-OTs sumaba de más frente al total que
   // muestra esa vista.
   const otsPadres = ots.filter((o) => !o.ordenPadre && !o.anulado);
-  const esCerrada = (o) => o.estadoCadena === "cerrado";
-  const abiertas = otsPadres.filter((o) => !esCerrada(o));
+  const esFacturada = (o) => o.estadoGeneral === "facturado";
+  const abiertas = otsPadres.filter((o) => !esFacturada(o));
   const totalOTs = otsPadres.length;
 
   // Un KPI por estado del servicio — mismas categorías que el filtro de la
-  // vista simplificada (ver categoriaGlobal en ListaOrdenesTrabajo.jsx). Las
-  // OTs con cadena cerrada quedan fuera (ahí caen en su propia categoría
-  // "cerrada", no se cuentan en esta vista).
+  // vista simplificada (ver tablasPlanner en ListaOrdenesTrabajo.jsx),
+  // incluida "Facturado": los KPI suman el total de OTs.
   const kpisServicio = ESTADOS_SERVICIO.map((e) => ({
     ...e,
-    total: abiertas.filter((o) => o.estadoGeneral === e.valor).length,
+    total: otsPadres.filter((o) => o.estadoGeneral === e.valor).length,
   }));
 
   // "Trabajo terminado" = cualquier OT de "terminado" en adelante — sobre ESE
