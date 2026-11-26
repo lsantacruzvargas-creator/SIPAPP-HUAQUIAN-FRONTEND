@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { fetchAuth, getUsuario } from "../utils/fetchAuth";
 import { formatearFecha } from "../utils/fecha";
 import TablaScroll from "../components/TablaScroll";
+import BarraFiltros, { ANCHO_FILTRO, ANCHO_FECHA } from "../components/BarraFiltros";
 import {
   TIPO_DOC_CPE,
   ESTADO_COMPROBANTE,
@@ -12,7 +13,7 @@ import { generarComprobantePdf } from "../utils/comprobantePdf";
 import { generarFacturaPdf } from "../utils/facturaPdf";
 
 const FILTROS_VACIO = { tipoDoc: "", estado: "", desde: "", hasta: "", q: "" };
-const SELECT = "input-field w-auto";
+const SELECT = "input-field";
 
 const TIPO_DOC_CLASE = {
   "01": "bg-blue-100 text-blue-700",
@@ -303,32 +304,41 @@ export default function ListaComprobantes() {
       </div>
 
       {/* Filtros */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-5 flex flex-wrap gap-3 items-center barra-filtros">
-        <select name="tipoDoc" value={filtros.tipoDoc} onChange={handleFiltro} className={SELECT}>
+      <BarraFiltros
+        busqueda={
+          <input
+            name="q"
+            value={filtros.q}
+            onChange={handleFiltro}
+            onKeyDown={(e) => e.key === "Enter" && buscar()}
+            placeholder="RUC, serie-correlativo, receptor o emisión (dd/mm/aaaa)…"
+            className={`${SELECT} w-full`}
+          />
+        }
+        acciones={<>
+          <button onClick={buscar} className="btn-primary">Buscar</button>
+          <button onClick={limpiar} className="text-sm text-gray-400 hover:text-gray-800 transition">Limpiar</button>
+        </>}
+      >
+        <select name="tipoDoc" value={filtros.tipoDoc} onChange={handleFiltro} className={`${SELECT} ${ANCHO_FILTRO}`}>
           <option value="">Todo tipo</option>
           {TIPO_DOC_CPE.map((t) => (
             <option key={t.valor} value={t.valor}>{t.label}</option>
           ))}
         </select>
-        <select name="estado" value={filtros.estado} onChange={handleFiltro} className={SELECT}>
+        <select name="estado" value={filtros.estado} onChange={handleFiltro} className={`${SELECT} ${ANCHO_FILTRO}`}>
           <option value="">Todo estado</option>
           {ESTADO_COMPROBANTE.map((e) => (
             <option key={e.valor} value={e.valor}>{e.label}</option>
           ))}
         </select>
-        <input type="date" name="desde" value={filtros.desde} onChange={handleFiltro} className={SELECT} />
-        <input type="date" name="hasta" value={filtros.hasta} onChange={handleFiltro} className={SELECT} />
-        <input
-          name="q"
-          value={filtros.q}
-          onChange={handleFiltro}
-          onKeyDown={(e) => e.key === "Enter" && buscar()}
-          placeholder="RUC, serie-correlativo, receptor o emisión (dd/mm/aaaa)…"
-          className={`${SELECT} flex-1 min-w-40`}
-        />
-        <button onClick={buscar} className="btn-primary">Buscar</button>
-        <button onClick={limpiar} className="text-sm text-gray-400 hover:text-gray-800 transition">Limpiar</button>
-      </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-gray-400">Emisión</span>
+          <input type="date" name="desde" value={filtros.desde} onChange={handleFiltro} className={`${SELECT} ${ANCHO_FECHA}`} title="Emisión desde" />
+          <span className="text-gray-400 text-xs">a</span>
+          <input type="date" name="hasta" value={filtros.hasta} onChange={handleFiltro} className={`${SELECT} ${ANCHO_FECHA}`} title="Emisión hasta" />
+        </div>
+      </BarraFiltros>
 
       {/* Tabla */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">

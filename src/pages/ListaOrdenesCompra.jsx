@@ -9,11 +9,13 @@ import {
   Chip, DotChip, badgePago, badgeGeneral, dotGeneral, badgeInformes, dotInformes, ESTADOS_SERVICIO, bloqueadoPorPago,
 } from "../components/detalleShared";
 import TablaScroll from "../components/TablaScroll";
+import BarraFiltros, { ANCHO_FILTRO, ANCHO_FECHA } from "../components/BarraFiltros";
 import Paginacion from "../components/Paginacion";
 import { usePaginacion } from "../utils/usePaginacion";
 import * as XLSX from "xlsx";
 import { r2 } from "../utils/redondeo";
 
+const SELECT_OC = "border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300";
 const MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 const TH = "px-3 py-3 font-semibold text-gray-500 whitespace-nowrap align-bottom leading-tight";
 
@@ -796,30 +798,30 @@ export default function ListaOrdenesCompra() {
       </div>
 
       {/* Filtros */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-5 flex gap-3 flex-wrap items-center barra-filtros">
-        <select
-          value={anio}
-          onChange={(e) => setAnio(e.target.value ? Number(e.target.value) : "")}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-        >
-          <option value="">Todo año</option>
-          {anios.map((a) => <option key={a} value={a}>{a}</option>)}
-        </select>
-        <select
-          value={mes}
-          onChange={(e) => setMes(e.target.value ? Number(e.target.value) : "")}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-        >
-          <option value="">Todo mes</option>
-          {MESES.map((m, i) => (
-            <option key={i} value={i + 1}>{m}</option>
-          ))}
-        </select>
-        <select
-          value={empresa}
-          onChange={handleEmpresa}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-        >
+      <BarraFiltros
+        busqueda={
+          <input
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar por N° OT, cotización, OC, factura, título, empresa o RUC…"
+            className={`${SELECT_OC} w-full`}
+          />
+        }
+        acciones={<>
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className={`${SELECT_OC} ${ANCHO_FILTRO}`}>
+            {SORTS.map(({ valor, label }) => (
+              <option key={valor} value={valor}>Ordenar: {label}</option>
+            ))}
+          </select>
+          <button
+            onClick={() => { setBusqueda(""); setEstadoOT(""); setEmpresa(""); setPlanta(""); setAnio(""); setMes(""); setVista("todasLasOC"); }}
+            className="text-sm text-gray-400 hover:text-gray-700 transition"
+          >
+            Limpiar
+          </button>
+        </>}
+      >
+        <select value={empresa} onChange={handleEmpresa} className={`${SELECT_OC} ${ANCHO_FILTRO}`}>
           <option value="">Toda empresa</option>
           {empresasLista.map((e) => (
             <option key={e._id} value={e._id}>
@@ -827,61 +829,35 @@ export default function ListaOrdenesCompra() {
             </option>
           ))}
         </select>
-        {plantasLista.length > 0 && (
-          <select
-            value={planta}
-            onChange={(e) => setPlanta(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-          >
-            <option value="">Toda planta</option>
-            {plantasLista.map((p) => (
-              <option key={p} value={p}>{p}</option>
-            ))}
-          </select>
-        )}
-        <input
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          placeholder="Buscar por N° OT, cotización, OC, factura, título, empresa o RUC…"
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm flex-1 min-w-60 focus:outline-none focus:ring-2 focus:ring-blue-300"
-        />
-        <select
-          value={estadoOT}
-          onChange={(e) => setEstadoOT(e.target.value)}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-        >
+        <select value={planta} onChange={(e) => setPlanta(e.target.value)} disabled={!plantasLista.length}
+          className={`${SELECT_OC} ${ANCHO_FILTRO} disabled:opacity-50`}>
+          <option value="">Toda planta</option>
+          {plantasLista.map((p) => (
+            <option key={p} value={p}>{p}</option>
+          ))}
+        </select>
+        <select value={anio} onChange={(e) => setAnio(e.target.value ? Number(e.target.value) : "")} className={`${SELECT_OC} ${ANCHO_FECHA}`}>
+          <option value="">Todo año</option>
+          {anios.map((a) => <option key={a} value={a}>{a}</option>)}
+        </select>
+        <select value={mes} onChange={(e) => setMes(e.target.value ? Number(e.target.value) : "")} className={`${SELECT_OC} ${ANCHO_FECHA}`}>
+          <option value="">Todo mes</option>
+          {MESES.map((m, i) => (
+            <option key={i} value={i + 1}>{m}</option>
+          ))}
+        </select>
+        <select value={vista} onChange={(e) => setVista(e.target.value)} className={`${SELECT_OC} ${ANCHO_FILTRO}`}>
+          {VISTAS.map(({ valor, label }) => (
+            <option key={valor} value={valor}>{label}</option>
+          ))}
+        </select>
+        <select value={estadoOT} onChange={(e) => setEstadoOT(e.target.value)} className={`${SELECT_OC} ${ANCHO_FILTRO}`}>
           <option value="">Todo estado de servicio</option>
           {ESTADOS_SERVICIO.map(({ valor, label }) => (
             <option key={valor} value={valor}>{label}</option>
           ))}
         </select>
-        <select
-          value={vista}
-          onChange={(e) => setVista(e.target.value)}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-        >
-          {VISTAS.map(({ valor, label }) => (
-            <option key={valor} value={valor}>{label}</option>
-          ))}
-        </select>
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value)}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-        >
-          {SORTS.map(({ valor, label }) => (
-            <option key={valor} value={valor}>Ordenar: {label}</option>
-          ))}
-        </select>
-        {(hayFiltro || vista !== "todasLasOC") && (
-          <button
-            onClick={() => { setBusqueda(""); setEstadoOT(""); setEmpresa(""); setPlanta(""); setAnio(""); setMes(""); setVista("todasLasOC"); }}
-            className="text-sm text-gray-400 hover:text-gray-700 transition"
-          >
-            Limpiar
-          </button>
-        )}
-      </div>
+      </BarraFiltros>
 
       {seleccion.oc && (
         <div className="sticky top-0 z-10 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 mb-5 flex items-center gap-3 flex-wrap">

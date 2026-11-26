@@ -6,6 +6,7 @@ import DetalleDocumento from "../components/DetalleDocumento";
 import ModalImportarExcel, { COLS_FACTURAS } from "../components/ModalImportarExcel";
 import { DotChip, badgePago, dotPago, badgeGeneral, dotGeneral, ESTADOS_SERVICIO, money } from "../components/detalleShared";
 import TablaScroll from "../components/TablaScroll";
+import BarraFiltros, { ANCHO_FILTRO, ANCHO_FECHA } from "../components/BarraFiltros";
 import Paginacion from "../components/Paginacion";
 import { usePaginacion } from "../utils/usePaginacion";
 import ConfirmacionAccion from "../components/ConfirmacionAccion";
@@ -642,8 +643,23 @@ export default function ListaFacturas() {
       </div>
 
       {/* Filtros */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-5 flex flex-wrap gap-3 items-center barra-filtros">
-        <select name="empresa" value={filtros.empresa} onChange={handleEmpresa} className={SELECT}>
+      <BarraFiltros
+        busqueda={
+          <input name="busqueda" value={filtros.busqueda} onChange={handleFiltro}
+            placeholder="Buscar por N° OT, cotización, OC, factura, título, empresa o RUC…"
+            className={`${SELECT} w-full`} />
+        }
+        acciones={<>
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className={`${SELECT} ${ANCHO_FILTRO}`}>
+            {SORTS.map(({ valor, label }) => (
+              <option key={valor} value={valor}>Ordenar: {label}</option>
+            ))}
+          </select>
+          <button onClick={() => setFiltros(FILTROS_VACIO)}
+            className="text-sm text-gray-400 hover:text-gray-700 transition">Limpiar</button>
+        </>}
+      >
+        <select name="empresa" value={filtros.empresa} onChange={handleEmpresa} className={`${SELECT} ${ANCHO_FILTRO}`}>
           <option value="">Toda empresa</option>
           {empresasLista.map(e => (
             <option key={e._id} value={e._id}>
@@ -651,45 +667,32 @@ export default function ListaFacturas() {
             </option>
           ))}
         </select>
-        {plantasLista.length > 0 && (
-          <select name="planta" value={filtros.planta} onChange={handleFiltro} className={SELECT}>
-            <option value="">Toda planta</option>
-            {plantasLista.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
-        )}
-        <select name="ano" value={filtros.ano} onChange={handleFiltro} className={SELECT}>
-          <option value="">Todos los años</option>
+        <select name="planta" value={filtros.planta} onChange={handleFiltro} disabled={!plantasLista.length}
+          className={`${SELECT} ${ANCHO_FILTRO} disabled:opacity-50`}>
+          <option value="">Toda planta</option>
+          {plantasLista.map(p => <option key={p} value={p}>{p}</option>)}
+        </select>
+        <select name="ano" value={filtros.ano} onChange={handleFiltro} className={`${SELECT} ${ANCHO_FECHA}`}>
+          <option value="">Todo año</option>
           {anos.map(a => <option key={a} value={a}>{a}</option>)}
         </select>
-        <select name="mes" value={filtros.mes} onChange={handleFiltro} className={SELECT}>
-          <option value="">Todos los meses</option>
+        <select name="mes" value={filtros.mes} onChange={handleFiltro} className={`${SELECT} ${ANCHO_FECHA}`}>
+          <option value="">Todo mes</option>
           {MESES.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
         </select>
-        <select name="estadoPago" value={filtros.estadoPago} onChange={handleFiltro} className={SELECT}>
-          <option value="">Todos los estados</option>
+        <select name="estadoPago" value={filtros.estadoPago} onChange={handleFiltro} className={`${SELECT} ${ANCHO_FILTRO}`}>
+          <option value="">Todo estado de pago</option>
           {ESTADOS_PAGO.map(({ valor, label }) => (
             <option key={valor} value={valor}>{label}</option>
           ))}
         </select>
-        <select name="estadoServicio" value={filtros.estadoServicio} onChange={handleFiltro} className={SELECT}>
+        <select name="estadoServicio" value={filtros.estadoServicio} onChange={handleFiltro} className={`${SELECT} ${ANCHO_FILTRO}`}>
           <option value="">Todo estado de servicio</option>
           {ESTADOS_SERVICIO.map(({ valor, label }) => (
             <option key={valor} value={valor}>{label}</option>
           ))}
         </select>
-        <input name="busqueda" value={filtros.busqueda} onChange={handleFiltro}
-          placeholder="Buscar por N° OT, cotización, OC, factura, título, empresa o RUC…"
-          className={`${SELECT} flex-1 min-w-52`} />
-        <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className={SELECT}>
-          {SORTS.map(({ valor, label }) => (
-            <option key={valor} value={valor}>Ordenar: {label}</option>
-          ))}
-        </select>
-        {Object.values(filtros).some(Boolean) && (
-          <button onClick={() => setFiltros(FILTROS_VACIO)}
-            className="text-sm text-gray-400 hover:text-gray-700 transition">Limpiar</button>
-        )}
-      </div>
+      </BarraFiltros>
 
       <TablaFacturas
         titulo="Por cobrar"

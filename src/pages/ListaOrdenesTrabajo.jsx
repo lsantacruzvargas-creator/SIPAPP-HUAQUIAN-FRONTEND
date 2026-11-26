@@ -6,6 +6,7 @@ import DetalleDocumento from "../components/DetalleDocumento";
 import ModalNuevaOT from "../components/ModalNuevaOT";
 import ModalImportarExcel, { COLS_OT } from "../components/ModalImportarExcel";
 import TablaScroll from "../components/TablaScroll";
+import BarraFiltros, { ANCHO_FILTRO, ANCHO_FECHA } from "../components/BarraFiltros";
 import Paginacion from "../components/Paginacion";
 import { usePaginacion } from "../utils/usePaginacion";
 import { DotChip, badgeOT, dotOT, badgeInformes, dotInformes, badgeGeneral, dotGeneral, ESTADOS_SERVICIO } from "../components/detalleShared";
@@ -567,36 +568,47 @@ export default function ListaOrdenesTrabajo() {
         </div>
       </div>
 
-      {/* Filtros — orden: Ordenar, Estado, Empresa (+ Planta), búsqueda, Estado informes */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-5 flex flex-wrap gap-3 items-center barra-filtros">
-
-        <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className={SELECT}>
-          {SORTS.map(({ valor, label }) => (
-            <option key={valor} value={valor}>Ordenar: {label}</option>
-          ))}
-        </select>
-
-        {esVistaSimplificada && (
-          <select value={filtroEstadoPlanner} onChange={(e) => setFiltroEstadoPlanner(e.target.value)} className={SELECT}>
-            <option value="todos">Todo estado</option>
-            {ESTADOS_SERVICIO.map(({ valor, label }) => (
-              <option key={valor} value={valor}>{label}</option>
+      <BarraFiltros
+        busqueda={
+          <input
+            name="busqueda"
+            value={filtros.busqueda}
+            onChange={handleFiltro}
+            placeholder="Buscar por N° OT, cotización, OC, factura, título, empresa o RUC…"
+            className={`${SELECT} w-full`}
+          />
+        }
+        acciones={<>
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className={`${SELECT} ${ANCHO_FILTRO}`}>
+            {SORTS.map(({ valor, label }) => (
+              <option key={valor} value={valor}>Ordenar: {label}</option>
             ))}
           </select>
-        )}
 
-        {esTecnicoRol && !esVistaSimplificada && (
-          <select value={filtroEstadoTecnico} onChange={(e) => setFiltroEstadoTecnico(e.target.value)} className={SELECT}>
-            <option value="todos">Todo estado</option>
-            <option value="pendiente">Pendiente</option>
-            <option value="enProgreso">En progreso</option>
-            <option value="terminado">Terminado</option>
-            <option value="completado">Completado</option>
-            <option value="facturada">Facturada</option>
-          </select>
-        )}
+          {/* Botón dedicado (a pedido del usuario) — planner/coordinadora/
+              asistente comparten esta misma vista de OTs, y las 3 lo usan para
+              priorizar por antigüedad en todas las tablas de un solo click. */}
+          <button
+            type="button"
+            onClick={() => setSortBy(sortBy === "diasRecibido" ? "fecha" : "diasRecibido")}
+            className={`px-3 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap ${
+              sortBy === "diasRecibido"
+                ? "bg-gray-900 text-white"
+                : "border border-gray-300 text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            Días desde recibido ↓
+          </button>
 
-        <select name="empresa" value={filtros.empresa} onChange={handleEmpresa} className={SELECT}>
+          <button
+            onClick={() => { setFiltros(FILTROS_VACIO); setFiltroEstadoPlanner("todos"); setFiltroEstadoTecnico("todos"); }}
+            className="text-sm text-gray-400 hover:text-gray-700 transition"
+          >
+            Limpiar
+          </button>
+        </>}
+      >
+        <select name="empresa" value={filtros.empresa} onChange={handleEmpresa} className={`${SELECT} ${ANCHO_FILTRO}`}>
           <option value="">Toda empresa</option>
           {empresasLista.map((e) => (
             <option key={e._id} value={e._id}>
@@ -605,62 +617,50 @@ export default function ListaOrdenesTrabajo() {
           ))}
         </select>
 
-        {plantasLista.length > 0 && (
-          <select name="planta" value={filtros.planta} onChange={handleFiltro} className={SELECT}>
-            <option value="">Toda planta</option>
-            {plantasLista.map((p) => (
-              <option key={p} value={p}>{p}</option>
-            ))}
-          </select>
-        )}
+        <select name="planta" value={filtros.planta} onChange={handleFiltro} disabled={!plantasLista.length}
+          className={`${SELECT} ${ANCHO_FILTRO} disabled:opacity-50`}>
+          <option value="">Toda planta</option>
+          {plantasLista.map((p) => (
+            <option key={p} value={p}>{p}</option>
+          ))}
+        </select>
 
-        <input
-          name="busqueda"
-          value={filtros.busqueda}
-          onChange={handleFiltro}
-          placeholder="Buscar por N° OT, cotización, OC, factura, título, empresa o RUC…"
-          className={`${SELECT} flex-1 min-w-52`}
-        />
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-gray-400">Ingreso</span>
+          <input type="date" name="fechaDesde" value={filtros.fechaDesde} onChange={handleFiltro}
+            className={`${SELECT} ${ANCHO_FECHA}`} title="Fecha de ingreso desde" />
+          <span className="text-gray-400 text-xs">a</span>
+          <input type="date" name="fechaHasta" value={filtros.fechaHasta} onChange={handleFiltro}
+            className={`${SELECT} ${ANCHO_FECHA}`} title="Fecha de ingreso hasta" />
+        </div>
 
-        <select name="estadoInformes" value={filtros.estadoInformes} onChange={handleFiltro} className={SELECT}>
+        <select name="estadoInformes" value={filtros.estadoInformes} onChange={handleFiltro} className={`${SELECT} ${ANCHO_FILTRO}`}>
           <option value="">Todo estado de informes</option>
           {ESTADOS_INFORMES.map((e) => (
             <option key={e} value={e} className="capitalize">{e}</option>
           ))}
         </select>
 
-        <div className="flex items-center gap-1.5">
-          <input type="date" name="fechaDesde" value={filtros.fechaDesde} onChange={handleFiltro}
-            className={SELECT} title="Fecha de ingreso desde" />
-          <span className="text-gray-400 text-xs">a</span>
-          <input type="date" name="fechaHasta" value={filtros.fechaHasta} onChange={handleFiltro}
-            className={SELECT} title="Fecha de ingreso hasta" />
-        </div>
-
-        {/* Botón dedicado (a pedido del usuario) — planner/coordinadora/
-            asistente comparten esta misma vista de OTs, y las 3 lo usan para
-            priorizar por antigüedad en todas las tablas de un solo click. */}
-        <button
-          type="button"
-          onClick={() => setSortBy(sortBy === "diasRecibido" ? "fecha" : "diasRecibido")}
-          className={`px-3 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap ${
-            sortBy === "diasRecibido"
-              ? "bg-gray-900 text-white"
-              : "border border-gray-300 text-gray-600 hover:bg-gray-50"
-          }`}
-        >
-          Días desde recibido ↓
-        </button>
-
-        {(Object.values(filtros).some(Boolean) || filtroEstadoPlanner !== "todos" || filtroEstadoTecnico !== "todos") && (
-          <button
-            onClick={() => { setFiltros(FILTROS_VACIO); setFiltroEstadoPlanner("todos"); setFiltroEstadoTecnico("todos"); }}
-            className="text-sm text-gray-400 hover:text-gray-700 transition"
-          >
-            Limpiar
-          </button>
+        {esVistaSimplificada && (
+          <select value={filtroEstadoPlanner} onChange={(e) => setFiltroEstadoPlanner(e.target.value)} className={`${SELECT} ${ANCHO_FILTRO}`}>
+            <option value="todos">Todo estado de servicio</option>
+            {ESTADOS_SERVICIO.map(({ valor, label }) => (
+              <option key={valor} value={valor}>{label}</option>
+            ))}
+          </select>
         )}
-      </div>
+
+        {esTecnicoRol && !esVistaSimplificada && (
+          <select value={filtroEstadoTecnico} onChange={(e) => setFiltroEstadoTecnico(e.target.value)} className={`${SELECT} ${ANCHO_FILTRO}`}>
+            <option value="todos">Todo estado</option>
+            <option value="pendiente">Pendiente</option>
+            <option value="enProgreso">En progreso</option>
+            <option value="terminado">Terminado</option>
+            <option value="completado">Completado</option>
+            <option value="facturada">Facturada</option>
+          </select>
+        )}
+      </BarraFiltros>
 
       {!esVistaSimplificada && !esTecnicoPrueba && !esTecnicoIntervencion && (
         <div className="flex gap-2 mb-5">

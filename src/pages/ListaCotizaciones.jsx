@@ -9,6 +9,7 @@ import ModalNuevaOT from "../components/ModalNuevaOT";
 import ModalNuevaCotizacion from "../components/ModalNuevaCotizacion";
 import { DotChip, badgeGeneral, dotGeneral, ESTADOS_SERVICIO } from "../components/detalleShared";
 import TablaScroll from "../components/TablaScroll";
+import BarraFiltros, { ANCHO_FILTRO, ANCHO_FECHA } from "../components/BarraFiltros";
 import Paginacion from "../components/Paginacion";
 import { usePaginacion } from "../utils/usePaginacion";
 import * as XLSX from "xlsx";
@@ -89,12 +90,10 @@ const totalesDuales = (c, tipoCambio) => {
   return { pen: sinIgv, usd: tc > 0 ? r2(sinIgv / tc) : null };
 };
 
-// Días transcurridos desde el ingreso (fechaRecibida) — mismo cálculo que
-// "Días desde recibido" en ListaOrdenesTrabajo.jsx; se toma la de la OT y, si
-// no tiene, la de la cotización.
-const diasDesdeRecibido = (fecha) => {
-  if (!fecha) return null;
-  return Math.max(0, Math.floor((Date.now() - new Date(fecha).getTime()) / 86400000));
+// null si el informe no está marcado como enviado (o es una fila de OT sin cotización).
+const diasDesdeInforme = (c) => {
+  if (c._esOT || !c.informeEnviado || !c.fechaInformeEnviado) return null;
+  return Math.max(0, Math.floor((Date.now() - new Date(c.fechaInformeEnviado).getTime()) / 86400000));
 };
 
 // Rango "desde/hasta" de un input type=date contra el día calendario de Lima
@@ -110,7 +109,6 @@ const dentroDeRangoFecha = (fecha, desde, hasta) => {
 
 const otPrincipalDe = (otsPorCot, c) => otsPorCot?.get(c._id)?.[0] || null;
 const fechaSalidaDe = (otsPorCot, c) => otPrincipalDe(otsPorCot, c)?.fechaSalida || c.fechaSalida || null;
-const fechaRecibidaDe = (otsPorCot, c) => otPrincipalDe(otsPorCot, c)?.fechaRecibida || c.fechaRecibida || null;
 
 const VACIO = <span className="text-gray-300">—</span>;
 
@@ -138,7 +136,7 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
               <th className={`${TH} text-center`}><DosLineas>Fecha de salida a cliente</DosLineas></th>
               <th className={`${TH} text-left`}><DosLineas>N° OC</DosLineas></th>
               <th className={`${TH} text-center`}><DosLineas>Informe enviado</DosLineas></th>
-              <th className={`${TH} text-center`}><DosLineas>Días desde recibido</DosLineas></th>
+              <th className={`${TH} text-center`}><DosLineas>Días desde informe enviado</DosLineas></th>
               {puedeVerPrecios && <th className={`${TH} text-right`}><DosLineas>Total sin IGV (S/)</DosLineas></th>}
               {puedeVerPrecios && <th className={`${TH} text-right`}><DosLineas>Total sin IGV (US$)</DosLineas></th>}
               <th className={`${TH} text-center`}><DosLineas>Estado de aprobación</DosLineas></th>
@@ -157,7 +155,7 @@ function TablaCotizaciones({ titulo, acento, cotizaciones, onSelect, vacioMsg, t
                 const otPrincipal = otsDeCot?.[0];
                 const ocs = numerosOC(ocsPorCot?.get(c._id));
                 const fechaSalida = fechaSalidaDe(otsPorCot, c);
-                const dias = diasDesdeRecibido(fechaRecibidaDe(otsPorCot, c));
+                const dias = diasDesdeInforme(c);
                 return (
                 <tr
                   key={c._id}
@@ -466,7 +464,7 @@ export default function ListaCotizaciones() {
       "Fecha de salida a cliente": fechaSalida ? formatearFecha(fechaSalida) : "—",
       "N° OC":                  numerosOC(ocsPorCot.get(c._id)).join(", ") || "—",
       "Informe enviado":        c._esOT ? "—" : (c.informeEnviado ? "Enviado" : "No enviado"),
-      "Días desde recibido":    diasDesdeRecibido(fechaRecibidaDe(otsPorCot, c)) ?? "—",
+      "Días desde informe enviado": diasDesdeInforme(c) ?? "—",
       ...(puedeVerPrecios ? {
         "Total sin IGV (S/)":   pen != null ? pen.toFixed(2) : "—",
         "Total sin IGV (US$)":  usd != null ? usd.toFixed(2) : "—",
@@ -538,8 +536,44 @@ export default function ListaCotizaciones() {
       </div>
 
       {/* Filtros */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-5 flex flex-wrap gap-3 items-center barra-filtros">
-        <select name="empresa" value={filtros.empresa} onChange={handleEmpresa} className={SELECT}>
+      <BarraFiltros
+        busqueda={
+          <input
+            name="busqueda"
+            value={filtros.busqueda}
+            onChange={handleFiltro}
+            placeholder="Buscar por N° OT, cotización, OC, factura, título, empresa o RUC…"
+            className={`${SELECT} w-full`}
+          />
+        }
+        acciones={<>
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className={`${SELECT} ${ANCHO_FILTRO}`}>
+            {SORTS.map(({ valor, label }) => (
+              <option key={valor} value={valor}>Ordenar: {label}</option>
+            ))}
+          </select>
+
+          <button
+            type="button"
+            onClick={() => setFiltros((f) => ({ ...f, informeEnviado: !f.informeEnviado }))}
+            className={`px-3 py-2 rounded-lg text-sm border transition ${
+              filtros.informeEnviado
+                ? "bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-700"
+                : "border-gray-300 text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            Informe enviado
+          </button>
+
+          <button
+            onClick={() => { setFiltros(FILTROS_VACIO); setVista("todasLasCotizaciones"); }}
+            className="text-sm text-gray-400 hover:text-gray-700 transition"
+          >
+            Limpiar
+          </button>
+        </>}
+      >
+        <select name="empresa" value={filtros.empresa} onChange={handleEmpresa} className={`${SELECT} ${ANCHO_FILTRO}`}>
           <option value="">Toda empresa</option>
           {empresasLista.map((e) => (
             <option key={e._id} value={e._id}>
@@ -548,23 +582,35 @@ export default function ListaCotizaciones() {
           ))}
         </select>
 
-         {plantasLista.length > 0 && (
-          <select name="planta" value={filtros.planta} onChange={handleFiltro} className={SELECT}>
-            <option value="">Toda planta</option>
-            {plantasLista.map((p) => (
-              <option key={p} value={p}>{p}</option>
-            ))}
-          </select>
-        )}
+        <select name="planta" value={filtros.planta} onChange={handleFiltro} disabled={!plantasLista.length}
+          className={`${SELECT} ${ANCHO_FILTRO} disabled:opacity-50`}>
+          <option value="">Toda planta</option>
+          {plantasLista.map((p) => (
+            <option key={p} value={p}>{p}</option>
+          ))}
+        </select>
 
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-gray-400">Salida</span>
           <input type="date" name="fechaDesde" value={filtros.fechaDesde} onChange={handleFiltro}
-            className={SELECT} title="Fecha de salida desde" />
+            className={`${SELECT} ${ANCHO_FECHA}`} title="Fecha de salida desde" />
           <span className="text-gray-400 text-xs">a</span>
           <input type="date" name="fechaHasta" value={filtros.fechaHasta} onChange={handleFiltro}
-            className={SELECT} title="Fecha de salida hasta" />
+            className={`${SELECT} ${ANCHO_FECHA}`} title="Fecha de salida hasta" />
         </div>
+
+        <select value={vista} onChange={(e) => setVista(e.target.value)} className={`${SELECT} ${ANCHO_FILTRO}`}>
+          {VISTAS.map(({ valor, label }) => (
+            <option key={valor} value={valor}>{label}</option>
+          ))}
+        </select>
+
+        <select name="estadoServicio" value={filtros.estadoServicio} onChange={handleFiltro} className={`${SELECT} ${ANCHO_FILTRO}`}>
+          <option value="">Todo estado de servicio</option>
+          {FILTRO_ESTADOS_SERVICIO.map(({ valor, label }) => (
+            <option key={valor} value={valor}>{label}</option>
+          ))}
+        </select>
 
         {rolVePrecios && (
           <div className="flex items-center gap-1.5">
@@ -576,53 +622,7 @@ export default function ListaCotizaciones() {
               min="0" step="0.01" placeholder="Hasta" title="Total sin IGV hasta (S/)" className={`${SELECT} w-28`} />
           </div>
         )}
-
-        <select value={vista} onChange={(e) => setVista(e.target.value)} className={SELECT}>
-          {VISTAS.map(({ valor, label }) => (
-            <option key={valor} value={valor}>{label}</option>
-          ))}
-        </select>
-
-        <select name="estadoServicio" value={filtros.estadoServicio} onChange={handleFiltro} className={SELECT}>
-          <option value="">Todo estado de servicio</option>
-          {FILTRO_ESTADOS_SERVICIO.map(({ valor, label }) => (
-            <option key={valor} value={valor}>{label}</option>
-          ))}
-        </select>
-
-        <input
-          name="busqueda"
-          value={filtros.busqueda}
-          onChange={handleFiltro}
-          placeholder="Buscar por N° OT, cotización, OC, factura, título, empresa o RUC…"
-          className={`${SELECT} flex-1 min-w-52`}
-        />
-
-        <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className={SELECT}>
-          {SORTS.map(({ valor, label }) => (
-            <option key={valor} value={valor}>Ordenar: {label}</option>
-          ))}
-        </select>
-
-        <button
-          type="button"
-          onClick={() => setFiltros((f) => ({ ...f, informeEnviado: !f.informeEnviado }))}
-          className={`px-3 py-2 rounded-lg text-sm border transition ${
-            filtros.informeEnviado
-              ? "bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-700"
-              : "border-gray-300 text-gray-600 hover:bg-gray-50"
-          }`}
-        >
-          Informe enviado
-        </button>
-
-        <button
-          onClick={() => { setFiltros(FILTROS_VACIO); setVista("todasLasCotizaciones"); }}
-          className="text-sm text-gray-400 hover:text-gray-700 transition"
-        >
-          Limpiar
-        </button>
-      </div>
+      </BarraFiltros>
 
       {vista === "todasLasCotizaciones" && (
         <TablaCotizaciones
