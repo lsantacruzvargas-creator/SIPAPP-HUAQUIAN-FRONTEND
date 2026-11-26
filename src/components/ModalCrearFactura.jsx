@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { fetchAuth } from "../utils/fetchAuth";
+import { fetchAuth, mensajeError } from "../utils/fetchAuth";
 import { fechaHoyLima } from "../utils/fecha";
 import { formatearGuiaRemision, parsearGuiaRemision } from "../utils/catalogosSunat";
 import { r2, r0 } from "../utils/redondeo";
@@ -296,6 +296,9 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
 
     const { ocId, error: errorOC } = await resolverOrdenCompra();
     if (errorOC) { setError(errorOC); setGuardando(false); return; }
+    // Este modal factura la OC entera en una línea: con partidas, son todas. Si alguna ya está
+    // facturada o en emisión, el backend responde 409 con el mensaje que la nombra.
+    const partidasOC = (ocVinculada?.partidas || []).map((p) => p._id);
 
     // Paso 1: emitir la Factura SUNAT real (correlativo atómico vía SerieCorrelativo).
     const resCpe = await fetchAuth("/cpe/factura", {
@@ -325,14 +328,20 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
         moneda: "PEN",
         numeroOrdenCompra: form.numeroOrdenCompra || "",
         ordenCompra: ocId,
+        ...(partidasOC.length ? { partidasOC } : {}),
         facturaInternaDesdeCliente: true,
         ...(parsearGuiaRemision(guiaRelacionada) ? { guiaRelacionada: parsearGuiaRemision(guiaRelacionada) } : {}),
       }),
     });
-    const dataCpe = await resCpe.json();
+    const dataCpe = await resCpe.json().catch(() => ({}));
     if (!dataCpe.ok) {
       setError(dataCpe.mensaje || dataCpe.error || "SUNAT rechazó el comprobante.");
       setGuardando(false);
+      return;
+    }
+    // La Factura interna exige un comprobante ACEPTADO; uno EN_PROCESO la recibe de «Consultar estado».
+    if (dataCpe.estado !== "ACEPTADO") {
+      setError(`La factura SUNAT ${dataCpe.serie} quedó EN PROCESO. El registro interno se creará cuando «Consultar estado» (Facturación Electrónica) confirme que SUNAT la aceptó.`);
       return;
     }
 
@@ -347,6 +356,8 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
       numeroGuiaEmision:  form.numeroGuiaEmision,
       numeroGuiaRemision: form.numeroGuiaRemision,
       ordenCompra:        ocId,
+      partidasOC,
+      comprobante:        dataCpe.id,
       empresa:            form.empresa,
     };
     // Crédito con cuotas reemplaza a "Fecha cancelación": el vencimiento pasa
@@ -368,11 +379,20 @@ export default function ModalCrearFactura({ onClose, onCreada, ocInicial }) {
       body: JSON.stringify(factPayload),
     });
     if (!resF.ok) {
-      setError(`La factura SUNAT ${dataCpe.serie} se emitió correctamente, pero no se pudo crear el registro interno. Verifica manualmente.`);
-      setGuardando(false);
+      const motivo = await mensajeError(resF, "");
+      setError(`La factura SUNAT ${dataCpe.serie} se emitió correctamente, pero no se pudo crear el registro interno${motivo ? `: ${motivo}` : "."} Verifica manualmente.`);
       return;
     }
     const factura = await resF.json();
+    const resV = await fetchAuth(`/cpe/${dataCpe.id}/vincular-factura`, {
+      method: "PATCH",
+      body: JSON.stringify({ facturaInterna: factura._id }),
+    });
+    if (!resV.ok) {
+      const motivo = await mensajeError(resV, "");
+      setError(`La factura ${factura.codigo} se creó, pero no se pudo vincular al comprobante ${dataCpe.serie}${motivo ? `: ${motivo}` : "."} Verifica manualmente.`);
+      return;
+    }
 
     setExito(factura.codigo);
     setTimeout(() => onCreada(factura), 1800);

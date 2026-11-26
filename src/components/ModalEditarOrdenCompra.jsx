@@ -122,7 +122,6 @@ export default function ModalEditarOrdenCompra({ orden, onClose, onGuardada }) {
 
   const [form, setForm] = useState({
     numeroOrden:   orden.numeroOrden   || "",
-    numeroFactura: orden.numeroFactura || "",
     empresa:       orden.empresa?._id  || "",
     titulo:        orden.titulo        || "",
     subtotal:      subtotalInicial > 0 ? String(subtotalInicial) : "",
@@ -167,7 +166,6 @@ export default function ModalEditarOrdenCompra({ orden, onClose, onGuardada }) {
     setGuardando(true); setError("");
     const payload = {
       numeroOrden:   form.numeroOrden,
-      numeroFactura: form.numeroFactura,
       titulo:        form.titulo    || "por definir",
       subtotal:      Number(form.subtotal) || 0,
       igv:           calc.igv,
@@ -258,9 +256,10 @@ export default function ModalEditarOrdenCompra({ orden, onClose, onGuardada }) {
                     placeholder="Ej. OC-2024-001" className={INP} />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500 block mb-1">N° de factura</label>
-                  <input name="numeroFactura" value={form.numeroFactura} onChange={handleChange}
-                    placeholder="Ej. F001-00123" className={INP} />
+                  <span className="text-xs text-gray-500 block mb-1">N° de factura</span>
+                  <p className="px-3 py-2 text-sm font-mono text-gray-700 bg-gray-50 border border-gray-100 rounded-lg min-h-[38px] break-words">
+                    {orden.estadoFacturacion?.numerosFactura || <span className="text-gray-300">—</span>}
+                  </p>
                 </div>
               </div>
 

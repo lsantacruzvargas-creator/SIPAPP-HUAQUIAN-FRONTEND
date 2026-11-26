@@ -4,7 +4,7 @@ import { fetchAuth, uploadAuth, abrirArchivoProtegido, getUsuario } from "../uti
 import { formatearFecha, anioLima, mesLima } from "../utils/fecha";
 import DetalleDocumento from "../components/DetalleDocumento";
 import ModalImportarExcel, { COLS_OC, COLS_CADENA } from "../components/ModalImportarExcel";
-import { DotChip, badgeGeneral, dotGeneral, badgeInformes, dotInformes, ESTADOS_SERVICIO } from "../components/detalleShared";
+import { DotChip, badgeGeneral, dotGeneral, badgeInformes, dotInformes, ESTADOS_SERVICIO, bloqueadoPorPago } from "../components/detalleShared";
 import TablaScroll from "../components/TablaScroll";
 import Paginacion from "../components/Paginacion";
 import { usePaginacion } from "../utils/usePaginacion";
@@ -184,7 +184,17 @@ function TablaOC({
                   </td>
                   {mostrarHesActa && <td className="px-4 py-3.5 text-center"><PillSiNo si={!!o.hesConfirmado} /></td>}
                   {mostrarHesActa && <td className="px-4 py-3.5 text-center"><PillSiNo si={!!o.actaConformidadConfirmada} /></td>}
-                  {mostrarDocumento && (
+                  {mostrarDocumento && bloqueadoPorPago(o, getUsuario()?.rol) && (
+                    <td className="px-4 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
+                      {o.documento ? (
+                        <button type="button" onClick={() => abrirArchivoProtegido(o.documento)}
+                          className="text-blue-600 hover:text-blue-800 text-xs font-medium underline">
+                          Ver PDF
+                        </button>
+                      ) : <span className="text-gray-300 text-xs">—</span>}
+                    </td>
+                  )}
+                  {mostrarDocumento && !bloqueadoPorPago(o, getUsuario()?.rol) && (
                     <td className="px-4 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
                       <label className="cursor-pointer inline-flex flex-col items-center gap-1">
                         <input

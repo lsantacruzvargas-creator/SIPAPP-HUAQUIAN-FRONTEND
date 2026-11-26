@@ -23,6 +23,26 @@ const TIPO_DOC_CLASE = {
 
 const tipoDocTexto = (v) => TIPO_DOC_CPE.find((t) => t.valor === v)?.label.split(" — ")[1] ?? v;
 const simboloMoneda = (m) => (m === "USD" ? "US$" : !m || m === "PEN" ? "S/" : m);
+// ANULADO sin llegar a SUNAT: la emisión chocó con otro comprobante que ya reservaba las partidas
+// de la OC (el correlativo se consumió y quedó registrado así, ver emitirFacturaBoleta).
+const noEnviado = (c) => c.estado === "ANULADO" && /^No enviado/i.test(c.sunat?.mensaje || "");
+const CLASE_NO_ENVIADO = "bg-orange-50 text-orange-700 border border-orange-200";
+
+function ChipEstado({ c }) {
+  if (noEnviado(c)) {
+    return (
+      <span title={c.sunat.mensaje} className={`px-2.5 py-0.5 rounded-full text-xs font-medium cursor-help ${CLASE_NO_ENVIADO}`}>
+        No enviado
+      </span>
+    );
+  }
+  return (
+    <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${estadoComprobanteClase(c.estado)}`}>
+      {c.estado}
+    </span>
+  );
+}
+
 const nombreMoneda = (m) => (m === "USD" ? "Dólares (USD)" : !m || m === "PEN" ? "Soles (PEN)" : m);
 
 const leerBase64 = (archivo) => !archivo ? Promise.resolve(undefined) : new Promise((resolve, reject) => {
@@ -348,9 +368,7 @@ export default function ListaComprobantes() {
                   </td>
                   <td className="px-4 py-3 text-center text-gray-500">{formatearFecha(c.fechaEmision)}</td>
                   <td className="px-4 py-3 text-center">
-                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${estadoComprobanteClase(c.estado)}`}>
-                      {c.estado}
-                    </span>
+                    <ChipEstado c={c} />
                   </td>
                 </tr>
               ))
@@ -392,9 +410,7 @@ export default function ListaComprobantes() {
                 </h3>
                 <span className="font-mono text-xs text-gray-400">{seleccionado.nombreArchivo}</span>
               </div>
-              <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${estadoComprobanteClase(seleccionado.estado)}`}>
-                {seleccionado.estado}
-              </span>
+              <ChipEstado c={seleccionado} />
             </div>
 
             {(seleccionado.estado === "RECHAZADO" || seleccionado.estado === "ERROR") && seleccionado.sunat?.mensaje && (
@@ -415,7 +431,14 @@ export default function ListaComprobantes() {
             )}
             {seleccionado.estado === "ANULADO" && (
               <div className="bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg px-4 py-3 mb-4">
-                {seleccionado.anulacionExterna?.documento ? (
+                {noEnviado(seleccionado) ? (
+                  <>
+                    <strong>No enviado a SUNAT.</strong> {seleccionado.sunat.mensaje.replace(/^No enviado:?\s*/i, "")}
+                    <span className="block text-xs text-gray-400 mt-1">
+                      El correlativo se consumió pero el comprobante nunca se envió: no existe en SUNAT ni reserva partidas.
+                    </span>
+                  </>
+                ) : seleccionado.anulacionExterna?.documento ? (
                   <>
                     Anulado en SUNAT con <strong>{seleccionado.anulacionExterna.documento}</strong>: {seleccionado.anulacionExterna.motivo}
                     <span className="block text-xs text-gray-400 mt-1">

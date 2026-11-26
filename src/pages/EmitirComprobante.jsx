@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { MensajeError } from "../components/detalleShared";
 import { useLocation, useNavigate } from "react-router-dom";
-import { fetchAuth } from "../utils/fetchAuth";
+import { fetchAuth, mensajeError } from "../utils/fetchAuth";
 import { fechaHoyLima, formatearFecha } from "../utils/fecha";
 import TablaScroll from "../components/TablaScroll";
 import {
@@ -22,10 +22,11 @@ import {
   formatearGuiaRemision,
   parsearGuiaRemision,
 } from "../utils/catalogosSunat";
-import { RUC_GLORIA, esFormatoAlicorp, ocEsParcial } from "../utils/cotizacionItems";
+import { RUC_GLORIA, esFormatoAlicorp } from "../utils/cotizacionItems";
 import { r2, r0 } from "../utils/redondeo";
 
 const RECEPTOR_VACIO = { schemeID: "6", numDoc: "", nombre: "" };
+const noEnviado = (c) => c.estado === "ANULADO" && /^No enviado/i.test(c.sunat?.mensaje || "");
 const REFERENCIA_VACIA = { id: "", serie: "", tipoDoc: "" };
 
 // Empresa emisora fija — este ERP factura únicamente a nombre de Huaquian.
@@ -100,6 +101,8 @@ export default function EmitirComprobante() {
   // con éxito, además crea el registro interno Factura vinculado a esta OC
   // (mismo paso 2 que hacía ModalCrearFactura.jsx).
   const [ocOrigen, setOcOrigen] = useState(null);
+  // _id de las partidas de `ocOrigen` que factura este comprobante (vacío en una OC legado).
+  const [partidasOC, setPartidasOC] = useState([]);
   const [facturaInterna, setFacturaInterna] = useState(null);
   // RUC cuya razón social ya está resuelta (precargada desde la OC o el
   // comprobante de referencia, o ya consultada) — sin esto, cada vez que el
@@ -107,6 +110,11 @@ export default function EmitirComprobante() {
   const rucResuelto = useRef("");
 
   const esNota = tipoDoc === "07" || tipoDoc === "08";
+
+  // El mensaje se muestra arriba y el botón Emitir está al pie del formulario.
+  useEffect(() => {
+    if (error) window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [error]);
 
   const aplicarComprobanteReferencia = (c) => {
     setReferencia({ id: c._id, serie: `${c.serie}-${c.correlativo}`, tipoDoc: c.tipoDoc });
@@ -126,10 +134,10 @@ export default function EmitirComprobante() {
     })));
   };
 
-  // Precarga emisor (fijo), receptor, ítems y precios, y N° de OC a partir
-  // de la Cotización vinculada a la orden de compra — la OC en sí no tiene
-  // ítems propios, solo un monto global (ver OrdenCompra.js).
-  const aplicarPrellenadoOC = (oc, cotizacion) => {
+  // Precarga emisor (fijo), receptor, ítems y N° de OC a partir de las partidas
+  // elegidas de la OC y sus cotizaciones (la OC no tiene ítems propios). Una OC
+  // sin partidas (legado) se factura entera, en una línea por su monto.
+  const aplicarPrellenadoOC = (oc, idsPartidas, cotizaciones) => {
     setOcOrigen(oc);
     setTipoDoc("01");
     setSerie(SERIE_POR_TIPO["01"]);
@@ -138,39 +146,51 @@ export default function EmitirComprobante() {
       setReceptor({ schemeID: "6", numDoc: emp.ruc || "", nombre: emp.razonSocial || "" });
       if (emp.razonSocial) rucResuelto.current = emp.ruc || "";
     }
-    const esServicio = cotizacion?.tipo === "servicio";
-    const unidad = esServicio ? "ZZ" : "NIU";
-    setTipoBienServicio(esServicio ? "servicio" : "bien");
-    if (cotizacion?.moneda) setMoneda(cotizacion.moneda);
     setNumeroOrdenCompra(oc.numeroOrden || oc.codigo || "");
     setOrdenCompraId(oc._id || "");
-    // OC con varias partidas: una línea por partida, por el monto de esa partida en la OC.
-    if (oc.partidas?.length > 1) {
-      setItems(oc.partidas.map((p) => {
-        const valor = r2(Number(p.subtotal) || 0);
-        return {
-          ...itemVacioComprobante(),
-          descripcion: p.titulo || p.cotizacion?.titulo || "",
-          cantidad: 1,
-          unidad,
-          valorUnitario: valor,
-          precioUnitario: precioUnitarioDesdeValor(valor, "10"),
-          afectacion: "10",
-          descuentoPorcentaje: 0,
-        };
-      }));
+    const ids = (idsPartidas || []).map(String);
+    const elegidas = (oc.partidas || []).filter((p) => ids.includes(String(p._id)));
+    setPartidasOC(elegidas.map((p) => p._id));
+
+    const cotDe = (p) => cotizaciones?.[p.cotizacion?._id || p.cotizacion] || p.cotizacion;
+    const cotBase = elegidas.length ? cotDe(elegidas[0]) : oc.cotizacion;
+    const esServicio = cotBase?.tipo === "servicio";
+    const unidad = esServicio ? "ZZ" : "NIU";
+    setTipoBienServicio(esServicio ? "servicio" : "bien");
+    if (cotBase?.moneda) setMoneda(cotBase.moneda);
+
+    const linea = (descripcion, monto) => {
+      const valor = r2(Number(monto) || 0);
+      return {
+        ...itemVacioComprobante(),
+        descripcion,
+        cantidad: 1,
+        unidad,
+        valorUnitario: valor,
+        precioUnitario: precioUnitarioDesdeValor(valor, "10"),
+        afectacion: "10",
+        descuentoPorcentaje: 0,
+      };
+    };
+    if (!elegidas.length) {
+      setItems([linea(oc.descripcion || oc.titulo || "", oc.subtotal)]);
       return;
     }
-    // Ítems Gloria del grupo "mano_obra" usan personas×horas×tarifaHora en
-    // vez de cantidad/precio (ver Cotizacion.js itemSchema) — se traduce a
-    // cantidad/valorUnitario equivalentes. Filas puramente informativas o
-    // de agrupación (sin cantidad ni precio) se descartan del prellenado.
-    // OC con una sola partida: solo se facturan los ítems de esa partida.
-    const partidaUnica = oc.partidas?.[0];
-    const itemsDeOC = (cotizacion?.items || []).filter((i) => partidaUnica
-      ? String(i.partidaOC) === String(partidaUnica._id)
-      : (i.ocGenerada?._id || i.ocGenerada) === oc._id);
-    const itemsValidos = (itemsDeOC.length ? itemsDeOC : cotizacion?.items || [])
+    const lineasPorPartida = () => setItems(elegidas.map((p) => linea(p.titulo || cotDe(p)?.titulo || "", p.subtotal)));
+    // Formatos Gloria y Alicorp/Intradevco/Masterbread: el cliente paga el TOTAL (SIN IGV), que ya
+    // incluye gastos y utilidad — los ítems solo suman el SUB-TOTAL. Se factura una línea por partida
+    // por su monto (decisión del usuario, 2026-11-03).
+    const formatoEspecial = emp?.ruc === RUC_GLORIA || esFormatoAlicorp(emp?.ruc);
+    if (elegidas.length > 1 || formatoEspecial) return lineasPorPartida();
+
+    // Una sola partida de una cotización genérica: un ítem de factura por ítem de la partida, si
+    // cuadran con su monto. Ítems Gloria del grupo "mano_obra" usan personas×horas×tarifaHora en
+    // vez de cantidad/precio (ver Cotizacion.js itemSchema); filas informativas (sin cantidad ni
+    // precio) se descartan.
+    const [partida] = elegidas;
+    const cotizacion = cotDe(partida);
+    const itemsValidos = (cotizacion?.items || [])
+      .filter((i) => String(i.partidaOC) === String(partida._id))
       .map((i) => {
         const esManoObra = i.grupo === "mano_obra";
         const cantidad = esManoObra
@@ -180,49 +200,26 @@ export default function EmitirComprobante() {
         return { descripcion: i.descripcion, cantidad, valorUnitario };
       })
       .filter((i) => i.cantidad > 0 && i.valorUnitario > 0);
-    // Formatos Gloria y Alicorp/Intradevco/Masterbread: el cliente paga el TOTAL (SIN IGV), que ya
-    // incluye gastos y utilidad — los ítems solo suman el SUB-TOTAL. Se factura en una sola línea
-    // por ese monto (decisión del usuario, 2026-11-03), igual que la OC (`total - igv`).
-    // El monto a facturar es el de la OC (puede ser menor al de la cotización,
-    // ver ModalOrdenCompra.jsx); la cotización solo aporta descripciones.
-    const totalSinIgv = r2(((Number(cotizacion?.total) || 0) - (Number(cotizacion?.igv) || 0)));
-    const montoOC = Number(oc.subtotal) > 0 ? r2(Number(oc.subtotal)) : totalSinIgv;
-    const lineaUnica = (descripcion) => setItems([{
-      ...itemVacioComprobante(),
-      descripcion,
-      cantidad: 1,
-      unidad,
-      valorUnitario: montoOC,
-      precioUnitario: precioUnitarioDesdeValor(montoOC, "10"),
-      afectacion: "10",
-      descuentoPorcentaje: 0,
-    }]);
-    // Descuento global de la cotización (genérica) → mismo % en cada línea, para
-    // que la base de la factura cuadre con la OC (que ya nació descontada).
+    // Descuento global de la cotización → mismo % en cada línea, para que la base cuadre con la
+    // partida (que ya nació descontada).
+    const montoPartida = r2(Number(partida.subtotal) || 0);
     const descPct = Number(cotizacion?.descuentoPorcentaje) || 0;
     const baseItems = itemsValidos.reduce((s, i) =>
       s + calcularLineaComprobante({ ...i, afectacion: "10", descuentoPorcentaje: descPct / 100 }).base, 0);
     // Tolerancia: redondeo del descuento por línea (medio céntimo por ítem).
-    const itemsCuadranConOC = !(montoOC > 0) || Math.abs(baseItems - montoOC) <= 0.01 * itemsValidos.length;
-    const formatoEspecial = emp?.ruc === RUC_GLORIA || esFormatoAlicorp(emp?.ruc);
-    if (formatoEspecial && montoOC > 0) {
-      lineaUnica((ocEsParcial(oc, cotizacion) && oc.titulo) || itemsValidos[0]?.descripcion || oc.descripcion || oc.titulo || "");
-    } else if (itemsValidos.length && itemsCuadranConOC) {
-      setItems(itemsValidos.map((i) => ({
-        _key: Date.now() + Math.random(),
-        descripcion: i.descripcion,
-        cantidad: i.cantidad,
-        unidad,
-        valorUnitario: i.valorUnitario,
-        precioUnitario: precioUnitarioDesdeValor(i.valorUnitario, "10"),
-        afectacion: "10",
-        descuentoPorcentaje: descPct,
-      })));
-    } else if (montoOC > 0) {
-      lineaUnica(oc.descripcion || oc.titulo || itemsValidos[0]?.descripcion || "");
-    } else {
-      setItems([{ ...itemVacioComprobante(), descripcion: oc.descripcion || oc.titulo || "", unidad }]);
-    }
+    const cuadran = itemsValidos.length > 0
+      && (!(montoPartida > 0) || Math.abs(baseItems - montoPartida) <= 0.01 * itemsValidos.length);
+    if (!cuadran) return lineasPorPartida();
+    setItems(itemsValidos.map((i) => ({
+      _key: Date.now() + Math.random(),
+      descripcion: i.descripcion,
+      cantidad: i.cantidad,
+      unidad,
+      valorUnitario: i.valorUnitario,
+      precioUnitario: precioUnitarioDesdeValor(i.valorUnitario, "10"),
+      afectacion: "10",
+      descuentoPorcentaje: descPct,
+    })));
   };
 
   useEffect(() => {
@@ -233,7 +230,7 @@ export default function EmitirComprobante() {
     }
     const pre = location.state?.prellenarDesdeOC;
     if (pre?.oc) {
-      aplicarPrellenadoOC(pre.oc, pre.cotizacion);
+      aplicarPrellenadoOC(pre.oc, pre.partidas, pre.cotizaciones);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -242,7 +239,8 @@ export default function EmitirComprobante() {
     if (!esNota || !rucEmisor) { setComprobantesRef([]); return; }
     fetchAuth(`/cpe?rucEmisor=${rucEmisor}&estado=ACEPTADO&limit=50`).then(async (r) => {
       const data = await r.json();
-      if (data.ok) setComprobantesRef(data.data.filter((c) => c.tipoDoc === "01" || c.tipoDoc === "03"));
+      // Un ANULADO "No enviado" nunca llegó a SUNAT (choque de reserva de partidas): no se referencia.
+      if (data.ok) setComprobantesRef(data.data.filter((c) => (c.tipoDoc === "01" || c.tipoDoc === "03") && !noEnviado(c)));
     });
   }, [esNota, rucEmisor]);
 
@@ -429,6 +427,11 @@ export default function EmitirComprobante() {
   };
 
   const elegirOC = (o) => {
+    if (o.partidas?.length) {
+      setMostrarBuscadorOC(false);
+      setError(`La OC ${o.numeroOrden || o.codigo} se factura por partidas: emite desde el detalle de la OC eligiendo las partidas.`);
+      return;
+    }
     setNumeroOrdenCompra(o.numeroOrden || o.codigo);
     setOrdenCompraId(o._id);
     setMostrarBuscadorOC(false);
@@ -581,6 +584,7 @@ export default function EmitirComprobante() {
           informacionRelacionada: informacionRelacionada.trim(),
           numeroOrdenCompra: numeroOrdenCompra.trim(),
           ...(ordenCompraId ? { ordenCompra: ordenCompraId } : {}),
+          ...(ocOrigen && partidasOC.length ? { partidasOC } : {}),
           facturaInternaDesdeCliente: !!ocOrigen,
           ...(parsearGuiaRemision(guiaRelacionada) ? { guiaRelacionada: parsearGuiaRemision(guiaRelacionada) } : {}),
           ...(detraccionAplica ? {
@@ -611,8 +615,12 @@ export default function EmitirComprobante() {
       if (data.estado === "ERROR") {
         setError(`No se obtuvo respuesta de SUNAT${data.mensaje ? ` (${data.mensaje})` : ""}. El comprobante ${data.serie || ""} quedó en ERROR, no rechazado: no lo vuelvas a emitir — revísalo en Facturación Electrónica (Consultar estado / Adjuntar XML/CDR).`);
       } else if (!data.ok) {
-        setError(data.mensaje || data.error || "El comprobante fue rechazado por SUNAT.");
-      } else if (ocOrigen) {
+        const mensaje = data.mensaje || data.error || "El comprobante fue rechazado por SUNAT.";
+        // 409 de carrera: el correlativo se consumió pero el comprobante quedó ANULADO sin enviarse.
+        setError(res.status === 409 && data.serie
+          ? `${mensaje} El correlativo ${data.serie} quedó anulado sin enviarse a SUNAT.`
+          : mensaje);
+      } else if (ocOrigen && data.estado === "ACEPTADO") {
         await crearFacturaInterna(data);
       }
     } catch {
@@ -637,6 +645,8 @@ export default function EmitirComprobante() {
       numeroGuiaEmision:  ocOrigen.numeroGuiaEmision || "",
       numeroGuiaRemision: ocOrigen.numeroGuiaRemision || "",
       ordenCompra:        ocOrigen._id,
+      partidasOC,
+      comprobante:        dataCpe.id,
       empresa:            ocOrigen.empresa?._id || ocOrigen.empresa,
       codigoSap:          ocOrigen.codigoSap,
       fechaSalida:        ocOrigen.fechaSalida,
@@ -647,7 +657,8 @@ export default function EmitirComprobante() {
     }
     const resF = await fetchAuth("/facturas", { method: "POST", body: JSON.stringify(factPayload) });
     if (!resF.ok) {
-      setError(`El comprobante ${dataCpe.serie} se emitió correctamente, pero no se pudo crear el registro interno de Factura. Verifica manualmente.`);
+      const motivo = await mensajeError(resF, "");
+      setError(`El comprobante ${dataCpe.serie} se emitió correctamente, pero no se pudo crear el registro interno de Factura${motivo ? `: ${motivo}` : "."} Verifica manualmente.`);
       return;
     }
     const factura = await resF.json();
@@ -655,10 +666,14 @@ export default function EmitirComprobante() {
     // Enlaza el Comprobante ya emitido con esta Factura recién creada — la Factura no podía
     // existir antes (necesita el número ya emitido en SUNAT), así que el vínculo se completa acá,
     // no en el POST /cpe/factura de arriba (ver vincularFactura en comprobante.controller.js).
-    await fetchAuth(`/cpe/${dataCpe.id}/vincular-factura`, {
+    const resV = await fetchAuth(`/cpe/${dataCpe.id}/vincular-factura`, {
       method: "PATCH",
       body: JSON.stringify({ facturaInterna: factura._id }),
     });
+    if (!resV.ok) {
+      const motivo = await mensajeError(resV, "");
+      setError(`La factura ${factura.codigo} se creó, pero no se pudo vincular al comprobante ${dataCpe.serie}${motivo ? `: ${motivo}` : "."} Verifica manualmente.`);
+    }
   };
 
   const nuevo = () => {
@@ -687,6 +702,7 @@ export default function EmitirComprobante() {
     setOrdenCompraId("");
     setGuiaRelacionada("");
     setOcOrigen(null);
+    setPartidasOC([]);
     setFacturaInterna(null);
     rucResuelto.current = "";
     setResultado(null);
@@ -714,6 +730,11 @@ export default function EmitirComprobante() {
         <div className="bg-amber-50 border border-amber-200 text-amber-700 text-sm rounded-lg px-4 py-3 mb-5">
           Comprobante <strong>{resultado.serie}</strong> EN PROCESO — SUNAT aún no confirma el resultado.
           Verifica el estado más tarde en la lista de comprobantes.
+          {ocOrigen && (
+            <span className="block mt-1">
+              El registro interno de la Factura de la orden de compra se creará cuando «Consultar estado» confirme que SUNAT lo aceptó.
+            </span>
+          )}
         </div>
       )}
       {facturaInterna && (
@@ -1207,15 +1228,22 @@ export default function EmitirComprobante() {
                 <div className="flex gap-2">
                   <input value={numeroOrdenCompra}
                     onChange={(e) => { setNumeroOrdenCompra(e.target.value); setOrdenCompraId(""); }}
-                    disabled={ro}
+                    disabled={ro || !!ocOrigen}
+                    title={ocOrigen ? "Se factura desde esta orden de compra: no se puede cambiar." : undefined}
                     className="flex-1 input-field w-auto disabled:bg-gray-50 disabled:text-gray-500" />
-                  {!ro && (
+                  {!ro && !ocOrigen && (
                     <button type="button" onClick={abrirBuscadorOC}
                       className="px-4 py-2 rounded-lg text-sm border border-gray-300 text-gray-500 hover:text-gray-800 transition">
                       Buscar
                     </button>
                   )}
                 </div>
+                {ocOrigen && partidasOC.length > 0 && (
+                  <p className="text-xs text-gray-500 mt-1.5">
+                    Partidas de la OC que factura este comprobante ({partidasOC.length} de {ocOrigen.partidas.length}):{" "}
+                    {ocOrigen.partidas.filter((p) => partidasOC.includes(p._id)).map((p) => `«${p.titulo}»`).join(", ")}
+                  </p>
+                )}
               </div>
 
               <div className="mt-4 pt-4 border-t border-gray-100">

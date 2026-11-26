@@ -7,7 +7,7 @@ import ModalDetalleGuia from "./ModalDetalleGuia";
 import ConfirmacionAccion from "./ConfirmacionAccion";
 import {
   FlujoNegocio, TarjetaRelacion, Chip,
-  badgePago, badgeGeneral, money, totalSinIgv, BotonAnular, BotonCerrarCadena, BotonDesanular, BannerAnulado, bloqueadoPorCadenaCerrada, MensajeError,
+  badgePago, badgeGeneral, money, totalSinIgv, BotonAnular, BotonDesanular, BannerAnulado, bloqueadoPorPago, MensajeError,
 } from "./detalleShared";
 import { r2, r0 } from "../utils/redondeo";
 import { montoAjustadoItem, lineasConsolidadas } from "../utils/cotizacionItems";
@@ -25,12 +25,30 @@ function calcular(sub) {
   return { igv, total, detraccion, totalAPagar: r2((total - detraccion)) };
 }
 
+// Estado de facturación de una partida (estadoFacturacion.partidas[i], derivado en el backend).
+function CeldaFacturaPartida({ estado }) {
+  if (!estado) return <span className="text-gray-300">—</span>;
+  if (estado.factura) {
+    return (
+      <span className="flex flex-wrap items-center gap-1.5">
+        <span className="font-mono text-xs text-gray-700 whitespace-nowrap">{estado.factura.numeroFactura || estado.factura.codigo}</span>
+        <Chip className={badgePago(estado.factura.estadoPago)}>{estado.factura.estadoPago || "sin pago"}</Chip>
+      </span>
+    );
+  }
+  if (estado.estado === "reservada") {
+    return <span title="Un comprobante en emisión incluye esta partida."><Chip className="bg-amber-100 text-amber-700">Reservada</Chip></span>;
+  }
+  if (estado.estado === "pagada") return <Chip className={badgePago("pagado")}>pagada</Chip>;
+  if (estado.estado === "facturada") return <span className="text-xs text-gray-500">Facturada</span>;
+  return <span className="text-gray-300">—</span>;
+}
+
 export default function DetalleOrdenCompra({ orden, onClose, onGuardada, facturaVinculada, onNavegar }) {
   const subtotalInicial = orden.subtotal ?? orden.monto ?? 0;
 
   const [form, setForm] = useState({
     numeroOrden:   orden.numeroOrden   || "",
-    numeroFactura: orden.numeroFactura || "",
     empresa:       orden.empresa?._id  || "",
     titulo:        orden.titulo        || "",
     subtotal:      subtotalInicial > 0 ? String(subtotalInicial) : "",
@@ -53,7 +71,6 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
   const [error, setError]         = useState("");
   const [cargandoFactura, setCargandoFactura] = useState(false);
   const [cargandoCot, setCargandoCot] = useState(false);
-  const [cargandoCrearFactura, setCargandoCrearFactura] = useState(false);
   const navigate = useNavigate();
   const [ordenActual, setOrdenActual] = useState(orden);
   const consolidada = lineasConsolidadas(ordenActual).length > 0;
@@ -65,13 +82,18 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
   const [partidaADesvincular, setPartidaADesvincular] = useState(null);
   const [desvinculando, setDesvinculando] = useState(false);
   const [errorDesvincular, setErrorDesvincular] = useState("");
+  const [seleccionadas, setSeleccionadas] = useState([]);
+  const [confirmandoPagada, setConfirmandoPagada] = useState(false);
+  const [guardandoPagada, setGuardandoPagada] = useState(false);
+  const [errorPagada, setErrorPagada] = useState("");
   const rolActual = getUsuario()?.rol;
   const puedeEditar = ["admin", "asistente", "facturacion", "jefatura"].includes(rolActual);
   // Anular un documento queda reservado a Admin y Jefatura — Facturación ya
-  // no puede. Desanular y cerrar/abrir la cadena a mano son exclusivos de admin.
+  // no puede. Desanular y marcar la OC como pagada a mano son exclusivos de admin.
   const puedeAnular = ["admin", "jefatura"].includes(rolActual);
   const esAdmin = rolActual === "admin";
-  const cadenaCerrada = bloqueadoPorCadenaCerrada(orden.estadoCadena, rolActual);
+  const bloqueada = bloqueadoPorPago(ordenActual, rolActual);
+  const estadoFact = ordenActual.estadoFacturacion;
   const puedeConfirmarHesActa = ["admin", "asistente", "facturacion", "jefatura"].includes(rolActual);
   // Montos/cálculos exclusivos de admin/jefatura/facturación — mismo criterio
   // que ListaOrdenesCompra.jsx y que precios de Cotización (Fase 16). Antes
@@ -106,12 +128,12 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
     setGuardandoConfirmacion("");
   };
 
-  const abrirFactura = async () => {
-    if (!facturaVinculada || cargandoFactura) return;
+  const abrirFactura = async (f) => {
+    if (!f || cargandoFactura) return;
     setCargandoFactura(true);
     const res = await fetchAuth("/facturas");
     const lista = res.ok ? await res.json() : [];
-    const full = lista.find(f => f._id === facturaVinculada._id) || facturaVinculada;
+    const full = lista.find(x => x._id === f._id) || f;
     setCargandoFactura(false);
     onNavegar?.({ tipo: "factura", data: full });
   };
@@ -131,22 +153,14 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
     onNavegar?.({ tipo: "cotizacion", data: full });
   };
 
-  // Emitir Factura desde una OC: lleva a la página completa de Emitir CPE
-  // (en vez del pequeño ModalCrearFactura) con emisor/receptor/ítems y
-  // precios precargados desde la Cotización vinculada — la OC no tiene
-  // ítems propios (ver OrdenCompra.js), solo un monto global.
-  const crearFacturaDesdeOC = async () => {
-    if (cargandoCrearFactura) return;
-    setCargandoCrearFactura(true);
-    let cotizacionCompleta = null;
-    if (cot) {
-      const res = await fetchAuth("/cotizaciones");
-      const lista = res.ok ? await res.json() : [];
-      cotizacionCompleta = lista.find(c => c._id === cot._id) || null;
-    }
-    setCargandoCrearFactura(false);
+  // Emitir Factura desde una OC: lleva a la página completa de Emitir CPE con
+  // emisor/receptor/ítems precargados desde las partidas elegidas y sus
+  // cotizaciones. Una OC sin partidas (legado) se factura entera: `partidas` vacío.
+  const facturarPartidas = (ids) => {
+    const idsCot = new Set(partidas.filter(p => ids.includes(p._id)).map(idCotDe));
+    const cotizaciones = Object.fromEntries(Object.entries(cotizacionesPartidas).filter(([id]) => idsCot.has(id)));
     navigate("/facturacion-electronica/emitir", {
-      state: { prellenarDesdeOC: { oc: ordenActual, cotizacion: cotizacionCompleta } },
+      state: { prellenarDesdeOC: { oc: ordenActual, partidas: ids, cotizaciones } },
     });
   };
 
@@ -217,7 +231,6 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
     setGuardando(true); setError("");
     const payload = {
       numeroOrden:   form.numeroOrden,
-      numeroFactura: form.numeroFactura,
       titulo:        form.titulo    || "por definir",
       subtotal:      Number(form.subtotal) || 0,
       igv:           calc.igv,
@@ -269,27 +282,47 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
     else { return mensajeError(res, "Error al desanular el documento."); }
   };
 
-  const toggleCerrarCadena = async (cerrado) => {
-    const res = await fetchAuth(`/ordenes-compra/${orden._id}/cerrar-cadena`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cerrado }),
-    });
-    if (res.ok) { onGuardada(await res.json()); }
-    else { return mensajeError(res, "Error al cerrar/abrir la cadena."); }
+  const marcarPagada = async () => {
+    setGuardandoPagada(true);
+    setErrorPagada("");
+    try {
+      const res = await fetchAuth(`/ordenes-compra/${orden._id}/pagada-manual`, {
+        method: "PATCH",
+        body: JSON.stringify({ pagada: !ordenActual.pagadaManual }),
+      });
+      if (!res.ok) return setErrorPagada(await mensajeError(res, "No se pudo cambiar el estado de pago de la OC."));
+      aplicarOrden(await res.json());
+      setConfirmandoPagada(false);
+    } catch {
+      setErrorPagada("No se pudo conectar con el servidor.");
+    } finally {
+      setGuardandoPagada(false);
+    }
   };
 
   const cot     = orden.cotizacion;
-  const factura = facturaVinculada;
 
   // Una partida por cotización (ver routes/ordenesCompra.js); sus ítems son los de la cotización con `partidaOC` igual a su _id.
   const cotId = cot?._id || cot;
   const partidas = ordenActual.partidas || [];
   const idCotDe = (p) => p.cotizacion?._id || p.cotizacion;
+  const estadoPartida = (p) => estadoFact?.partidas?.find(e => String(e._id) === String(p._id));
+  const sinFacturar = (p) => estadoPartida(p)?.estado === "sin facturar";
+  // Facturas vigentes de la OC (una puede cubrir varias partidas). Una OC sin partidas (legado) no
+  // trae el detalle por partida: se usa la factura que encontró la lista.
+  const facturas = partidas.length
+    ? [...new Map((estadoFact?.partidas || []).filter(e => e.factura).map(e => [e.factura._id, e.factura])).values()]
+    : (facturaVinculada && !facturaVinculada.anulado ? [facturaVinculada] : []);
+  const factura = facturas.length === 1 ? facturas[0] : null;
+  const facturadas = (estadoFact?.partidas || []).filter(e => e.estado === "facturada" || e.estado === "pagada").length;
+  const puedeFacturar = puedeCrearFacturaRol && !ordenActual.anulado && !bloqueada;
+  const seleccionables = puedeFacturar ? partidas.filter(sinFacturar) : [];
+  const toggleSeleccion = (id) => setSeleccionadas(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   // La partida de origen no se desvincula si es la única de esa cotización: se anula la OC.
-  const puedeDesvincular = (p) => puedeEditar && !orden.anulado && !cadenaCerrada
+  const puedeDesvincular = (p) => puedeEditar && !orden.anulado && !bloqueada && sinFacturar(p)
     && (idCotDe(p) !== cotId || partidas.filter(x => idCotDe(x) === cotId).length > 1);
   const hayColumnaDesvincular = partidas.some(puedeDesvincular);
+  const hayCheck = seleccionables.length > 0;
   const itemsDePartida = (p) => (cotizacionesPartidas[idCotDe(p)]?.items || [])
     .map((item, idx) => ({ item, idx }))
     .filter(e => e.item.partidaOC && String(e.item.partidaOC) === String(p._id));
@@ -298,6 +331,7 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
     .map(o => o.numeroOT || o.codigo);
   const aplicarOrden = (nueva) => {
     setOrdenActual(nueva);
+    setSeleccionadas([]);
     setForm(prev => ({ ...prev, subtotal: String(nueva.subtotal ?? 0) }));
     setCalc(calcular(nueva.subtotal ?? 0));
   };
@@ -319,7 +353,7 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
     { tipo: "ot",         activo: !!ot,              codigo: ot?.codigo },
     { tipo: "informe",    activo: informes.length>0, codigo: ultimo?.codigo || (informes.length ? `${informes.length} av.` : "") },
     { tipo: "oc",         activo: true,              codigo: orden.codigo },
-    { tipo: "factura",    activo: !!factura,         codigo: factura?.codigo },
+    { tipo: "factura",    activo: facturas.length > 0, codigo: facturas.length > 1 ? `${facturas.length} fact.` : factura?.codigo },
   ];
 
   return (
@@ -352,14 +386,22 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
                     <p className="text-lg font-bold leading-tight">{money(totalSinIgv(ordenActual), cot?.moneda)}</p>
                   </>
                 )}
-                {factura?.estadoPago && (
-                  <Chip className="mt-0.5 bg-white/20 text-white">{factura.estadoPago}</Chip>
+                {estadoFact?.estado && (
+                  <Chip className="mt-0.5 bg-white/20 text-white">
+                    {estadoFact.estado}{partidas.length > 0 && ` ${facturadas}/${partidas.length}`}
+                    {ordenActual.pagadaManual && " (manual)"}
+                  </Chip>
                 )}
               </div>
-              {!orden.anulado && !cadenaCerrada && puedeAnular && <BotonAnular onAnular={anular} />}
+              {!orden.anulado && !bloqueada && puedeAnular && <BotonAnular onAnular={anular} />}
               {esAdmin && orden.anulado && <BotonDesanular onDesanular={desanular} />}
-              {esAdmin && <BotonCerrarCadena cerrado={cadenaCerrada} onToggle={toggleCerrarCadena} />}
-              {!orden.anulado && !cadenaCerrada && puedeEditar && (
+              {esAdmin && !ordenActual.anulado && (
+                <button onClick={() => { setErrorPagada(""); setConfirmandoPagada(true); }}
+                  className="text-xs text-white/70 hover:text-white underline transition">
+                  {ordenActual.pagadaManual ? "Desmarcar pagada" : "Marcar OC como pagada"}
+                </button>
+              )}
+              {!orden.anulado && !bloqueada && puedeEditar && (
                 <button onClick={guardar} disabled={guardando}
                   className="bg-white text-blue-700 text-sm px-5 py-2 rounded-lg hover:bg-blue-50 disabled:opacity-60 transition font-semibold shadow-sm shrink-0">
                   {guardando ? "Guardando…" : "Guardar cambios"}
@@ -376,7 +418,7 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
                   <input
                     type="checkbox"
                     checked={!!ordenActual.hesConfirmado}
-                    disabled={!puedeConfirmarHesActa || ordenActual.anulado || guardandoConfirmacion === "hesConfirmado"}
+                    disabled={!puedeConfirmarHesActa || ordenActual.anulado || bloqueada || guardandoConfirmacion === "hesConfirmado"}
                     onChange={(e) => confirmarHesActa("hesConfirmado", e.target.checked)}
                     className="w-4 h-4"
                   />
@@ -391,7 +433,7 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
                   <input
                     type="checkbox"
                     checked={!!ordenActual.actaConformidadConfirmada}
-                    disabled={!puedeConfirmarHesActa || ordenActual.anulado || guardandoConfirmacion === "actaConformidadConfirmada"}
+                    disabled={!puedeConfirmarHesActa || ordenActual.anulado || bloqueada || guardandoConfirmacion === "actaConformidadConfirmada"}
                     onChange={(e) => confirmarHesActa("actaConformidadConfirmada", e.target.checked)}
                     className="w-4 h-4"
                   />
@@ -418,7 +460,7 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
         <div className="max-w-6xl mx-auto px-8 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
 
           {/* Datos editables */}
-          <fieldset disabled={orden.anulado || cadenaCerrada || !puedeEditar} className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5 self-start">
+          <fieldset disabled={orden.anulado || bloqueada || !puedeEditar} className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5 self-start">
             <div className="flex items-center gap-2">
               <span className="w-1.5 h-5 rounded-full bg-blue-500" />
               <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Datos de la orden</h2>
@@ -428,9 +470,11 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
               <BannerAnulado motivo={orden.motivoAnulacion} por={orden.anuladoPor} fecha={orden.fechaAnulacion} />
             )}
 
-            {!orden.anulado && cadenaCerrada && (
+            {!orden.anulado && bloqueada && (
               <p className="text-xs text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-                La cadena de este documento está cerrada (factura pagada) — de solo lectura. Solo Jefatura puede editarlo.
+                {ordenActual.pagadaManual
+                  ? `OC marcada como pagada${ordenActual.pagadaManualPor ? ` por ${ordenActual.pagadaManualPor}` : ""}${ordenActual.pagadaManualFecha ? ` el ${formatearFecha(ordenActual.pagadaManualFecha)}` : ""}`
+                  : "OC pagada"} — de solo lectura. Solo Jefatura puede editarla.
               </p>
             )}
 
@@ -441,9 +485,10 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
                   placeholder="Ej. OC-2024-001" className={INP} />
               </div>
               <div>
-                <label className="text-xs text-gray-500 block mb-1">N° de factura</label>
-                <input name="numeroFactura" value={form.numeroFactura} onChange={handleChange}
-                  placeholder="Ej. F001-00123" className={INP} />
+                <span className="text-xs text-gray-500 block mb-1">N° de factura</span>
+                <p className="px-3 py-2 text-sm font-mono text-gray-700 bg-gray-50 border border-gray-100 rounded-lg min-h-[38px] break-words">
+                  {estadoFact?.numerosFactura || <span className="text-gray-300">—</span>}
+                </p>
               </div>
             </div>
 
@@ -615,21 +660,29 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
 
             <TarjetaRelacion tipo="oc" codigo={orden.codigo} numero={orden.numeroOrden} actual />
 
-            <TarjetaRelacion tipo="factura" codigo={factura?.codigo} numero={factura?.numeroFactura} vacio={!factura}
-              onClick={factura ? abrirFactura : undefined} cargando={cargandoFactura || cargandoCrearFactura}
-              onCrear={!factura && !orden.anulado && puedeCrearFacturaRol ? crearFacturaDesdeOC : undefined} crearLabel="Factura">
-              {puedeVerPrecios && (factura?.totalAPagar || factura?.total) > 0 && (
+            <TarjetaRelacion tipo="factura"
+              codigo={facturas.length > 1 ? `${facturas.length} facturas` : factura?.codigo}
+              numero={factura?.numeroFactura} vacio={facturas.length === 0}
+              onClick={factura ? () => abrirFactura(factura) : undefined} cargando={cargandoFactura}
+              onCrear={!partidas.length && puedeFacturar && estadoFact?.estado === "sin facturar" ? () => facturarPartidas([]) : undefined}
+              crearLabel="Factura">
+              {facturas.length === 1 && puedeVerPrecios && (factura.totalAPagar || factura.total) > 0 && (
                 <p className="text-xs text-gray-500">{money(factura.totalAPagar ?? factura.total, factura.moneda ?? cot?.moneda)}</p>
               )}
-              {factura?.estadoPago && <Chip className={badgePago(factura.estadoPago)}>{factura.estadoPago}</Chip>}
-              {factura && !orden.anulado && puedeCrearFacturaRol && (
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); crearFacturaDesdeOC(); }}
-                  className="text-xs text-blue-600 hover:text-blue-800 underline mt-0.5"
-                >
-                  + Crear otra factura
-                </button>
+              {facturas.length === 1 && factura.estadoPago && <Chip className={badgePago(factura.estadoPago)}>{factura.estadoPago}</Chip>}
+              {facturas.length > 1 && (
+                <ul className="space-y-1">
+                  {facturas.map(f => (
+                    <li key={f._id}>
+                      <button type="button"
+                        onClick={(e) => { e.stopPropagation(); abrirFactura(f); }}
+                        className="flex items-center gap-2 w-full text-left hover:underline">
+                        <span className="font-mono text-xs text-gray-700">{f.numeroFactura || f.codigo}</span>
+                        <Chip className={badgePago(f.estadoPago)}>{f.estadoPago || "sin pago"}</Chip>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               )}
             </TarjetaRelacion>
           </section>
@@ -642,17 +695,32 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
                 <span className="w-1.5 h-5 rounded-full bg-sky-500" />
                 <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Partidas</h2>
                 <span className="text-xs text-gray-400">({partidas.length})</span>
+                {hayCheck && (
+                  <button type="button" onClick={() => facturarPartidas(seleccionadas)} disabled={!seleccionadas.length}
+                    className="ml-auto bg-blue-600 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition font-medium">
+                    Facturar seleccionadas ({seleccionadas.length})
+                  </button>
+                )}
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
                     <tr>
+                      {hayCheck && (
+                        <th className="px-3 py-3 w-10 text-center">
+                          <input type="checkbox" aria-label="Seleccionar todas las partidas sin facturar"
+                            checked={seleccionadas.length === seleccionables.length}
+                            onChange={(e) => setSeleccionadas(e.target.checked ? seleccionables.map(p => p._id) : [])}
+                            className="w-4 h-4" />
+                        </th>
+                      )}
                       <th className="px-3 py-3 text-center w-16">Pos.</th>
                       <th className="px-3 py-3 text-left w-36">N° cotización</th>
                       <th className="px-3 py-3 text-left w-36">N° OT</th>
                       <th className="px-3 py-3 text-left">Título</th>
                       <th className="px-3 py-3 text-left w-28">Ítems</th>
                       {puedeVerPrecios && <th className="px-3 py-3 text-right w-40">Total sin IGV</th>}
+                      <th className="px-3 py-3 text-left w-48">Factura</th>
                       {hayColumnaDesvincular && <th className="px-3 py-3 w-10"><span className="sr-only">Desvincular</span></th>}
                     </tr>
                   </thead>
@@ -664,7 +732,16 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
                       const abierta = partidaExpandida === p._id;
                       return (
                         <Fragment key={p._id}>
-                          <tr className="align-top">
+                          <tr className={`align-top ${seleccionadas.includes(p._id) ? "bg-blue-50/50" : ""}`}>
+                            {hayCheck && (
+                              <td className="px-3 py-3 text-center">
+                                {seleccionables.includes(p) && (
+                                  <input type="checkbox" aria-label={`Seleccionar partida ${idx + 1}`}
+                                    checked={seleccionadas.includes(p._id)} onChange={() => toggleSeleccion(p._id)}
+                                    className="w-4 h-4" />
+                                )}
+                              </td>
+                            )}
                             <td className="px-3 py-3 text-center text-gray-500 font-mono text-xs whitespace-nowrap">{idx + 1}/{partidas.length}</td>
                             <td className="px-3 py-3 font-mono text-sm text-sky-700 whitespace-nowrap">
                               {p.cotizacion?.numeroCotizacion || p.cotizacion?.codigo || "—"}
@@ -684,6 +761,7 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
                             {puedeVerPrecios && (
                               <td className="px-3 py-3 text-right font-semibold text-gray-800 tabular-nums whitespace-nowrap">{money(p.subtotal, cot?.moneda)}</td>
                             )}
+                            <td className="px-3 py-3"><CeldaFacturaPartida estado={estadoPartida(p)} /></td>
                             {hayColumnaDesvincular && (
                               <td className="px-3 py-3 text-center">
                                 {puedeDesvincular(p) && (
@@ -696,8 +774,8 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
                           </tr>
                           {abierta && (
                             <tr className="bg-gray-50/60">
-                              <td />
-                              <td colSpan={4 + (puedeVerPrecios ? 1 : 0) + (hayColumnaDesvincular ? 1 : 0)} className="px-3 py-3">
+                              <td colSpan={hayCheck ? 2 : 1} />
+                              <td colSpan={5 + (puedeVerPrecios ? 1 : 0) + (hayColumnaDesvincular ? 1 : 0)} className="px-3 py-3">
                                 {!cotP ? (
                                   <p className={`text-xs ${errorCotizaciones ? "text-red-500" : "text-gray-400"}`}>
                                     {errorCotizaciones ? "No se pudieron cargar los ítems." : "Cargando ítems…"}
@@ -729,8 +807,9 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
                   {puedeVerPrecios && (
                     <tfoot className="bg-gray-50 border-t border-gray-200">
                       <tr>
-                        <td colSpan={5} className="px-3 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Total sin IGV de la OC</td>
+                        <td colSpan={hayCheck ? 6 : 5} className="px-3 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Total sin IGV de la OC</td>
                         <td className="px-3 py-3 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap">{money(ordenActual.subtotal, cot?.moneda)}</td>
+                        <td />
                         {hayColumnaDesvincular && <td />}
                       </tr>
                     </tfoot>
@@ -744,6 +823,15 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
 
       {guiaDetalle && (
         <ModalDetalleGuia guia={guiaDetalle} onClose={() => setGuiaDetalle(null)} />
+      )}
+      {confirmandoPagada && (
+        <ConfirmacionAccion
+          mensaje={ordenActual.pagadaManual
+            ? "¿Desmarcar esta OC como pagada? Vuelve al estado que dan sus facturas y deja de estar bloqueada si no están todas pagadas."
+            : "¿Marcar esta OC como pagada? Todas sus partidas cuentan como pagadas: la OC y lo que hereda el pago (ítems de cotización, OT e informes) quedan de solo lectura. Se puede desmarcar después."}
+          textoConfirmar={ordenActual.pagadaManual ? "Desmarcar pagada" : "Marcar como pagada"}
+          procesando={guardandoPagada} error={errorPagada}
+          onCancelar={() => setConfirmandoPagada(false)} onConfirmar={marcarPagada} />
       )}
       {partidaADesvincular && (
         <ConfirmacionAccion

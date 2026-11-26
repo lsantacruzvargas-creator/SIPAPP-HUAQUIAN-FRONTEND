@@ -261,6 +261,10 @@ export const dotGeneral = (e) => ESTADOS_SERVICIO.find((s) => s.valor === e)?.do
 export const bloqueadoPorCadenaCerrada = (estadoCadena, rolActual) =>
   estadoCadena === "cerrado" && rolActual !== "jefatura";
 
+// `bloqueadoPorPago` lo calcula el backend (utils/bloqueos.js) y lo adjunta al documento; Jefatura
+// conserva su excepción, igual que en los PUT.
+export const bloqueadoPorPago = (doc, rolActual) => !!doc?.bloqueadoPorPago && rolActual !== "jefatura";
+
 export const money = (v, moneda = "PEN") =>
   (moneda === "USD" ? "US$ " : "S/ ") + Number(v ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2 });
 
