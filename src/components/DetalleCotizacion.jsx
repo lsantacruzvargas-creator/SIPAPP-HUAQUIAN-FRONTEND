@@ -179,9 +179,11 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
   const partidasFacturadas = new Set((cot.bloqueo?.indicesFacturados || [])
     .map(i => cot.items?.[i]?.partidaOC).filter(Boolean).map(String));
   const esFacturado = (item) => !!item.partidaOC && partidasFacturadas.has(String(item.partidaOC));
-  const montosBloqueados = partidasFacturadas.size > 0 || !!cot.bloqueo?.facturada;
+  const montosBloqueados = partidasFacturadas.size > 0 || !!cot.bloqueo?.facturada || !!cot.bloqueo?.reservada;
+  // Con alguna partida en una OC vigente, aunque no esté facturada, el receptor y la moneda ya son los de esa OC.
+  const empresaMonedaFijas = montosBloqueados || !!cot.bloqueo?.enOC;
   // Sin ítems, la partida cubre la cotización entera: agregar uno cambiaría el monto facturado.
-  const sinAgregarItems = !!cot.bloqueo?.facturada && (cot.items || []).length === 0;
+  const sinAgregarItems = (!!cot.bloqueo?.facturada || !!cot.bloqueo?.reservada) && (cot.items || []).length === 0;
 
   // Las respuestas de aprobar/enviar/anular/generar-ot/quitar-ot no traen el bloqueo. `base` es la
   // última versión con bloqueo: tras un PUT previo en el mismo flujo, el `cot` de esta closure es viejo.
@@ -869,8 +871,14 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
             {!cot.anulado && !bloqueada && montosBloqueados && (
               <p className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
                 {(cot.items || []).length > 0
-                  ? "Tiene ítems facturados: esos ítems, el descuento, los gastos, la utilidad y la moneda no se pueden cambiar. Los ítems libres sí."
-                  : "Cotización facturada: sus montos y la moneda no se pueden cambiar."}
+                  ? "Tiene ítems facturados o en emisión: esos ítems, el descuento, los gastos, la utilidad, la empresa y la moneda no se pueden cambiar. Los ítems libres sí."
+                  : "Cotización facturada o en emisión: sus montos, la empresa y la moneda no se pueden cambiar."}
+              </p>
+            )}
+
+            {!cot.anulado && !bloqueada && !montosBloqueados && empresaMonedaFijas && (
+              <p className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
+                Tiene partidas en una orden de compra: la empresa y la moneda no se pueden cambiar. Para cambiarlas, desvincula la partida o anula la OC.
               </p>
             )}
 
@@ -940,7 +948,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
                         type="text"
                         value={busquedaEmpresa}
                         onChange={cambiarBusquedaEmpresa}
-                        disabled={montosBloqueados}
+                        disabled={empresaMonedaFijas}
                         onFocus={() => setListaEmpresaAbierta(true)}
                         onBlur={() => setListaEmpresaAbierta(false)}
                         placeholder="Escribe el nombre de la empresa…"
@@ -959,7 +967,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
                         </div>
                       )}
                     </div>
-                    <button type="button" onClick={() => setEmpresasOpen(true)} disabled={montosBloqueados}
+                    <button type="button" onClick={() => setEmpresasOpen(true)} disabled={empresaMonedaFijas}
                       className="shrink-0 text-xs border border-gray-300 px-3 rounded-lg hover:bg-gray-50 transition">
                       Empresas
                     </button>
@@ -1107,7 +1115,7 @@ export default function DetalleCotizacion({ cotizacion: inicial, onClose, onGuar
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs text-gray-500 block mb-1">Moneda de la cotización</label>
-                    <select name="moneda" value={form.moneda} onChange={handleChange} disabled={montosBloqueados} className={INP}>
+                    <select name="moneda" value={form.moneda} onChange={handleChange} disabled={empresaMonedaFijas} className={INP}>
                       <option value="PEN">Soles (S/)</option>
                       <option value="USD">Dólares (US$)</option>
                     </select>

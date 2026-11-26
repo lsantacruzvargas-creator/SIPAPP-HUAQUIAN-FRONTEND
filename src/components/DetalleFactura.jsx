@@ -33,7 +33,10 @@ function BuscadorOC({ onSelect, onClose }) {
   useEffect(() => {
     fetchAuth("/ordenes-compra").then(r => r.ok && r.json()).then(d => setLista(d || []));
   }, []);
-  const filtradas = lista.filter(o => !q ||
+  // Solo OC legado (sin partidas) aún sin facturar: a una OC por partidas se llega desde la emisión.
+  const libres = lista.filter(o => !o.anulado && !(o.partidas || []).length
+    && o.estadoFacturacion?.estado === "sin facturar" && !o.estadoFacturacion?.reservada);
+  const filtradas = libres.filter(o => !q ||
     [o.numeroOrden, o.titulo, o.empresa?.razonSocial, o.codigo]
       .some(v => v?.toLowerCase().includes(q.toLowerCase())));
   return (
@@ -49,7 +52,7 @@ function BuscadorOC({ onSelect, onClose }) {
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-1">
           {filtradas.length === 0
-            ? <p className="text-sm text-gray-400 text-center py-8">Sin resultados</p>
+            ? <p className="text-sm text-gray-400 text-center py-8">Sin resultados. Aquí solo aparecen las OC sin partidas y sin facturar; una OC por partidas se factura desde su detalle.</p>
             : filtradas.map(o => (
               <button key={o._id} onClick={() => onSelect(o)}
                 className="w-full text-left px-4 py-3 rounded-xl hover:bg-blue-50 border border-transparent hover:border-blue-100 transition">
@@ -110,6 +113,9 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
   const puedeVerPrecios = ["admin", "facturacion", "jefatura"].includes(rolActual);
   const bloqueada = bloqueadoPorPago(inicial, rolActual);
   const cpeAceptado = !!inicial.comprobanteEmitido;
+  // La OC (y sus partidas) es lo que marca qué está facturado: ya guardada, o con CPE aceptado, no se
+  // cambia (PUT /facturas/:id lo rechaza).
+  const ocFija = !!inicial.ordenCompra || (inicial.partidasOC || []).length > 0 || cpeAceptado;
 
   const abrirOC = async () => {
     if (!ocVinculada || cargandoOC) return;
@@ -431,11 +437,16 @@ export default function DetalleFactura({ factura: inicial, onClose, onGuardada, 
                     <span className="font-mono text-xs text-blue-600 flex-1">
                       {oc.codigo}{oc.numeroOrden ? ` · ${oc.numeroOrden}` : ""}
                     </span>
-                    <button onClick={() => setBOC(true)}
-                      className="text-xs text-gray-400 hover:text-blue-600 underline shrink-0">Cambiar</button>
-                    <button onClick={() => setOC(null)}
-                      className="text-gray-300 hover:text-red-400 text-lg leading-none">✕</button>
+                    {/* Solo la OC elegida aquí y aún sin guardar se puede cambiar o quitar. */}
+                    {!ocFija && (<>
+                      <button type="button" onClick={() => setBOC(true)}
+                        className="text-xs text-gray-400 hover:text-blue-600 underline shrink-0">Cambiar</button>
+                      <button type="button" onClick={() => setOC(null)} aria-label="Quitar la orden de compra elegida"
+                        className="text-gray-300 hover:text-red-400 text-lg leading-none">✕</button>
+                    </>)}
                   </div>
+                ) : cpeAceptado ? (
+                  <p className="px-3 py-2 text-sm text-gray-400 bg-gray-50 border border-gray-100 rounded-lg">Sin orden de compra</p>
                 ) : (
                   <button type="button" onClick={() => setBOC(true)}
                     className="w-full text-xs border border-dashed border-gray-300 px-3 py-2 rounded-lg hover:bg-gray-50 text-blue-600 transition text-left">

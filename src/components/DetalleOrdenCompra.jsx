@@ -475,7 +475,8 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
 
             <div>
               <label className="text-xs text-gray-500 block mb-1">Empresa</label>
-              <select name="empresa" value={form.empresa} onChange={handleChange} className={INP}>
+              <select name="empresa" value={form.empresa} onChange={handleChange} disabled={partidas.length > 0}
+                className={`${INP} disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed`}>
                 <option value="">— Sin empresa —</option>
                 {empresas.map(e => (
                   <option key={e._id} value={e._id}>
@@ -483,6 +484,9 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
                   </option>
                 ))}
               </select>
+              {partidas.length > 0 && (
+                <p className="text-[11px] text-gray-400 mt-1">Con partidas, la empresa es la de sus cotizaciones y no se cambia aquí.</p>
+              )}
             </div>
 
             {/* OC consolidada: estos datos son propios de cada cotización y su OT (se editan allí). */}
