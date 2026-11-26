@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import DosLineas from "../components/DosLineas";
 import { fetchAuth, uploadAuth, abrirArchivoProtegido, getUsuario } from "../utils/fetchAuth";
@@ -6,7 +6,7 @@ import { formatearFecha, anioLima, mesLima } from "../utils/fecha";
 import DetalleDocumento from "../components/DetalleDocumento";
 import ModalImportarExcel, { COLS_OC, COLS_CADENA } from "../components/ModalImportarExcel";
 import {
-  Chip, DotChip, CeldaFacturaPartida, badgeGeneral, dotGeneral, badgeInformes, dotInformes, ESTADOS_SERVICIO, bloqueadoPorPago,
+  Chip, DotChip, badgePago, badgeGeneral, dotGeneral, badgeInformes, dotInformes, ESTADOS_SERVICIO, bloqueadoPorPago,
 } from "../components/detalleShared";
 import TablaScroll from "../components/TablaScroll";
 import Paginacion from "../components/Paginacion";
@@ -44,22 +44,48 @@ const BADGE_FACTURACION = {
   "pagada":            "bg-green-100 text-green-700",
 };
 
+const BADGE_PARTIDA = {
+  "sin facturar": "bg-gray-100 text-gray-500",
+  "reservada":    "bg-amber-100 text-amber-700",
+  "facturada":    "bg-emerald-100 text-emerald-700",
+  "pagada":       "bg-green-100 text-green-700",
+};
+
 const SELECCION_VACIA = { oc: null, partidas: [], cargando: false, error: "" };
 
 const estadoDePartida = (o, p) => o.estadoFacturacion?.partidas?.find((e) => String(e._id) === String(p._id));
 const facturadasDe = (o) => (o.estadoFacturacion?.partidas || []).filter((e) => e.estado === "facturada" || e.estado === "pagada").length;
 const numerosFacturaDe = (o) => (o.estadoFacturacion?.numerosFactura || "").split(/\s*,\s*/).filter(Boolean);
 const idCotDe = (p) => p.cotizacion?._id || p.cotizacion;
+const numeroOTDe = (ot) => ot.numeroOT || ot.codigo;
 
-// OT padre de cada cotización (mismo criterio que la tabla de partidas de DetalleOrdenCompra.jsx).
-const otsPorCotizacion = (ots) => {
-  const map = {};
+// OTs padre de cada cotización (mismo criterio que la tabla de partidas de DetalleOrdenCompra.jsx)
+// y sub-OTs de cada OT padre, para que cada partida muestre los estados de sus propias OTs.
+const indexarOTs = (ots) => {
+  const porCot = {};
+  const subs = {};
   ots.forEach((ot) => {
+    if (ot.ordenPadre) {
+      (subs[ot.ordenPadre._id || ot.ordenPadre] ||= []).push(ot);
+      return;
+    }
     const cotId = ot.cotizacion?._id || ot.cotizacion;
-    if (ot.ordenPadre || !cotId) return;
-    (map[cotId] ||= []).push(ot.numeroOT || ot.codigo);
+    if (cotId) (porCot[cotId] ||= []).push(ot);
   });
-  return map;
+  return { porCot, subs };
+};
+
+const textoCotizacion = (cot) => ({
+  aprobado: cot?.aprobado ? "Aprobada" : "Pendiente",
+  enviado: cot?.enviado ? "Enviada" : "No enviada",
+  informe: cot?.informeEnviado ? "Informe enviado" : "Informe no enviado",
+});
+
+// Con varias OTs en una partida, cada estado se lista con su N° OT en vez de agregarse.
+const textoPorOT = (ots, valor, vacio) => {
+  if (!ots.length) return vacio;
+  if (ots.length === 1) return valor(ots[0]) || vacio;
+  return ots.map((ot) => `${numeroOTDe(ot)}: ${valor(ot) || vacio}`).join(", ");
 };
 
 const SORTS = [
@@ -112,19 +138,103 @@ function CheckOC({ marcadas, total, disabled, title, onChange, label }) {
 
 const celdaMonto = (v) => (v != null ? v.toLocaleString("es-PE", { minimumFractionDigits: 2 }) : "—");
 
+function ChipsCotizacion({ cot }) {
+  const t = textoCotizacion(cot);
+  const chip = (si, texto) => (
+    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full uppercase tracking-wide whitespace-nowrap ${si ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+      {texto}
+    </span>
+  );
+  return (
+    <div className="flex flex-col items-center gap-1">
+      {chip(cot?.aprobado, t.aprobado)}
+      {chip(cot?.enviado, t.enviado)}
+      {chip(cot?.informeEnviado, t.informe)}
+    </div>
+  );
+}
+
+const chipServicio = (ot) => <DotChip chip={badgeGeneral(ot.estadoGeneral)} dot={dotGeneral(ot.estadoGeneral)}>{ot.estadoGeneral}</DotChip>;
+const chipInformes = (ot) => <DotChip chip={badgeInformes(ot.estadoInformes)} dot={dotInformes(ot.estadoInformes)}>{ot.estadoInformes}</DotChip>;
+const chipGRE = (gre) => gre ? (
+  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 whitespace-nowrap">GRE {gre}</span>
+) : <span className="text-gray-300 text-xs">Sin GRE</span>;
+
+// Un chip por OT de la partida (con su N° OT si hay varias), sin agregar estados.
+function EstadosPorOT({ ots, render, vacio }) {
+  if (!ots.length) return <span className="text-gray-300 text-xs">{vacio}</span>;
+  return (
+    <div className="flex flex-col items-center gap-1">
+      {ots.map((ot) => (
+        <span key={ot._id} title={`OT ${numeroOTDe(ot)}`} className="inline-flex items-center gap-1.5 whitespace-nowrap">
+          {ots.length > 1 && <span className="font-mono text-[10px] text-gray-400">{numeroOTDe(ot)}</span>}
+          {render(ot)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function CeldaFacturacionPartida({ estado }) {
+  if (!estado) return <span className="text-gray-300">—</span>;
+  const pago = estado.factura?.estadoPago || "sin pago";
+  return (
+    <span className="flex flex-col items-start gap-1 whitespace-nowrap">
+      <span title={estado.estado === "reservada" ? "Un comprobante en emisión incluye esta partida." : undefined}>
+        <Chip className={BADGE_PARTIDA[estado.estado] || "bg-gray-100 text-gray-500"}>{estado.estado}</Chip>
+      </span>
+      {estado.factura && (
+        <span className="flex items-center gap-1.5">
+          <span className="font-mono text-xs text-gray-700 whitespace-nowrap">{estado.factura.numeroFactura || estado.factura.codigo}</span>
+          {estado.estado === "facturada" && <Chip className={badgePago(pago)}>{pago}</Chip>}
+        </span>
+      )}
+    </span>
+  );
+}
+
 function TablaOC({
-  titulo, acento, ordenes, otGroupMap, otsCot, greMap, tipoCambio, onSelect, subirDocumento,
+  titulo, acento, ordenes, otGroupMap, otsCot, subsOT, greMap, tipoCambio, onSelect, subirDocumento,
   mostrarFactura = true, mostrarTitulo = true, mostrarDocumento = true, mostrarHesActa = false,
   puedeVerPrecios = true, vacioMsg,
-  puedeFacturarOC, seleccion, onTogglePartida, onToggleOC, expandidas, onToggleExpandir,
+  puedeFacturarOC, seleccion, onTogglePartida, onToggleOC, onLimpiarSeleccion, colapsadas, onToggleExpandir,
 }) {
   const hayCheck = ordenes.some(puedeFacturarOC);
+  // Sin columna Título de la OC (vista Sin facturar), el título de cada partida tiene su propia columna.
+  const columnaTitulo = mostrarTitulo || ordenes.some((o) => o.partidas?.length);
   const totalColumnas = 11
     + (hayCheck ? 1 : 0)
     + (puedeVerPrecios ? 2 : 0)
-    + (mostrarFactura ? 1 : 0) + (mostrarTitulo ? 1 : 0)
+    + (mostrarFactura ? 1 : 0) + (columnaTitulo ? 1 : 0)
     + (mostrarHesActa ? 2 : 0) + (mostrarDocumento ? 1 : 0);
   const pag = usePaginacion(ordenes);
+
+  // Una selección cuya OC quedó en otra página de esta tabla ya no se ve: se descarta.
+  const idSel = seleccion.oc?._id;
+  const selFueraDePagina = !!idSel && ordenes.some((o) => o._id === idSel) && !pag.visibles.some((o) => o._id === idSel);
+  useEffect(() => {
+    if (selFueraDePagina) onLimpiarSeleccion();
+  }, [selFueraDePagina, onLimpiarSeleccion]);
+
+  const celdasVacias = (n, prefijo) => Array.from({ length: n }, (_, i) => <td key={`${prefijo}${i}`} className="px-4 py-3" />);
+  const colsHesActaDoc = (mostrarHesActa ? 2 : 0) + (mostrarDocumento ? 1 : 0);
+
+  const filaSub = (o, s, key) => (
+    <tr key={key}
+      className={`hover:bg-gray-50 cursor-pointer transition-colors bg-indigo-50/30 ${s.anulado ? "opacity-50" : ""}`}
+      onClick={() => onSelect(o)}>
+      <td className="py-3" />
+      {hayCheck && <td className="py-3" />}
+      <td className="px-4 py-3" />
+      <td className="px-4 py-3 font-semibold text-indigo-700 whitespace-nowrap pl-8">↳ {s.numeroOT}</td>
+      {celdasVacias(4 + (mostrarFactura ? 1 : 0) + (columnaTitulo ? 1 : 0) + (puedeVerPrecios ? 2 : 0) + 1, "a")}
+      <td className="px-4 py-3 text-center">{chipServicio(s)}</td>
+      <td className="px-4 py-3 text-center">{chipInformes(s)}</td>
+      <td className="px-4 py-3 text-center">{chipGRE(greMap[s._id])}</td>
+      {celdasVacias(colsHesActaDoc, "b")}
+    </tr>
+  );
+
   return (
     <div className="mb-6">
       <div className="flex items-center gap-2 mb-3">
@@ -146,7 +256,7 @@ function TablaOC({
               {mostrarFactura && <th className={`${TH} text-left`}><DosLineas>N° Factura</DosLineas></th>}
               <th className={`${TH} text-left`}><DosLineas>Facturación</DosLineas></th>
               <th className={`${TH} text-left min-w-[13rem]`}><DosLineas>Empresa</DosLineas></th>
-              {mostrarTitulo && <th className={`${TH} text-left min-w-[13rem]`}><DosLineas>Título</DosLineas></th>}
+              {columnaTitulo && <th className={`${TH} text-left min-w-[13rem]`}><DosLineas>{mostrarTitulo ? "Título" : "Título de la partida"}</DosLineas></th>}
               {puedeVerPrecios && <th className={`${TH} text-right`}><DosLineas>Total (S/)</DosLineas></th>}
               {puedeVerPrecios && <th className={`${TH} text-right`}><DosLineas>Total (US$)</DosLineas></th>}
               <th className={`${TH} text-center`}><DosLineas>Estado Cotización</DosLineas></th>
@@ -164,11 +274,11 @@ function TablaOC({
             ) : pag.visibles.flatMap((o) => {
               const grupoOT = otGroupMap[o.numeroDocumento];
               const otPadre = grupoOT?.parent || null;
-              const subs = grupoOT?.subs || [];
               const { pen, usd } = totalesDuales(o.monto, o.cotizacion?.moneda, tipoCambio);
               const partidas = o.partidas || [];
+              const conPartidas = partidas.length > 0;
               const estadoFact = o.estadoFacturacion;
-              const abierta = expandidas.includes(o._id);
+              const abierta = conPartidas && !colapsadas.includes(o._id);
               const seleccionables = puedeFacturarOC(o)
                 ? partidas.filter((p) => estadoDePartida(o, p)?.estado === "sin facturar").map((p) => p._id)
                 : [];
@@ -178,12 +288,14 @@ function TablaOC({
                 ? `Ya hay partidas seleccionadas de ${seleccion.oc.numeroOrden || seleccion.oc.codigo}: se factura una sola OC a la vez.`
                 : undefined;
 
+              // Con partidas, los estados de cotización/servicio/informes/GRE y la facturación son de
+              // cada partida (sub-filas); la fila de la OC solo lleva sus datos propios y el avance k/N.
               const filaPrincipal = (
                 <tr key={o._id}
                   className={`hover:bg-gray-50 cursor-pointer transition-colors ${o.anulado ? "opacity-50" : ""} ${deEstaOC ? "bg-blue-50/40" : ""}`}
                   onClick={() => onSelect(o)}>
                   <td className="pl-3 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
-                    {partidas.length > 0 && (
+                    {conPartidas && (
                       <button type="button" onClick={() => onToggleExpandir(o._id)} aria-expanded={abierta}
                         aria-label={abierta ? "Ocultar partidas" : "Ver partidas"} title={abierta ? "Ocultar partidas" : "Ver partidas"}
                         className="text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded text-base leading-none w-6 h-6">
@@ -201,8 +313,14 @@ function TablaOC({
                       )}
                     </td>
                   )}
-                  <td className="px-4 py-3.5 font-semibold text-gray-800 whitespace-nowrap">{o.cotizacion?.numeroCotizacion || <span className="text-gray-300">—</span>}</td>
-                  <td className="px-4 py-3.5 font-semibold text-gray-800 whitespace-nowrap">{otPadre?.numeroOT || <span className="text-gray-300 font-sans">Sin OT</span>}</td>
+                  <td className="px-4 py-3.5 font-semibold text-gray-800 whitespace-nowrap">
+                    {conPartidas
+                      ? <span className="text-xs font-normal text-gray-500">{partidas.length} partida{partidas.length !== 1 ? "s" : ""}</span>
+                      : o.cotizacion?.numeroCotizacion || <span className="text-gray-300">—</span>}
+                  </td>
+                  <td className="px-4 py-3.5 font-semibold text-gray-800 whitespace-nowrap">
+                    {conPartidas ? null : otPadre?.numeroOT || <span className="text-gray-300 font-sans">Sin OT</span>}
+                  </td>
                   <td className="px-4 py-3.5 font-semibold text-gray-800 max-w-[220px]">
                     <div className="flex items-center gap-1.5 flex-wrap break-words">
                       {o.numeroOrden || <span className="text-gray-300">—</span>}
@@ -224,16 +342,15 @@ function TablaOC({
                     </td>
                   )}
                   <td className="px-4 py-3.5 whitespace-nowrap">
-                    {estadoFact?.estado ? (
+                    {conPartidas ? (
+                      <span className="text-xs text-gray-500 tabular-nums" title={`${facturadasDe(o)} de ${partidas.length} partidas facturadas`}>
+                        {facturadasDe(o)}/{partidas.length} facturadas
+                      </span>
+                    ) : estadoFact?.estado ? (
                       <span className="flex items-center gap-1.5">
                         <Chip className={BADGE_FACTURACION[estadoFact.estado] || "bg-gray-100 text-gray-500"}>{estadoFact.estado}</Chip>
-                        {partidas.length > 0 && (
-                          <span className="text-xs text-gray-500 tabular-nums" title={`${facturadasDe(o)} de ${partidas.length} partidas facturadas`}>
-                            {facturadasDe(o)}/{partidas.length}
-                          </span>
-                        )}
                         {estadoFact.reservada && (
-                          <span title="Un comprobante en emisión incluye partidas de esta OC.">
+                          <span title="Un comprobante en emisión incluye esta OC.">
                             <Chip className="bg-amber-100 text-amber-700">En emisión</Chip>
                           </span>
                         )}
@@ -241,45 +358,21 @@ function TablaOC({
                     ) : <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-4 py-3.5 text-gray-700">{o.empresa?.razonSocial || "—"}</td>
-                  {mostrarTitulo && <td className="px-4 py-3.5 text-gray-600">{o.titulo}</td>}
+                  {columnaTitulo && <td className="px-4 py-3.5 text-gray-600">{mostrarTitulo && o.titulo}</td>}
                   {puedeVerPrecios && <td className="px-4 py-3.5 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap">{celdaMonto(pen)}</td>}
                   {puedeVerPrecios && <td className="px-4 py-3.5 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap">{celdaMonto(usd)}</td>}
-                  <td className="px-4 py-3.5 text-center">
-                    <div className="flex flex-col items-center gap-1">
-                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full uppercase tracking-wide whitespace-nowrap ${o.cotizacion?.aprobado ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-                        {o.cotizacion?.aprobado ? "Aprobada" : "Pendiente"}
-                      </span>
-                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full uppercase tracking-wide whitespace-nowrap ${o.cotizacion?.enviado ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-                        {o.cotizacion?.enviado ? "Enviada" : "No enviada"}
-                      </span>
-                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full uppercase tracking-wide whitespace-nowrap ${o.cotizacion?.informeEnviado ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-                        {o.cotizacion?.informeEnviado ? "Informe enviado" : "Informe no enviado"}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3.5 text-center">
-                    {otPadre ? (
-                      <DotChip chip={badgeGeneral(otPadre.estadoGeneral)} dot={dotGeneral(otPadre.estadoGeneral)}>{otPadre.estadoGeneral}</DotChip>
-                    ) : (
-                      <span className="text-gray-300 text-xs">Sin OT</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3.5 text-center">
-                    {otPadre ? (
-                      <DotChip chip={badgeInformes(otPadre.estadoInformes)} dot={dotInformes(otPadre.estadoInformes)}>{otPadre.estadoInformes}</DotChip>
-                    ) : (
-                      <span className="text-gray-300 text-xs">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3.5 text-center">
-                    {otPadre && greMap[otPadre._id] ? (
-                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 whitespace-nowrap">
-                        GRE {greMap[otPadre._id]}
-                      </span>
-                    ) : (
-                      <span className="text-gray-300 text-xs">Sin GRE</span>
-                    )}
-                  </td>
+                  {conPartidas ? celdasVacias(4, "e") : (
+                    <>
+                      <td className="px-4 py-3.5 text-center"><ChipsCotizacion cot={o.cotizacion} /></td>
+                      <td className="px-4 py-3.5 text-center">
+                        {otPadre ? chipServicio(otPadre) : <span className="text-gray-300 text-xs">Sin OT</span>}
+                      </td>
+                      <td className="px-4 py-3.5 text-center">
+                        {otPadre ? chipInformes(otPadre) : <span className="text-gray-300 text-xs">—</span>}
+                      </td>
+                      <td className="px-4 py-3.5 text-center">{chipGRE(otPadre && greMap[otPadre._id])}</td>
+                    </>
+                  )}
                   {mostrarHesActa && <td className="px-4 py-3.5 text-center"><PillSiNo si={!!o.hesConfirmado} /></td>}
                   {mostrarHesActa && <td className="px-4 py-3.5 text-center"><PillSiNo si={!!o.actaConformidadConfirmada} /></td>}
                   {mostrarDocumento && bloqueadoPorPago(o, getUsuario()?.rol) && (
@@ -322,13 +415,11 @@ function TablaOC({
                 </tr>
               );
 
-              const filasPartida = !abierta ? [] : partidas.map((p, idx) => {
+              const filasPartida = !abierta ? [] : partidas.flatMap((p, idx) => {
                 const marcada = deEstaOC && seleccion.partidas.includes(p._id);
                 const totales = totalesDuales(p.subtotal, o.cotizacion?.moneda, tipoCambio);
-                const tituloPartida = (
-                  <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">{p.titulo || p.cotizacion?.titulo}</span>
-                );
-                return (
+                const ots = otsCot[idCotDe(p)] || [];
+                const fila = (
                   <tr key={`${o._id}-${p._id}`}
                     className={`hover:bg-gray-50 cursor-pointer transition-colors ${marcada ? "bg-blue-50/60" : "bg-sky-50/30"} ${o.anulado ? "opacity-50" : ""}`}
                     onClick={() => onSelect(o)}>
@@ -348,65 +439,33 @@ function TablaOC({
                       <span className="font-mono text-sm text-sky-700">{p.cotizacion?.numeroCotizacion || p.cotizacion?.codigo || "—"}</span>
                     </td>
                     <td className="px-4 py-3 font-mono text-sm text-gray-600 whitespace-nowrap">
-                      {otsCot[idCotDe(p)]?.join(", ") || <span className="text-gray-300">—</span>}
+                      {ots.map(numeroOTDe).join(", ") || <span className="text-gray-300 font-sans">Sin OT</span>}
                     </td>
                     <td className="px-4 py-3" />
                     <td className="px-4 py-3" />
                     {mostrarFactura && <td className="px-4 py-3" />}
-                    <td className="px-4 py-3"><CeldaFacturaPartida estado={estadoDePartida(o, p)} /></td>
-                    {/* Sin columna Título (vista Sin facturar), el título de la partida va en la de Empresa. */}
-                    <td className="px-4 py-3">{!mostrarTitulo && tituloPartida}</td>
-                    {mostrarTitulo && <td className="px-4 py-3">{tituloPartida}</td>}
+                    <td className="px-4 py-3"><CeldaFacturacionPartida estado={estadoDePartida(o, p)} /></td>
+                    <td className="px-4 py-3" />
+                    {columnaTitulo && (
+                      <td className="px-4 py-3">
+                        <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">{p.titulo || p.cotizacion?.titulo}</span>
+                      </td>
+                    )}
                     {puedeVerPrecios && <td className="px-4 py-3 text-right text-gray-700 tabular-nums whitespace-nowrap">{celdaMonto(totales.pen)}</td>}
                     {puedeVerPrecios && <td className="px-4 py-3 text-right text-gray-700 tabular-nums whitespace-nowrap">{celdaMonto(totales.usd)}</td>}
-                    <td className="px-4 py-3" />
-                    <td className="px-4 py-3" />
-                    <td className="px-4 py-3" />
-                    <td className="px-4 py-3" />
-                    {mostrarHesActa && <td className="px-4 py-3" />}
-                    {mostrarHesActa && <td className="px-4 py-3" />}
-                    {mostrarDocumento && <td className="px-4 py-3" />}
+                    <td className="px-4 py-3 text-center"><ChipsCotizacion cot={p.cotizacion} /></td>
+                    <td className="px-4 py-3 text-center"><EstadosPorOT ots={ots} render={chipServicio} vacio="Sin OT" /></td>
+                    <td className="px-4 py-3 text-center"><EstadosPorOT ots={ots} render={chipInformes} vacio="—" /></td>
+                    <td className="px-4 py-3 text-center"><EstadosPorOT ots={ots} render={(ot) => chipGRE(greMap[ot._id])} vacio="Sin GRE" /></td>
+                    {celdasVacias(colsHesActaDoc, "h")}
                   </tr>
                 );
+                const subs = ots.flatMap((ot) => subsOT[ot._id] || []);
+                return [fila, ...subs.map((s) => filaSub(o, s, `${o._id}-${p._id}-${s._id}`))];
               });
 
-              const filasSub = subs.map((s) => (
-                <tr key={s._id}
-                  className={`hover:bg-gray-50 cursor-pointer transition-colors bg-indigo-50/30 ${s.anulado ? "opacity-50" : ""}`}
-                  onClick={() => onSelect(o)}>
-                  <td className="py-3" />
-                  {hayCheck && <td className="py-3" />}
-                  <td className="px-4 py-3" />
-                  <td className="px-4 py-3 font-semibold text-indigo-700 whitespace-nowrap pl-8">↳ {s.numeroOT}</td>
-                  <td className="px-4 py-3" />
-                  <td className="px-4 py-3" />
-                  {mostrarFactura && <td className="px-4 py-3" />}
-                  <td className="px-4 py-3" />
-                  <td className="px-4 py-3" />
-                  {mostrarTitulo && <td className="px-4 py-3" />}
-                  {puedeVerPrecios && <td className="px-4 py-3" />}
-                  {puedeVerPrecios && <td className="px-4 py-3" />}
-                  <td className="px-4 py-3" />
-                  <td className="px-4 py-3 text-center">
-                    <DotChip chip={badgeGeneral(s.estadoGeneral)} dot={dotGeneral(s.estadoGeneral)}>{s.estadoGeneral}</DotChip>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <DotChip chip={badgeInformes(s.estadoInformes)} dot={dotInformes(s.estadoInformes)}>{s.estadoInformes}</DotChip>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    {greMap[s._id] ? (
-                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 whitespace-nowrap">
-                        GRE {greMap[s._id]}
-                      </span>
-                    ) : (
-                      <span className="text-gray-300 text-xs">Sin GRE</span>
-                    )}
-                  </td>
-                  {mostrarHesActa && <td className="px-4 py-3" />}
-                  {mostrarHesActa && <td className="px-4 py-3" />}
-                  {mostrarDocumento && <td className="px-4 py-3" />}
-                </tr>
-              ));
+              // Legado (sin partidas): las sub-OTs se agrupan por el numeroDocumento de la OC.
+              const filasSub = conPartidas ? [] : (grupoOT?.subs || []).map((s) => filaSub(o, s, s._id));
 
               return [filaPrincipal, ...filasPartida, ...filasSub];
             })}
@@ -430,13 +489,15 @@ export default function ListaOrdenesCompra() {
   const [ordenes, setOrdenes]       = useState([]);
   const [otGroupMap, setOtGroupMap] = useState({});
   const [otsCot, setOtsCot]         = useState({});
+  const [subsOT, setSubsOT]         = useState({});
   const [greMap, setGreMap]         = useState({});
   const [tipoCambio, setTipoCambio] = useState(null);
   const [sortBy, setSortBy]         = useState("fecha");
   const [vista, setVista]           = useState("todasLasOC");
   const [detalle, setDetalle]       = useState(null);
   const [seleccion, setSeleccion]   = useState(SELECCION_VACIA);
-  const [expandidas, setExpandidas] = useState([]);
+  // Las OC con partidas se muestran desplegadas (los estados viven en cada partida); aquí van las plegadas.
+  const [colapsadas, setColapsadas] = useState([]);
   const [importarOpen, setImportarOpen] = useState(false);
   const [importarCadenaOpen, setImportarCadenaOpen] = useState(false);
   const [busqueda, setBusqueda] = useState("");
@@ -470,7 +531,9 @@ export default function ListaOrdenesCompra() {
         else otG[ot.numeroDocumento].parent = ot;
       });
       setOtGroupMap(otG);
-      setOtsCot(otsPorCotizacion(ots));
+      const { porCot, subs } = indexarOTs(ots);
+      setOtsCot(porCot);
+      setSubsOT(subs);
 
       // GRE generadas por OT/sub-OT (mismo mecanismo que el badge de
       // DetalleOrdenTrabajo.jsx) — solo cuentan las ACEPTADAS por SUNAT.
@@ -520,13 +583,14 @@ export default function ListaOrdenesCompra() {
     return partidas.length ? { ...SELECCION_VACIA, oc, partidas } : SELECCION_VACIA;
   });
   const toggleOC = (oc, ids) => {
-    setExpandidas((exp) => exp.includes(oc._id) ? exp : [...exp, oc._id]);
+    setColapsadas((prev) => prev.filter((x) => x !== oc._id));
     setSeleccion((prev) => {
       const todas = prev.oc?._id === oc._id && ids.every((id) => prev.partidas.includes(id));
       return todas ? SELECCION_VACIA : { ...SELECCION_VACIA, oc, partidas: ids };
     });
   };
-  const toggleExpandir = (id) => setExpandidas((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+  const toggleExpandir = (id) => setColapsadas((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+  const limpiarSeleccion = useCallback(() => setSeleccion(SELECCION_VACIA), []);
 
   // Mismo contrato que DetalleOrdenCompra.jsx: `cotizaciones` son las cotizaciones completas
   // (con ítems) de las partidas elegidas, indexadas por _id.
@@ -573,18 +637,20 @@ export default function ListaOrdenesCompra() {
       ...partidas.flatMap((p) => [p.cotizacion?.numeroCotizacion, p.cotizacion?.codigo]),
     ];
     const otsPartidas = partidas.flatMap((p) => otsCot[idCotDe(p)] || []);
+    const numerosOTPartidas = otsPartidas.map(numeroOTDe);
     const coincide = (v) => v?.toLowerCase().includes(txt);
     const matchBusq  = !txt
       || coincide(o.numeroOrden)
       || coincide(o.titulo)
       || numerosFacturaDe(o).some(coincide)
       || numerosOT.some(coincide)
-      || otsPartidas.some(coincide)
+      || numerosOTPartidas.some(coincide)
       || numerosCot.some(coincide)
       || coincide(o.empresa?.razonSocial)
       || o.empresa?.ruc?.includes(txt);
-    const estadoActual = grupoOT?.parent?.estadoGeneral;
-    const matchEstado = !estadoOT || estadoActual === estadoOT;
+    // Con partidas, basta que una de sus OTs esté en el estado de servicio elegido.
+    const estadosServicio = partidas.length ? otsPartidas.map((ot) => ot.estadoGeneral) : [grupoOT?.parent?.estadoGeneral];
+    const matchEstado = !estadoOT || estadosServicio.includes(estadoOT);
     const matchEmpresa = !empresa || o.empresa?._id === empresa;
     const matchPlanta = !planta || o.planta === planta;
     return matchAnio && matchMes && matchBusq && matchEstado && matchEmpresa && matchPlanta;
@@ -603,53 +669,59 @@ export default function ListaOrdenesCompra() {
   const vistaEfectiva = busqueda ? "todasLasOC" : vista;
 
   const porEstado = (estado) => filtradas.filter((o) => (o.estadoFacturacion?.estado || "sin facturar") === estado);
+  const tablasVisibles = TABLAS_ESTADO.filter(({ estado }) => vistaEfectiva === "todas" || vistaEfectiva === estado);
+  const ocsEnVista = vistaEfectiva === "todasLasOC" ? filtradas : tablasVisibles.flatMap(({ estado }) => porEstado(estado));
 
-  // Una fila por partida con las columnas de la OC repetidas; una OC sin partidas (legado) va en
-  // una sola fila. Mismas columnas que TablaOC (sin "Documento", no aplica a una hoja de cálculo).
+  // Filtro, búsqueda o vista que deja fuera a la OC de la selección: la selección se descarta
+  // (el cambio de página lo resuelve cada TablaOC).
+  if (seleccion.oc && !seleccion.cargando && !ocsEnVista.some((o) => o._id === seleccion.oc._id)) {
+    setSeleccion(SELECCION_VACIA);
+  }
+
+  // Una fila por partida con las columnas de la OC repetidas y los estados (facturación, cotización,
+  // servicio, informes, GRE) propios de la partida; una OC sin partidas (legado) va en una sola fila
+  // con los de su cotización y OT. Mismas columnas que TablaOC (sin "Documento", no aplica a una hoja).
   const filasOC = (o) => {
     const grupoOT = otGroupMap[o.numeroDocumento];
     const { pen, usd } = totalesDuales(o.monto, o.cotizacion?.moneda, tipoCambio);
     const partidas = o.partidas || [];
-    const base = {
-      "Cotización":         o.cotizacion?.numeroCotizacion || "—",
-      "N° Orden de Compra": o.numeroOrden || "—",
-      "Fecha de creación":  o.createdAt ? formatearFecha(o.createdAt) : "—",
-      "N° OT":              grupoOT?.parent?.numeroOT || "—",
-      "Sub-OTs":            grupoOT?.subs?.map((s) => s.numeroOT).join(", ") || "—",
-      "N° Factura":         o.estadoFacturacion?.numerosFactura || "—",
-      "Estado facturación": o.estadoFacturacion?.estado || "—",
-      "Partidas facturadas": partidas.length ? `${facturadasDe(o)}/${partidas.length}` : "—",
-      "Empresa":            o.empresa?.razonSocial || "—",
-      "Título":             o.titulo || "—",
-      ...(puedeVerPrecios ? {
-        "Total (S/)":       pen != null ? pen.toFixed(2) : "—",
-        "Total (US$)":      usd != null ? usd.toFixed(2) : "—",
-      } : {}),
-      "Aprobado":           o.cotizacion?.aprobado ? "Aprobada" : "Pendiente",
-      "Enviado":            o.cotizacion?.enviado ? "Enviada" : "No enviada",
-      "Informe enviado":    o.cotizacion?.informeEnviado ? "Enviado" : "No enviado",
-      "Estado de servicio": grupoOT?.parent?.estadoGeneral || "Sin OT",
-      "Estado Informes":    grupoOT?.parent?.estadoInformes || "—",
-      "GRE":                (grupoOT?.parent && greMap[grupoOT.parent._id]) || "Sin GRE",
-    };
-    const filaPartida = (p, idx) => {
+    const fila = (p, idx) => {
       const estado = p && estadoDePartida(o, p);
       const totales = p ? totalesDuales(p.subtotal, o.cotizacion?.moneda, tipoCambio) : {};
+      const cot = p ? p.cotizacion : o.cotizacion;
+      const ots = p ? (otsCot[idCotDe(p)] || []) : [grupoOT?.parent].filter(Boolean);
+      const subs = p ? ots.flatMap((ot) => subsOT[ot._id] || []) : grupoOT?.subs || [];
+      const tc = textoCotizacion(cot);
       return {
-        ...base,
-        "Partida":                  p ? `${idx + 1}/${partidas.length}` : "—",
-        "Cotización de la partida": p ? (p.cotizacion?.numeroCotizacion || p.cotizacion?.codigo || "—") : "—",
-        "OT de la partida":         p ? (otsCot[idCotDe(p)]?.join(", ") || "—") : "—",
-        "Título de la partida":     p ? (p.titulo || p.cotizacion?.titulo || "—") : "—",
+        "Partida":            p ? `${idx + 1}/${partidas.length}` : "—",
+        "Cotización":         (p ? cot?.numeroCotizacion || cot?.codigo : cot?.numeroCotizacion) || "—",
+        "N° Orden de Compra": o.numeroOrden || "—",
+        "Fecha de creación":  o.createdAt ? formatearFecha(o.createdAt) : "—",
+        "N° OT":              ots.map(numeroOTDe).join(", ") || "—",
+        "Sub-OTs":            subs.map((s) => s.numeroOT).join(", ") || "—",
+        "N° Factura OC":      o.estadoFacturacion?.numerosFactura || "—",
+        "Estado facturación OC": o.estadoFacturacion?.estado || "—",
+        "Partidas facturadas": partidas.length ? `${facturadasDe(o)}/${partidas.length}` : "—",
+        "Empresa":            o.empresa?.razonSocial || "—",
+        "Título":             o.titulo || "—",
+        "Título de la partida": p ? (p.titulo || cot?.titulo || "—") : "—",
         ...(puedeVerPrecios ? {
-          "Total partida (S/)":     totales.pen != null ? totales.pen.toFixed(2) : "—",
-          "Total partida (US$)":    totales.usd != null ? totales.usd.toFixed(2) : "—",
+          "Total OC (S/)":    pen != null ? pen.toFixed(2) : "—",
+          "Total OC (US$)":   usd != null ? usd.toFixed(2) : "—",
+          "Total partida (S/)":  p && totales.pen != null ? totales.pen.toFixed(2) : "—",
+          "Total partida (US$)": p && totales.usd != null ? totales.usd.toFixed(2) : "—",
         } : {}),
-        "Factura de la partida":    estado?.factura ? (estado.factura.numeroFactura || estado.factura.codigo) : "—",
-        "Estado de la partida":     estado?.estado || "—",
+        "Facturación de la partida": estado?.estado || "—",
+        "Factura de la partida":     estado?.factura ? (estado.factura.numeroFactura || estado.factura.codigo) : "—",
+        "Aprobado":           tc.aprobado,
+        "Enviado":            tc.enviado,
+        "Informe enviado":    cot?.informeEnviado ? "Enviado" : "No enviado",
+        "Estado de servicio": textoPorOT(ots, (ot) => ot.estadoGeneral, "Sin OT"),
+        "Estado Informes":    textoPorOT(ots, (ot) => ot.estadoInformes, "—"),
+        "GRE":                textoPorOT(ots, (ot) => greMap[ot._id], "Sin GRE"),
       };
     };
-    return partidas.length ? partidas.map(filaPartida) : [filaPartida(null)];
+    return partidas.length ? partidas.map(fila) : [fila(null)];
   };
 
   const exportarExcel = () => {
@@ -672,10 +744,10 @@ export default function ListaOrdenesCompra() {
   };
 
   const propsTabla = {
-    otGroupMap, otsCot, greMap, tipoCambio, puedeVerPrecios,
+    otGroupMap, otsCot, subsOT, greMap, tipoCambio, puedeVerPrecios,
     onSelect: abrirOrden, subirDocumento,
     puedeFacturarOC, seleccion, onTogglePartida: togglePartida, onToggleOC: toggleOC,
-    expandidas, onToggleExpandir: toggleExpandir,
+    onLimpiarSeleccion: limpiarSeleccion, colapsadas, onToggleExpandir: toggleExpandir,
   };
   const vacioFiltro = "Sin resultados para los filtros aplicados";
 
@@ -817,7 +889,7 @@ export default function ListaOrdenesCompra() {
         />
       )}
 
-      {TABLAS_ESTADO.filter(({ estado }) => vistaEfectiva === "todas" || vistaEfectiva === estado).map(({ estado, titulo, acento, vacio }) => (
+      {tablasVisibles.map(({ estado, titulo, acento, vacio }) => (
         <TablaOC
           key={estado}
           {...propsTabla}
