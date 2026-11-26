@@ -401,6 +401,9 @@ export default function EmitirComprobante() {
   const cuotasCuadran = Math.abs(sumaCuotas - montoNetoPendiente) < 0.005;
 
   const ro = !!resultado?.ok || resultado?.estado === "ERROR";
+  // Partidas de una OC: el monto de cada una lo fija la OC (precios de la API, solo lectura) y el
+  // backend rechaza un comprobante cuya base no sea la suma de las partidas. Solo la descripción se edita.
+  const montosFijos = !!ocOrigen && partidasOC.length > 0;
 
   const ordenesCompraFiltradas = ordenesCompra.filter((o) => {
     if (!filtroOC.trim()) return true;
@@ -620,7 +623,7 @@ export default function EmitirComprobante() {
         setError(res.status === 409 && data.serie
           ? `${mensaje} El correlativo ${data.serie} quedó anulado sin enviarse a SUNAT.`
           : mensaje);
-      } else if (ocOrigen && data.estado === "ACEPTADO") {
+      } else if (ocOrigen && tipoDoc === "01" && data.estado === "ACEPTADO") {
         await crearFacturaInterna(data);
       }
     } catch {
@@ -662,7 +665,6 @@ export default function EmitirComprobante() {
       return;
     }
     const factura = await resF.json();
-    setFacturaInterna(factura);
     // Enlaza el Comprobante ya emitido con esta Factura recién creada — la Factura no podía
     // existir antes (necesita el número ya emitido en SUNAT), así que el vínculo se completa acá,
     // no en el POST /cpe/factura de arriba (ver vincularFactura en comprobante.controller.js).
@@ -672,8 +674,10 @@ export default function EmitirComprobante() {
     });
     if (!resV.ok) {
       const motivo = await mensajeError(resV, "");
-      setError(`La factura ${factura.codigo} se creó, pero no se pudo vincular al comprobante ${dataCpe.serie}${motivo ? `: ${motivo}` : "."} Verifica manualmente.`);
+      setError(`Atención: la factura ${factura.codigo} se creó, pero NO quedó vinculada al comprobante ${dataCpe.serie}${motivo ? ` (${motivo})` : ""}. Revisa el comprobante en Facturación Electrónica o avisa al administrador.`);
+      return;
     }
+    setFacturaInterna(factura);
   };
 
   const nuevo = () => {
@@ -730,7 +734,7 @@ export default function EmitirComprobante() {
         <div className="bg-amber-50 border border-amber-200 text-amber-700 text-sm rounded-lg px-4 py-3 mb-5">
           Comprobante <strong>{resultado.serie}</strong> EN PROCESO — SUNAT aún no confirma el resultado.
           Verifica el estado más tarde en la lista de comprobantes.
-          {ocOrigen && (
+          {ocOrigen && tipoDoc === "01" && (
             <span className="block mt-1">
               El registro interno de la Factura de la orden de compra se creará cuando «Consultar estado» confirme que SUNAT lo aceptó.
             </span>
@@ -754,7 +758,8 @@ export default function EmitirComprobante() {
           <span className="text-sm font-medium text-gray-500">Tipo de comprobante:</span>
           {[["01", "Factura"], ["03", "Boleta"], ["07", "Nota de Crédito"], ["08", "Nota de Débito"]].map(([v, label]) => (
             <button
-              key={v} type="button" disabled={ro}
+              key={v} type="button" disabled={ro || (!!ocOrigen && v !== "01")}
+              title={ocOrigen && v !== "01" ? "Una orden de compra solo se factura con Factura." : undefined}
               onClick={() => cambiarTipoDoc(v)}
               className={`px-5 py-1.5 rounded-full text-sm font-medium transition ${
                 tipoDoc === v
@@ -785,7 +790,7 @@ export default function EmitirComprobante() {
               <div className="flex gap-3">
                 {TIPO_MONEDA.map((m) => (
                   <button
-                    key={m.valor} type="button" disabled={ro}
+                    key={m.valor} type="button" disabled={ro || montosFijos}
                     onClick={() => setMoneda(m.valor)}
                     className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
                       moneda === m.valor
@@ -948,7 +953,7 @@ export default function EmitirComprobante() {
           <span className="text-sm font-medium text-gray-500">Este comprobante es por:</span>
           {TIPO_ITEM.map((t) => (
             <button
-              key={t.valor} type="button" disabled={ro}
+              key={t.valor} type="button" disabled={ro || montosFijos}
               onClick={() => cambiarTipoBienServicio(t.valor)}
               className={`px-5 py-1.5 rounded-full text-sm font-medium transition ${
                 tipoBienServicio === t.valor
@@ -991,12 +996,12 @@ export default function EmitirComprobante() {
                     <td className="px-3 py-2">
                       <input type="number" min="0" step="0.01" value={item.cantidad}
                         onChange={(e) => handleItem(item._key, "cantidad", e.target.value)} onWheel={(e) => e.target.blur()}
-                        required disabled={ro}
+                        required disabled={ro || montosFijos}
                         className="w-full input-field w-auto" />
                     </td>
                     <td className="px-3 py-2">
                       <select value={item.unidad} onChange={(e) => handleItem(item._key, "unidad", e.target.value)}
-                        disabled={ro || tipoBienServicio === "servicio"} className="w-full input-field w-auto">
+                        disabled={ro || montosFijos || tipoBienServicio === "servicio"} className="w-full input-field w-auto">
                         {unidadesPorTipoItem(tipoBienServicio).map((u) => (
                           <option key={u.valor} value={u.valor}>{u.label}</option>
                         ))}
@@ -1005,12 +1010,12 @@ export default function EmitirComprobante() {
                     <td className="px-3 py-2">
                       <input type="number" min="0" step="0.01" value={item.valorUnitario}
                         onChange={(e) => handleItem(item._key, "valorUnitario", e.target.value)} onWheel={(e) => e.target.blur()}
-                        required disabled={ro}
+                        required disabled={ro || montosFijos}
                         className="w-full input-field w-auto" />
                     </td>
                     <td className="px-3 py-2">
                       <select value={item.afectacion} onChange={(e) => handleItem(item._key, "afectacion", e.target.value)}
-                        disabled={ro} className="w-full input-field w-auto">
+                        disabled={ro || montosFijos} className="w-full input-field w-auto">
                         {AFECTACION_IGV.map((a) => (
                           <option key={a.valor} value={a.valor}>{a.label}</option>
                         ))}
@@ -1019,7 +1024,7 @@ export default function EmitirComprobante() {
                     <td className="px-3 py-2">
                       <input type="number" min="0" max="100" step="1" value={item.descuentoPorcentaje}
                         onChange={(e) => handleItem(item._key, "descuentoPorcentaje", e.target.value)} onWheel={(e) => e.target.blur()}
-                        disabled={ro}
+                        disabled={ro || montosFijos}
                         className="w-full input-field w-auto" />
                     </td>
                     <td className="px-3 py-2 text-right font-medium text-gray-800">
@@ -1027,7 +1032,9 @@ export default function EmitirComprobante() {
                     </td>
                     {!ro && (
                       <td className="px-3 py-2 text-center">
-                        <button type="button" onClick={() => eliminarItem(item._key)} className="text-red-400 hover:text-red-600">✕</button>
+                        {!montosFijos && (
+                          <button type="button" onClick={() => eliminarItem(item._key)} className="text-red-400 hover:text-red-600">✕</button>
+                        )}
                       </td>
                     )}
                   </tr>
@@ -1081,7 +1088,12 @@ export default function EmitirComprobante() {
               </tfoot>
             </table>
           </TablaScroll>
-          {!ro && (
+          {montosFijos && !ro && (
+            <p className="px-4 py-3 border-t border-gray-100 text-xs text-gray-500">
+              Los montos salen de las partidas de la orden de compra y no se editan; solo la descripción de cada línea.
+            </p>
+          )}
+          {!ro && !montosFijos && (
             <div className="px-4 py-3 border-t border-gray-100">
               <button type="button" onClick={agregarItem}
                 className="text-sm text-gray-500 hover:text-gray-800 transition">
@@ -1238,7 +1250,7 @@ export default function EmitirComprobante() {
                     </button>
                   )}
                 </div>
-                {ocOrigen && partidasOC.length > 0 && (
+                {ocOrigen && tipoDoc === "01" && partidasOC.length > 0 && (
                   <p className="text-xs text-gray-500 mt-1.5">
                     Partidas de la OC que factura este comprobante ({partidasOC.length} de {ocOrigen.partidas.length}):{" "}
                     {ocOrigen.partidas.filter((p) => partidasOC.includes(p._id)).map((p) => `«${p.titulo}»`).join(", ")}

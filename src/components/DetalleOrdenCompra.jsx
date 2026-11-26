@@ -29,10 +29,12 @@ function calcular(sub) {
 function CeldaFacturaPartida({ estado }) {
   if (!estado) return <span className="text-gray-300">—</span>;
   if (estado.factura) {
+    // Una partida "pagada" sin que su factura lo esté es una OC marcada como pagada a mano.
+    const pago = estado.estado === "pagada" ? "pagado" : estado.factura.estadoPago || "sin pago";
     return (
       <span className="flex flex-wrap items-center gap-1.5">
         <span className="font-mono text-xs text-gray-700 whitespace-nowrap">{estado.factura.numeroFactura || estado.factura.codigo}</span>
-        <Chip className={badgePago(estado.factura.estadoPago)}>{estado.factura.estadoPago || "sin pago"}</Chip>
+        <Chip className={badgePago(pago)}>{pago}</Chip>
       </span>
     );
   }
@@ -664,10 +666,11 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
               codigo={facturas.length > 1 ? `${facturas.length} facturas` : factura?.codigo}
               numero={factura?.numeroFactura} vacio={facturas.length === 0}
               onClick={factura ? () => abrirFactura(factura) : undefined} cargando={cargandoFactura}
-              onCrear={!partidas.length && puedeFacturar && estadoFact?.estado === "sin facturar" ? () => facturarPartidas([]) : undefined}
+              onCrear={!partidas.length && puedeFacturar && estadoFact?.estado === "sin facturar" && !estadoFact?.reservada
+                ? () => facturarPartidas([]) : undefined}
               crearLabel="Factura">
               {facturas.length === 1 && puedeVerPrecios && (factura.totalAPagar || factura.total) > 0 && (
-                <p className="text-xs text-gray-500">{money(factura.totalAPagar ?? factura.total, factura.moneda ?? cot?.moneda)}</p>
+                <p className="text-xs text-gray-500">{money(factura.totalAPagar || factura.total, factura.moneda ?? cot?.moneda)}</p>
               )}
               {facturas.length === 1 && factura.estadoPago && <Chip className={badgePago(factura.estadoPago)}>{factura.estadoPago}</Chip>}
               {facturas.length > 1 && (
@@ -678,6 +681,9 @@ export default function DetalleOrdenCompra({ orden, onClose, onGuardada, factura
                         onClick={(e) => { e.stopPropagation(); abrirFactura(f); }}
                         className="flex items-center gap-2 w-full text-left hover:underline">
                         <span className="font-mono text-xs text-gray-700">{f.numeroFactura || f.codigo}</span>
+                        {puedeVerPrecios && (f.totalAPagar || f.total) > 0 && (
+                          <span className="text-xs text-gray-500 tabular-nums">{money(f.totalAPagar || f.total, f.moneda ?? cot?.moneda)}</span>
+                        )}
                         <Chip className={badgePago(f.estadoPago)}>{f.estadoPago || "sin pago"}</Chip>
                       </button>
                     </li>
